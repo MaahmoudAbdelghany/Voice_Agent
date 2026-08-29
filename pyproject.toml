@@ -1,0 +1,53 @@
+[project]
+name = "voice-agent"
+version = "0.1.0"
+description = "Production-grade scalable Voice AI Agent for Customer Service"
+authors = [{ name = "Mahmoud Abdelghany" }]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    # LiveKit Voice Agent Core & Plugins
+    "livekit-agents>=0.8.0",
+    "livekit-plugins-deepgram>=0.6.0",
+    "livekit-plugins-groq>=0.2.0",
+    "livekit-plugins-elevenlabs>=0.7.0",
+    "livekit-plugins-silero>=0.6.0",
+    
+    # Vector DB & Embeddings (RAG)
+    "qdrant-client>=1.9.0",
+    "fastembed>=0.3.0",
+    
+    # Settings, Data Validation & Utilities
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.2.0",
+    "python-dotenv>=1.0.0",
+    
+    # Dashboard & UI
+    "streamlit>=1.35.0",
+    "pandas>=2.2.0",
+    "plotly>=5.22.0",
+    
+    # HTTP & Async utils
+    "httpx>=0.27.0",
+    "aiohttp>=3.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
