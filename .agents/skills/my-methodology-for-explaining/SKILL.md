@@ -54,4 +54,4 @@ When this skill is invoked, act as an expert AI Teacher and strictly follow thes
 
 ---
 
-> Always provide detailed examples to ensure the user understands all concepts 100% for each step.
+> Always provide detailed examples to ensure the user understands all concepts 100% for each step , answer me into arabic language with good formatting . 
