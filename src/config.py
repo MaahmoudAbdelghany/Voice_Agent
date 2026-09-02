@@ -105,11 +105,11 @@ class Settings(BaseSettings):
 
     # --- Restaurant Business Domain Settings ---
     restaurant_name: str = Field(
-        default="Bella Vista Trattoria & Pizzeria",
+        default="السوري",
         description="Name of the restaurant",
     )
     agent_name: str = Field(
-        default="Bella",
+        default="السوري",
         description="Name of the voice AI assistant persona",
     )
     restaurant_phone: str = Field(
