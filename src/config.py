@@ -45,8 +45,8 @@ class Settings(BaseSettings):
         description="Deepgram transcription model (e.g., nova-3, nova-2)",
     )
     deepgram_language: str = Field(
-        default="en-US",
-        description="Speech recognition language code",
+        default="ar",
+        description="Speech recognition language code (e.g. 'ar' for Arabic, 'en-US' for English)",
     )
 
     # --- LLM Reasoning - Groq Cloud ---
@@ -99,8 +99,8 @@ class Settings(BaseSettings):
         description="Target Qdrant collection name for knowledge base",
     )
     embedding_model: str = Field(
-        default="BAAI/bge-small-en-v1.5",
-        description="FastEmbed model for generating dense text vectors",
+        default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+        description="FastEmbed multilingual model for generating dense text vectors (supports Arabic)",
     )
 
     # --- Restaurant Business Domain Settings ---

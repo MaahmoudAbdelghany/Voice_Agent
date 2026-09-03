@@ -8,7 +8,7 @@
 
 ## Phase 2: RAG Knowledge Base Engine (Qdrant + FastEmbed)
 - [x] knowledge_base/restaurant_kb.md — rich restaurant domain knowledge base
-- [x] src/rag/embeddings.py — FastEmbed local embedding service (bge-small-en-v1.5)
+- [x] src/rag/embeddings.py — FastEmbed multilingual embedding service (paraphrase-multilingual-MiniLM-L12-v2)
 - [x] src/rag/retriever.py — Qdrant vector store connection & hybrid search
 - [x] src/rag/ingestion.py — markdown header-aware chunking pipeline
 - [x] scripts/ingest_knowledge.py — CLI ingestion & retrieval verification script
