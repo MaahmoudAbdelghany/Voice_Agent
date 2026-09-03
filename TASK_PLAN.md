@@ -5,7 +5,7 @@
   - Implement centralized configuration in `src/config.py` using `pydantic-settings`.
   - Validate environment loading and directory structure.
 
-- [ ] **Step 2: RAG Knowledge Base Engine (Qdrant + FastEmbed)** <!-- id: 1 -->
+- [x] **Step 2: RAG Knowledge Base Engine (Qdrant + FastEmbed)** <!-- id: 1 -->
   - Implement embedding helper in `src/rag/embeddings.py` using `fastembed`.
   - Implement Qdrant vector store connection & hybrid search in `src/rag/retriever.py`.
   - Create rich restaurant domain knowledge base (menu, ingredients, allergens, FAQs, delivery rules) in `knowledge_base/restaurant_kb.md`.
