@@ -99,7 +99,8 @@ def test_knowledge_ingestion_pipeline():
     assert indexed_count == len(chunks)
 
     # Verify querying the ingested knowledge
-    search_hits = test_retriever.search("Kunafa dessert price and ingredients", limit=3)
+    search_hits = test_retriever.search("كنافة نابلسية بالجبنة السايحة", limit=3)
     assert len(search_hits) > 0
-    found_kunafa = any("Kunafa" in hit["text"] for hit in search_hits)
+    found_kunafa = any("كنافة" in hit["text"] for hit in search_hits)
     assert found_kunafa
+

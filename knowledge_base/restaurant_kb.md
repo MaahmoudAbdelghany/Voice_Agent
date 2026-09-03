@@ -1,165 +1,174 @@
-# Al-Soury Restaurant (مطعم السوري) — Official Knowledge Base
+# مطعم السوري — قاعدة المعرفة والبيانات الرسمية (اللهجة المصرية)
 
-Welcome to the knowledge base of **Al-Soury Restaurant**, authentic Levantine and Syrian cuisine. This document serves as the primary source of truth for our Voice AI Assistant and customer service operations.
-
----
-
-## 1. Restaurant Overview & General Information
-
-- **Name**: Al-Soury Restaurant (مطعم السوري)
-- **Tagline**: Authentic Levantine Taste, Crafted with Passion.
-- **Cuisine Type**: Syrian & Levantine (Shawarma, Charcoal Grills, Mezza, Desserts)
-- **Halal Certification**: 100% Halal certified meat, poultry, and ingredients. No alcohol served or used in preparation.
-- **Main Address**: 123 Culinary Boulevard, Downtown, Suite 100.
-- **Branch Locations**:
-  - **Downtown Branch (Flagship)**: 123 Culinary Boulevard, Downtown.
-  - **Westside Branch**: 742 Evergreen Terrace, Westside District.
-- **Phone Number**: +1 (555) 234-5678 / +1 (555) AL-SOURY
-- **Customer Support Email**: support@alsoury-restaurant.com
-- **Operating Hours**:
-  - **Monday to Thursday**: 11:00 AM – 11:00 PM
-  - **Friday to Saturday**: 11:00 AM – 12:00 AM (Midnight)
-  - **Sunday**: 11:00 AM – 10:30 PM
-- **Dine-in, Takeout & Delivery**: Available all operating hours.
+أهلاً بيكم في قاعدة بيانات ومعلومات **مطعم السوري** (أكل شامي وسوري على أصوله). الملف ده هو المرجع الأساسي لمساعد الذكاء الاصطناعي الصوتي وخدمة العملاء والرد على التليفونات.
 
 ---
 
-## 2. Menu, Ingredients & Pricing
+## 1. معلومات عامة عن مطعم السوري وفروعه
 
-### 2.1 Shawarma Specialties
+- **اسم المطعم**: مطعم السوري (Al-Soury Restaurant)
+- **الشعار**: الطعم الشامي الأصلي.. معمول بحب في قلب مصر!
+- **نوع الأكل**: مأكولات سورية وشامية (شاورما صاج، فتة، مشاوي على الفحم، مقبلات، حلويات شامية).
+- **الذبح الحلال والجودة**: كل اللحوم والفراخ حلال 100% طازجة يومياً من مزارع معتمدة، ومفيش أي منتجات كحولية إطلاقاً.
+- **فروعنا في القاهرة والجيزة**:
+  - **فرع مدينة نصر**: شارع عباس العقاد، بجوار الجامعة العمالية.
+  - **فرع التجمع الخامس**: شارع التسعين الشمالي، مول سيلفر ستار.
+  - **فرع الدقي / المهندسين**: شارع مصدق، تقاطع شارع السودان.
+  - **فرع الشيخ زايد**: وصلة دهشور، أمام مول العرب.
+- **رقم التليفون والخط الساخن**: 19876 (رقم مختصر موحد) / أو واتساب وموبايل: 01012345678.
+- **مواعيد العمل في كل الفروع**:
+  - **من السبت للأربعاء**: من الساعة 11:00 الصبح لحد 2:00 بالليل.
+  - **الخميس والجمعة**: من الساعة 11:00 الصبح لحد 3:00 الفجر.
+- **الخدمات المتاحة**: صالة لتناول الطعام (تيك أواي)، واستلام من المطعم، وخدمة دليفري وتوصيل سريع للبيوت والمكاتب.
 
-| Item | Price | Description & Key Ingredients |
+---
+
+## 2. منيو الأكلات والأسعار والمكونات
+
+### 2.1 سندوتشات ووجبات الشاورما السوري
+
+| الصنف | السعر (جنيه مصري) | الوصف والمكونات بالتفصيل |
 |:---|:---|:---|
-| **Chicken Shawarma Wrap** | $9.99 | Thinly sliced marinated chicken breast wrapped in Saj bread with authentic Syrian toum (garlic whip), wild pickles, and hand-cut fries inside. |
-| **Beef Shawarma Wrap** | $11.49 | Tender spiced beef striploin shavings in Saj bread with sumac onions, fresh parsley, grilled tomatoes, and creamy tahini sauce. |
-| **Chicken Shawarma Arabi Platter** | $15.99 | Sliced chicken shawarma roll served bite-sized with golden french fries, extra toum garlic dip, pickles, and coleslaw salad. |
-| **Beef Shawarma Arabi Platter** | $17.49 | Sliced beef shawarma roll served bite-sized with french fries, tahini sauce, biwaz (sumac onion-parsley salad), and pickled turnips. |
-| **Mixed Shawarma Plate** | $18.99 | Generous portion of both chicken and beef shawarma over fragrant saffron basmati rice, served with both toum and tahini sauce, hummus, and pita bread. |
+| **ساندوتش شاورما فراخ صاج** | 85 ج | شرايح صدور فراخ متبلة بالبهارات الشامية في عيش صاج مقرمش على الجريل، مع التومية السوري الأصلية، وخيار مخلل مقرمش، وشوية بطاطس محمرة جوة الساندوتش. |
+| **ساندوتش شاورما فراخ صاروخ (حجم كبير)** | 115 ج | ساندوتش شاورما فراخ حجم سوبر جامبو في عيش صاج دبل، غرقان تومية ومخلل وبطاطس. |
+| **ساندوتش شاورما لحمة بلدي صاج** | 105 ج | شرايح لحمة بقري بلدي متبلة مع بقدونس فريش، بصل بالسماق، طماطم مشوية، وصوص طحينة سمسم بلدي مخصوصة. |
+| **ساندوتش شاورما لحمة صاروخ (حجم كبير)** | 140 ج | ساندوتش شاورما لحمة بلدي حجم كبير جداً في عيش صاج ومتحمص على الفحم. |
+| **وجبة شاورما فراخ عربي** | 145 ج | رول شاورما فراخ صاج متقطع قطع صغيرة (سلايس)، ينزل معاه بطاطس محمرة مقرمشة، علبة تومية، مخلل لفت وخيار، وسلطة كول سلو. |
+| **وجبة شاورما لحمة عربي** | 165 ج | رول شاورما لحمة صاج متقطع، معاه بطاطس محمرة، صوص طحينة، مخلل، وبصل بالسماق والبيواز. |
+| **وجبة شاورما ميكس عربي (دبل)** | 185 ج | نص رول فراخ ونص رول لحمة، مع بطاطس، تومية، وطحينة، ومخللات. |
+| **فتة شاورما فراخ سوري** | 135 ج | طبق فتة سوري غني: رز بسمتي أصفر مبهر، فوقه شرايح شاورما الفراخ المتشوحة، عيش شامي مقلي ومقرمش، ونازل عليها صوص تومية كريمي ورشة بقدونس ومكسرات. |
+| **فتة شاورما لحمة سوري** | 155 ج | رز بسمتي، شرايح شاورما لحمة بلدي، عيش مقرمش، صوص طحينة وتومية، ولوز محمص. |
+| **فتة شاورما ميكس (لحمة وفراخ)** | 165 ج | مكس بين شاورما الفراخ وشاورما اللحمة على الرز البسمتي والعيش المقلي وصوصات الشيف. |
 
-### 2.2 Charcoal Grills & BBQ
+### 2.2 المشاوي على الفحم والكباب
 
-| Item | Price | Description & Key Ingredients |
+| الصنف | السعر (جنيه مصري) | الوصف |
 |:---|:---|:---|
-| **Shish Tawook Skewers** | $16.99 | Two skewers of tender chicken breast marinated in yogurt, garlic, lemon, and Levantine spices, grilled over natural charcoal. Served with garlic sauce, grilled tomato, onion, and spiced rice or fries. |
-| **Aleppo Kebab (Kebab Halabi)** | $17.99 | Two skewers of finely minced lamb and beef blended with Aleppo pepper, pine nuts, and Syrian spices. Served over fire-roasted spicy tomato-pepper salsa and saffron rice. |
-| **Kufta Kebab Skewers** | $16.49 | Seasoned ground beef and lamb with parsley and minced onions, grilled to perfection. Served with sumac biwaz and basmati rice. |
-| **Mixed Grill Feast (Single)** | $22.99 | One skewer Shish Tawook, one skewer Kebab Halabi, and tender beef tikka cubes. Served with garlic dip, grilled vegetables, hummus, and warm pita. |
-| **Sultani Mixed Grill Platter (Serves 3-4)** | $69.99 | 4 skewers Tawook, 4 skewers Kebab, beef tikka, grilled chicken wings, large basmati rice, hummus, mutabbal, batata harra, and 6 pitas. |
+| **وجبة شيش طاووق على الفحم** | 170 ج | سيخين شيش صدور فراخ متبلة بالزبادي والليمون والتوم، مشوية على الفحم الطبيعي، مع رز بسمتي، بطاطس، وتومية وعيش. |
+| **وجبة كباب حلبي متبل** | 195 ج | سيخين كباب مفروم لحمة ضاني وعجالي بخلطة التوابل الحلبية والفستق، مع رز بسمتي، طماطم وبصل مشوي، وعيش بيواز. |
+| **وجبة كفتة مشوية على الفحم** | 165 ج | تلات سياخ كفتة بلدي مشوية على الجمر، متبلة بالبصل والبقدونس وبهارات السوري، مع طحينة وعيش سخن وبطاطس. |
+| **وجبة نص فرخة مشوية على الفحم** | 140 ج | نص فرخة متبلة على الطريقة السورية ومشوية ع الجمر، بتنزل مع رز أو بطاطس، تومية، مخلل، وعيش شامي. |
+| **وجبة ميكس جريل مشكل فردي** | 240 ج | سيخ شيش طاووق + سيخ كباب حلبي + سيخ كفتة + قطعة ريشة أو تكا لحمة، مع رز وسلطات وعيش. |
+| **صينية عائلية (صينية السوري تكفي 4 لـ 5 أفراد)** | 750 ج | 4 سياخ طاووق + 4 سياخ كفتة + 4 سياخ كباب + نص فرخة مشوية + سيرفيس رز بسمتي بالمكسرات + بطاطس عائلي + 2 تومية + 2 طحينة + مخللات و8 عيش صاج. |
 
-### 2.3 Hot & Cold Mezza (Appetizers)
+### 2.3 المقبلات الشامية والتسالي السخنة والباردة
 
-| Item | Price | Description & Dietary Info |
+| الصنف | السعر (جنيه مصري) | التفاصيل والمكونات |
 |:---|:---|:---|
-| **Traditional Hummus** | $6.99 | Silky chickpea puree with tahini, freshly squeezed lemon juice, drizzled with cold-pressed extra virgin olive oil. *[Vegan, Gluten-Free]* |
-| **Hummus with Shawarma** | $10.99 | Our classic hummus topped with warm, spiced chicken or beef shawarma shavings and toasted pine nuts. |
-| **Mutabbal (Smoked Eggplant)** | $7.49 | Fire-roasted eggplant blended with tahini, yogurt, garlic, and lemon, garnished with pomegranate seeds. *[Vegetarian, Gluten-Free]* |
-| **Baba Ghanoush** | $7.49 | Roasted eggplant tossed with diced bell peppers, tomatoes, fresh mint, parsley, walnuts, and pomegranate molasses. *[Vegan, Gluten-Free]* |
-| **Syrian Fried Kibbeh (4 pcs)** | $8.99 | Crispy bulgur shells stuffed with spiced ground beef, onions, and roasted pine nuts. Served with mint labneh dip. |
-| **Batata Harra (Spicy Potatoes)** | $6.99 | Crispy potato cubes tossed with roasted garlic, chili flakes, fresh cilantro, and a splash of lemon juice. *[Vegan, Gluten-Free]* |
-| **Falafel Plate (6 pcs)** | $7.49 | Golden crispy chickpea-herb fritters served with tahini sauce, pickled turnips, and fresh mint. *[Vegan, Gluten-Free]* |
-| **Syrian Cheese Rolls (4 pcs)** | $7.99 | Crispy phyllo rolls stuffed with Akkawi and Mozzarella cheese with nigella seeds and fresh parsley. *[Vegetarian]* |
+| **علبة تومية سوري أصلية** | 25 ج | تومية بيضا كريمية معمولة بالثوم الطبيعي، زيت، ليمون، ونشا (نباتية وصيامية 100% بدون بيض وبدون مايونيز وبدون لبن). |
+| **علبة تومية سبايسي حارة** | 25 ج | تومية سوري مضاف ليها شطة سورية ودبس فليفلة حلبية حارة لعشاق السبايسي. |
+| **طبق حمص شامى بالطحينة** | 45 ج | حمص بيوريه ناعم جداً مع الطحينة الخام وعصير الليمون، مع رشة زيت زيتون بكر بكر على الوش. |
+| **طبق حمص بالشاورما** | 85 ج | حمص شامى كريمي وعليه من فوق شرايح شاورما فراخ أو لحمة سخنة مع لوز وصنوبر محمص. |
+| **متبل بتنجان مشوي** | 45 ج | بتنجان رومي مشوي على الفحم ومهروس مع طحينة وزبادي ولمون وزيت زيتون. |
+| **بابا غنوج سوري** | 45 ج | بتنجان مشوي مع فلفل ألوان وطماطم ودبس رمان وجوز ونعناع فريش (نباتي صيامي). |
+| **بطاطس حارة (بطاطا حرة)** | 45 ج | مكعبات بطاطس مقلية دهبية متقلبة مع توم مهروس، كزبرة خضرا، شطة، وعصير ليمون. |
+| **سمبوسك جبنة (4 قطع)** | 50 ج | رقائق سمبوسك مقرمشة محشية مكس جبن عكاوي وموتزاريلا مع حبة البركة. |
+| **كبيبة شامي مقلية (4 قطع)** | 75 ج | أقراص برغل مقرمشة محشية لحمة مفرومة مع بصل ومكسرات ومقلية بالسمنة. |
+| **طبق بطاطس محمرة فارم فريتس** | 35 ج | صوابع بطاطس مقرمشة مع رشة بهارات بطاطس سورية. |
 
-### 2.4 Salads & Fresh Greens
+### 2.4 السلطات الفريش
 
-| Item | Price | Description & Dietary Info |
+| الصنف | السعر (جنيه مصري) | الوصف |
 |:---|:---|:---|
-| **Fattoush Salad** | $8.49 | Crisp romaine, cucumbers, cherry tomatoes, radishes, purslane/mint, crispy toasted pita chips, dressed in tangy pomegranate sumac vinaigrette. *[Vegan, GF without pita chips]* |
-| **Authentic Tabbouleh** | $8.99 | Finely chopped Italian parsley, fresh mint, diced tomatoes, sweet onions, fine cracked wheat (bulgur), seasoned with lemon juice and olive oil. *[Vegan]* |
-| **Levantine Village Salad** | $7.99 | Diced cucumber, tomato, red onion, kalamata olives, dried za'atar, crumbled feta cheese, and olive oil dressing. *[Vegetarian, Gluten-Free]* |
+| **سلطة فتوش سوري بالدبس** | 50 ج | خس كابوتشا، خيار، طماطم، فجل، نعناع فريش، عيش شامي مقلي مقرمش، ودريسنج دبس رمان وزيت زيتون وسماق. |
+| **سلطة تبولة خضرا** | 55 ج | بقدونس مفروم ناعم جداً، نعناع، طماطم مكعبات، برغل ناعم، ليمون وزيت زيتون صافي. |
+| **سلطة كول سلو** | 30 ج | كرنب مبشور وجزر في صوص مايونيز خفيف وحلو. |
 
-### 2.5 Desserts & Sweets
+### 2.5 الحلويات الشامية
 
-| Item | Price | Description |
+| الصنف | السعر (جنيه مصري) | الوصف |
 |:---|:---|:---|
-| **Kunafa Nabulsia** | $8.99 | Warm, stretchy sweet Nabulsi cheese baked beneath golden shredded kataifi dough, soaked in orange blossom sugar syrup and crushed pistachios. |
-| **Halawet El Jibn** | $8.49 | Sweet semolina and cheese dough rolls stuffed with rich clotted cream (Ashta), garnished with pistachio powder and rose petal jam. |
-| **Artisanal Baklava Assortment (4 pcs)** | $6.99 | Flaky phyllo pastry layers filled with Antep pistachios and walnuts, sweetened with light fragrant syrup. |
-| **Muhalabia (Milk Pudding)** | $5.49 | Traditional chilled milk and mastic pudding infused with rose water, topped with toasted almond slivers and pistachios. *[Vegetarian, Gluten-Free]* |
+| **كنافة نابلسية بالجبنة السايحة** | 65 ج | كنافة شعر برتقالي سخنة بتتعمل مخصوص على الفحم محشية جبنة عكاوي مطاطة وبتتسقى شربات خفيف ورشة فستق حلبي. |
+| **طبق حلاوة الجبن بالقشطة البلدي** | 60 ج | رولات سميد وجبنة محشية قشطة بلدي طازة، متزينة بفستق ومربى زهر الليمون. |
+| **مشكل بقلاوة سوري (4 قطع)** | 55 ج | جلاش مقرمش مورق ومحشي فستق وعين جمل وعسل نحل. |
+| **مهلبية شامية بالمستكة** | 40 ج | مهلبية حليب ساقعة بمستكة أصلية وماء ورد مع رشة مكسرات. |
 
-### 2.6 Beverages
+### 2.6 المشروبات والعصائر
 
-| Item | Price | Description |
+| الصنف | السعر (جنيه مصري) | التفاصيل |
 |:---|:---|:---|
-| **Fresh Mint Lemonade (Limonada)** | $4.49 | Freshly squeezed lemons blended with fresh mint leaves and crushed ice. |
-| **Chilled Ayran (Laban Shenina)** | $3.49 | Refreshing salted yogurt drink with a hint of dried mint. |
-| **Pomegranate Blossom Iced Tea** | $3.99 | Brewed black Ceylon tea infused with pomegranate juice and orange blossom. |
-| **Damascus Floral Tea (Hot)** | $3.49 | Black tea steeped with fresh sage, cardamom pods, and mint sprigs. |
-| **Soft Drinks (Can)** | $2.49 | Coke, Diet Coke, Sprite, Fanta, Sparkling Water. |
+| **عصير ليمون بالنعناع فريش** | 35 ج | ليمون طازة مع ورق نعناع وتلج مجروش منعش جداً. |
+| **لبن عيران ساقع (شنينة)** | 25 ج | زبادي مملح مخفوق ساقع مع رشة نعناع مجفف هاضم وممتاز مع الشاورما. |
+| **شاي سوري بالنعناع أو المرمرية** | 20 ج | براد شاي تقيل ومظبوط على الفحم. |
+| **كانز مياه غازية (بيبسي / سفن / ميريندا)** | 20 ج | كل المشروبات الغازية المتاحة. |
+| **مياه معدنية (صغيرة)** | 10 ج | مياه شرب معبأة. |
 
 ---
 
-## 3. Dietary Guidelines & Allergen Information
+## 3. معلومات الحساسية والدايت (مهمة جداً للعملاء)
 
-- **Halal**: All food is 100% Halal certified.
-- **Vegetarian Friendly**: Hummus, Mutabbal, Baba Ghanoush, Falafel, Cheese Rolls, Fattoush, Tabbouleh, Batata Harra, Kunafa, Halawet El Jibn, Muhalabia.
-- **Vegan Options**: Hummus, Baba Ghanoush, Falafel, Batata Harra, Fattoush (no pita chips), Tabbouleh.
-- **Gluten-Free**:
-  - Naturally GF: Hummus, Mutabbal, Baba Ghanoush, Batata Harra, Shish Tawook (specify rice instead of bread), Aleppo Kebab (specify GF side), Muhalabia.
-  - Contains Gluten: Pita bread, Saj wraps, Bulgur (in Kibbeh and Tabbouleh), Baklava, Kunafa, Cheese Rolls.
-- **Nut Allergies**: Pistachios, walnuts, and pine nuts are used in our kitchen (Baklava, Kunafa, Kibbeh, Aleppo Kebab). Please inform the agent/staff of severe nut allergies so kitchen takes dedicated allergen precautions.
-- **Dairy Allergens**: Toum (garlic sauce) is **100% dairy-free and egg-free** (made purely with fresh garlic, oil, lemon, and salt). Dairy is present in Mutabbal (yogurt), Cheese Rolls, Ayran, Kunafa, Halawet El Jibn, and Muhalabia.
-
----
-
-## 4. Delivery Policies, Timing & Fees
-
-- **Delivery Radius**: We deliver within a **10-mile radius** from our Downtown and Westside branches.
-- **Minimum Order Value**: $15.00 before taxes and fees.
-- **Delivery Fee Structure**:
-  - Flat rate of **$3.99** for delivery within 5 miles.
-  - **$5.99** for delivery between 5 and 10 miles.
-  - **Free Delivery** on orders of **$45.00** or more!
-- **Estimated Delivery Time**:
-  - Standard hours: **30 to 45 minutes**.
-  - Peak hours (Friday/Saturday dinner 6:30 PM - 9:00 PM): **45 to 60 minutes**.
-- **Live Order Tracking**:
-  - Customers receive an SMS with live GPS driver tracking upon dispatch.
-  - Callers can inquire about order status anytime by providing their **Order ID** (e.g., `ORD-101`, `ORD-204`) or their registered phone number.
-- **Order Modification & Cancellation**:
-  - Orders can be modified or cancelled within **5 minutes** of placement without fee.
-  - Once an order status is "In Kitchen / Preparing", items cannot be cancelled.
+- **هل التومية فيها بيض أو مايونيز؟**
+  - **الإجابة**: لأ نهائياً! التومية في مطعم السوري معمولة على الطريقة السورية التقليدية الأصلية: توم مقشر فريش، زيت ذرة نقي، ماية مثلجة، نشا، ليمون، وملح. **مفيهاش نقطة مايونيز، ومفيهاش بيض، ومفيهاش أي ألبان**، عشان كده هي مناسبة 100% للنباتيين والصياميين والإخوة المسيحيين وأصحاب حساسية البيض والألبان.
+- **الأكل الحلال**: كل اللحوم والفراخ مذبوحة حلال 100% وطازة، ومفيش أي دهن خنزير أو كحوليات في أي منتج.
+- **أصحاب حساسية الجلوتين (حساسية القمح)**:
+  - عيش الصاج والعيش الشامي والبرغل (في الكبيبة والتبولة) والكنافة بيحتووا على جلوتين.
+  - يقدر العميل يطلب: فراخ شيش طاووق، كباب، رز بسمتي، حمص، متبل، سلطة خضرا بدون عيش، أو شاورما في طبق بدون عيش.
+- **أصحاب حساسية المكسرات والفول السوداني**:
+  - الفستق واللوز وعين الجمل موجودين في الحلويات (البقلاوة والكنافة وحلاوة الجبن) والفتة والكبيبة والكباب الحلبي. لو العميل عنده حساسية مكسرات، يقدر يبلغنا في الأوردر وبنعمله الوجبة أو الفتة بدون أي مكسرات تماماً في منطقة تحضير مخصصة.
+- **أكل نباتي (Vegetarian & Vegan)**:
+  - سندوتشات الفلافل السوري، الحمص، بابا غنوج، البطاطا الحرة، الفتوش (بدون عيش مقلي لو جلوتين)، التومية، والبطاطس المحمرة كلها أكلات نباتية تماماً.
 
 ---
 
-## 5. Table Reservations & Dine-in Policy
+## 4. سياسة التوصيل (الدليفري) والأسعار والتتبع
 
-- **Party Sizes Accepted**: 1 to 20 guests via voice or online reservation.
-- **Advance Booking Window**: Up to 30 days in advance.
-- **Reservation Details Required**:
-  1. Customer Full Name
-  2. Contact Phone Number
-  3. Date and Preferred Time
-  4. Number of Guests (Party Size)
-  5. Seating Preference (Indoor Main Dining Room, Outdoor Heated Patio, Private Family Booth)
-  6. Special Requests (High chair, birthday celebration, dietary note)
-- **Large Parties (9+ guests)**:
-  - Parties greater than 8 people require a deposit of $10/person or advance confirmation 24 hours prior.
-- **Grace Period**: Tables are held for **15 minutes** past the reservation time before being released to walk-in guests.
-- **Peak Wait Times (Walk-ins)**: Weekend wait times for walk-ins can reach 30-45 minutes. Reservations are highly recommended.
-
----
-
-## 6. Catering & Special Events
-
-- **Corporate & Family Catering**: Available for groups of 15 to 300 people.
-- **Notice Period**: At least 48 hours notice required for catering orders.
-- **Customization**: Shawarma live carving stations and charcoal grill setups available upon request.
+- **مناطق التوصيل**:
+  - بنغطي كل أحياء القاهرة والجيزة المحيطة بفروعنا (مدينة نصر، مصر الجديدة، التجمع الأول والخامس، المعادي، الدقي، المهندسين، الزمالك، العجوزة، الشيخ زايد، و6 أكتوبر).
+- **الحد الأدنى للطلب (Minimum Order)**:
+  - الحد الأدنى لأوردر الدليفري هو **100 جنيه مصري**.
+- **مصاريف التوصيل**:
+  - رسوم التوصيل بتبدأ من **20 جنيه** للمناطق القريبة (أقل من 5 كم من الفرع)، وتصل لـ **35 جنيه** للمناطق الأبعد.
+  - **توصيل مجاني تماماً** لأي أوردر قيمته **400 جنيه أو أكتر**!
+- **وقت التوصيل المتوقع**:
+  - في الأيام العادية: من **35 لـ 50 دقيقة** من لحظة تأكيد الأوردر.
+  - في أوقات الذروة والويك إند (الخميس والجمعة بالليل): من **45 لـ 60 دقيقة**.
+- **تتبع حالة الأوردر (Order Tracking)**:
+  - لما العميل بيطلب من الوكيل الصوتي، بيقدر يسأله في أي وقت برقم الأوردر (زي `ORD-101` أو `ORD-204`) أو برقم تليفونه، والنظام هيبلغه فوراً بحالة الأوردر (مثلاً: "الأوردر بتاعك بيتحضر في المطبخ ونازل مع الطيار بعد 10 دقايق").
+- **تعديل أو إلغاء الأوردر**:
+  - يقدر العميل يعدل أو يلغي طلبه خلال **5 دقايق** من وقت الطلب قبل ما يبدأ المطبخ يلف السندوتشات.
 
 ---
 
-## 7. Frequently Asked Questions (FAQs)
+## 5. حجز الترابيزات والمناسبات في الصالة
 
-**Q: Is your chicken garlic sauce made with mayo or dairy?**
-*A:* No! Our traditional Syrian toum is made strictly of fresh peeled garlic, pure oil, fresh lemon juice, ice water, and salt. It contains zero mayonnaise, zero eggs, and zero dairy.
+- **الحجز مسبقاً**:
+  - متاح حجز ترابيزات لأي عدد من فردين لحد 30 فرد عبر المكالمة الصوتية أو الأبلكيشن.
+  - يفضل الحجز قبل المعاد بساعتين على الأقل، وفي الويك إند قبلها بيوم.
+- **البيانات المطلوبة لتأكيد الحجز**:
+  1. اسم العميل ورقم موبايله.
+  2. الفرع المطلوب (مدينة نصر، التجمع، الدقي، زايد).
+  3. اليوم والميعاد بالظبط.
+  4. عدد الأفراد (كبار وأطفال).
+  5. مكان القعدة (صالة داخلية مكيفة، أو قعدة أوت دور في الهواء الطلق، أو ركن عائلات خاص).
+  6. لو في مناسبة خاصة (عيد ميلاد، كتب كتاب، احتفال) أو طلب كرسي أطفال (Baby chair).
+- **فترة السماح**: الترابيزة بتفضل محجوزة لمدة **15 دقيقة** بعد الميعاد المحدد، لو العميل اتأخر أكتر من كده والفرع زحمة بتتسلم لعملاء الويتينج.
 
-**Q: Can I customize my shawarma sandwich?**
-*A:* Absolutely! Callers can request extra garlic, no pickles, extra tahini, spicy shatta chili sauce on the side, or have it served in a bowl without bread.
+---
 
-**Q: What payment methods do you accept?**
-*A:* We accept Cash, all major Credit/Debit cards (Visa, MasterCard, Amex), Apple Pay, Google Pay, and contactless NFC.
+## 6. بوفيهات الحفلات والعزومات والشركات
 
-**Q: How do I track my active delivery?**
-*A:* State your Order ID (such as `ORD-101`) to the voice assistant, and the system will immediately check the live status (e.g., "Out for delivery with courier Karim, estimated arrival in 12 minutes").
+- بنوفر خدمة تجهيز عزومات الشركات والحفلات وأعياد الميلاد من 15 فرد لحد 500 فرد.
+- متاح توفير "سيخ شاورما لايف" وشيف شاورما مخصوص في فيلتك أو في شركتك مع جريل المشاوي.
+- يشترط التنسيق مع إدارة الحفلات قبل الميعاد بـ 48 ساعة على الأقل.
 
-**Q: Can I speak to a human manager?**
-*A:* Yes! Whenever a customer has an issue that cannot be resolved automatically, our voice assistant can escalate and transfer the call directly to the on-duty manager.
+---
+
+## 7. الأسئلة الشائعة وإجاباتها (س & ج)
+
+**س: هل عندكم توصيل لمنطقتي؟**
+*ج:* بنوصل لمدينة نصر، التجمع، مصر الجديدة، المعادي، الدقي، المهندسين، زايد، وأكتوبر. مليني عنوانك بالظبط وأنا هأكدلك الفرع الأقرب ووقت التوصيل.
+
+**س: التومية بتاعتكم فيها بيض أو مايونيز؟**
+*ج:* لأ خالص يا فندم! التومية عندنا سورية أصلية 100% بالثوم والزيت والليمون والنشا، مفيهاش أي مايونيز ولا بيض ولا ألبان وصيامية تماماً.
+
+**س: إيه أكتر حاجة مشهورة عندكم وبتنصحني أجربها؟**
+*ج:* أكتر حاجة زبايننا بيحبوها هي **وجبة الشاورما الفراخ العربي** مع التومية والمخلل والبطاطس، و**فتة الشاورما الميكس**، ولو بتحب المشاوي جرب **الشيش طاووق على الفحم** أو **الكباب الحلبي**. وللتحلية لازم تجرب **الكنافة النابلسية السخنة بالجبنة السايحة**!
+
+**س: إيه طرق الدفع المتاحة؟**
+*ج:* بنقبل الدفع كاش عند الاستلام، وكل أنواع كروت البنك (فيزا وماستركارد وميزة)، والمحافظ الإلكترونية (فودافون كاش وأورنج كاش واتصالات كاش)، وتطبيق إنستاباي (InstaPay).
+
+**س: إزاي أتابع الأوردر بتاعي اللي طلبته؟**
+*ج:* قولي بس رقم الأوردر بتاعك (مثلاً: `ORD-101`) أو رقم التليفون اللي طلبت بيه، وهأكدلك مكانه مع الطيار وفاضله كام دقيقة ويوصلك لحد الباب.
+
+**س: ينفع أكلم مدير المطعم أو حد من خدمة العملاء البشريين؟**
+*ج:* طبعاً يا فندم! لو حابب تتكلم مع مدير الفرع أو حد من زمايلنا في خدمة العملاء، هحولك فوراً لمسؤول الفرع في ثواني.

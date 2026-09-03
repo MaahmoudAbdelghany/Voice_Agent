@@ -24,21 +24,41 @@ class KnowledgeIngestionPipeline:
         self.retriever = target_retriever or retriever
 
     def _infer_category(self, section_title: str, text: str) -> str:
-        """Categorize chunk for filtered vector lookups."""
+        """Categorize chunk for filtered vector lookups supporting English and Egyptian Arabic."""
         lower_title = section_title.lower()
         lower_text = text.lower()
         
-        if any(k in lower_title for k in ["menu", "shawarma", "grill", "mezza", "salad", "dessert", "beverage", "price"]):
-            return "menu"
-        elif any(k in lower_title or k in lower_text for k in ["allergen", "dietary", "vegan", "vegetarian", "gluten", "halal", "nut"]):
+        menu_keywords = [
+            "menu", "shawarma", "grill", "mezza", "salad", "dessert", "beverage", "price",
+            "منيو", "قائمة", "شاورما", "مشاوي", "مقبلات", "سلطات", "حلويات", "مشروبات",
+            "ساندوتش", "سندوتش", "وجبات", "وجبة", "فتة", "اسعار", "أسعار", "عصائر"
+        ]
+        allergen_keywords = [
+            "allergen", "dietary", "vegan", "vegetarian", "gluten", "halal", "nut",
+            "حساسية", "مسببات", "دايت", "نباتي", "جلوتين", "حلال", "مكسرات", "ألبان", "بيض", "ثومية", "تومية"
+        ]
+        delivery_keywords = [
+            "delivery", "order", "shipping", "fee", "tracking", "cancel",
+            "توصيل", "دليفري", "أوردر", "اوردر", "طلب", "تتبع", "إلغاء", "الغاء", "شحن", "رسوم", "مصاريف"
+        ]
+        reservation_keywords = [
+            "reservation", "booking", "table", "party", "walk-in",
+            "حجز", "ترابيزة", "ترابيزات", "طاولة", "طاولات", "حجوزات", "عيد ميلاد", "أفراح"
+        ]
+        faq_keywords = ["faq", "question", "أسئلة", "اسئلة", "شائعة", "استفسارات", "سؤال"]
+        catering_keywords = ["cater", "event", "بوفيه", "حفلات", "عزومات", "ايفنت", "شركات"]
+
+        if any(k in lower_title or k in lower_text for k in allergen_keywords):
             return "allergens"
-        elif any(k in lower_title or k in lower_text for k in ["delivery", "order", "shipping", "fee", "tracking", "cancel"]):
+        elif any(k in lower_title for k in menu_keywords):
+            return "menu"
+        elif any(k in lower_title or k in lower_text for k in delivery_keywords):
             return "delivery"
-        elif any(k in lower_title or k in lower_text for k in ["reservation", "booking", "table", "party", "walk-in"]):
+        elif any(k in lower_title or k in lower_text for k in reservation_keywords):
             return "reservations"
-        elif any(k in lower_title for k in ["faq", "question"]):
+        elif any(k in lower_title for k in faq_keywords):
             return "faqs"
-        elif any(k in lower_title for k in ["cater", "event"]):
+        elif any(k in lower_title for k in catering_keywords):
             return "catering"
         return "general"
 
