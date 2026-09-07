@@ -15,7 +15,7 @@
 - [x] tests/test_rag.py — unit tests for embeddings, retriever, and ingestion
 
 ## Phase 3: Agent Tools & Domain Execution Logic
-- [ ] src/tools/schemas.py — Pydantic schemas for tool inputs and outputs
+- [x] src/tools/schemas.py — Pydantic schemas for tool inputs and outputs
 - [ ] src/tools/knowledge_search.py — RAG knowledge search tool for menu and policies
 - [ ] src/tools/order_status.py — order lookup & live delivery tracking tool
 - [ ] src/tools/reservation.py — table booking & availability reservation tool
