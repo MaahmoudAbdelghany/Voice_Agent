@@ -48,18 +48,26 @@ class KnowledgeIngestionPipeline:
         faq_keywords = ["faq", "question", "أسئلة", "اسئلة", "شائعة", "استفسارات", "سؤال"]
         catering_keywords = ["cater", "event", "بوفيه", "حفلات", "عزومات", "ايفنت", "شركات"]
 
-        if any(k in lower_title or k in lower_text for k in allergen_keywords):
-            return "allergens"
-        elif any(k in lower_title for k in menu_keywords):
-            return "menu"
-        elif any(k in lower_title or k in lower_text for k in delivery_keywords):
+        # Prioritize title-based categorization for accurate section boundaries
+        if any(k in lower_title for k in delivery_keywords):
             return "delivery"
-        elif any(k in lower_title or k in lower_text for k in reservation_keywords):
+        elif any(k in lower_title for k in reservation_keywords):
             return "reservations"
-        elif any(k in lower_title for k in faq_keywords):
-            return "faqs"
+        elif any(k in lower_title for k in allergen_keywords):
+            return "allergens"
         elif any(k in lower_title for k in catering_keywords):
             return "catering"
+        elif any(k in lower_title for k in faq_keywords):
+            return "faqs"
+        elif any(k in lower_title for k in menu_keywords):
+            return "menu"
+        # Fallback to body text keyword matching
+        elif any(k in lower_text for k in allergen_keywords):
+            return "allergens"
+        elif any(k in lower_text for k in delivery_keywords):
+            return "delivery"
+        elif any(k in lower_text for k in reservation_keywords):
+            return "reservations"
         return "general"
 
     def parse_markdown(self, file_path: Path) -> List[Dict[str, Any]]:

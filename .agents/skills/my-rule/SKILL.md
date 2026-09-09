@@ -152,3 +152,6 @@ After completing a step and pushing to GitHub, summarize the progress using this
 - [ ] Commit and push to GitHub repository.
 - [ ] Output structured progress summary.
 - [ ] Stop and request user approval to proceed.
+
+
+and finaly i want you answer me into arabic when you explain me what you done and why  with good arabic format from left to right  .
