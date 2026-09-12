@@ -43,8 +43,8 @@ The agent can:
 - [ ] Build automated ingestion pipeline (`src/rag/ingestion.py` and `scripts/ingest_knowledge.py`).
 
 ### **Phase 3: Agent Tools & Domain Logic**
-- [ ] Build Knowledge Retrieval tool (`src/tools/knowledge_search.py`).
-- [ ] Build Order Status & Tracking tool with mock order database (`src/tools/order_status.py`).
+- [x] Build Knowledge Retrieval tool (`src/tools/knowledge_search.py`).
+- [x] Build Order Status & Tracking tool with mock order database (`src/tools/order_status.py`).
 - [ ] Build Table Reservation & Booking tool (`src/tools/reservation.py`).
 - [ ] Build Human Escalation & Handoff tool (`src/tools/human_handoff.py`).
 

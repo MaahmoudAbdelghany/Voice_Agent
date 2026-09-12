@@ -17,7 +17,7 @@
 ## Phase 3: Agent Tools & Domain Execution Logic
 - [x] src/tools/schemas.py — Pydantic schemas for tool inputs and outputs
 - [x] src/tools/knowledge_search.py — RAG knowledge search tool for menu and policies
-- [ ] src/tools/order_status.py — order lookup & live delivery tracking tool
+- [x] src/tools/order_status.py — order lookup & live delivery tracking tool
 - [ ] src/tools/reservation.py — table booking & availability reservation tool
 - [ ] src/tools/human_handoff.py — human supervisor escalation & handoff tool
 - [ ] src/tools/__init__.py — tool registry and exports
