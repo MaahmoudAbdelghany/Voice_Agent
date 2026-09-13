@@ -46,7 +46,7 @@ The agent can:
 - [x] Build Knowledge Retrieval tool (`src/tools/knowledge_search.py`).
 - [x] Build Order Status & Tracking tool with mock order database (`src/tools/order_status.py`).
 - [x] Build Table Reservation & Booking tool (`src/tools/reservation.py`).
-- [ ] Build Human Escalation & Handoff tool (`src/tools/human_handoff.py`).
+- [x] Build Human Escalation & Handoff tool (`src/tools/human_handoff.py`).
 
 ### **Phase 4: Real-Time LiveKit Voice Agent Pipeline**
 - [ ] Define persona & system prompts in `src/agent/prompts.py`.

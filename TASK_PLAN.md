@@ -19,7 +19,7 @@
 - [x] src/tools/knowledge_search.py — RAG knowledge search tool for menu and policies
 - [x] src/tools/order_status.py — order lookup & live delivery tracking tool
 - [x] src/tools/reservation.py — table booking & availability reservation tool
-- [ ] src/tools/human_handoff.py — human supervisor escalation & handoff tool
+- [x] src/tools/human_handoff.py — human supervisor escalation & handoff tool
 - [ ] src/tools/__init__.py — tool registry and exports
 - [ ] tests/test_tools.py — unit tests for all domain execution tools
 
