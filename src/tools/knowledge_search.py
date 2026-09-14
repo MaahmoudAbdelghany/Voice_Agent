@@ -204,3 +204,8 @@ async def async_search_knowledge(
         score_threshold=score_threshold,
         category=category,
     )
+
+
+# Descriptive aliases for function calling registry
+search_restaurant_knowledge = search_knowledge
+async_search_restaurant_knowledge = async_search_knowledge
