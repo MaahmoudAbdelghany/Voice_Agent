@@ -21,7 +21,7 @@
 - [x] src/tools/reservation.py — table booking & availability reservation tool
 - [x] src/tools/human_handoff.py — human supervisor escalation & handoff tool
 - [x] src/tools/__init__.py — tool registry and exports
-- [ ] tests/test_tools.py — unit tests for all domain execution tools
+- [x] tests/test_tools.py — unit tests for all domain execution tools
 
 ## Phase 4: Real-Time LiveKit Voice Agent Core
 - [ ] src/agent/prompts.py — persona, system prompts, and conversation guidelines
