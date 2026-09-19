@@ -24,7 +24,7 @@
 - [x] tests/test_tools.py — unit tests for all domain execution tools
 
 ## Phase 4: Real-Time LiveKit Voice Agent Core
-- [ ] src/agent/prompts.py — persona, system prompts, and conversation guidelines
+- [x] src/agent/prompts.py — persona, system prompts, and conversation guidelines
 - [ ] src/agent/session_manager.py — call session state, turn memory, and context tracking
 - [ ] src/agent/voice_agent.py — LiveKit pipeline (Deepgram STT + Groq LLM + ElevenLabs TTS + Silero VAD + Tools)
 - [ ] scripts/test_call.py — CLI voice agent simulation runner

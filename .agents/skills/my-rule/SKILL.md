@@ -67,15 +67,10 @@ flowchart TD
 - If verification fails, diagnose and resolve the issue before committing.
 
 ### 2.4 Handling External Dependencies & Blockers
-- If a step requires external resources (e.g., API keys, HuggingFace tokens, AWS credentials, GPU compute access):
+- If a step requires external resources (e.g., API keys, HuggingFace tokens, AWS credentials, GPU compute access, user design decisions):
   - **Immediately stop execution.**
   - Clearly explain what is needed and why.
-  - Wait for the user to provide the required resource.
-
-### 2.5 Autonomous Execution (No Conversational Questions)
-- **Zero Conversational Questions**: Complete tasks autonomously without asking questions, asking for preferences, or pausing for trivial clarifications during conversation.
-- **Decisive Decision Making**: Apply standard industry best practices and make sound architectural and technical decisions directly aligned with `TASK_PLAN.md` and `implementation_plan.md`.
-- **Direct Reporting**: Deliver clear progress reports at the end of each step without interrogative or conversational questions.
+  - Wait for the user to provide the required resource or guidance.
 
 ---
 
@@ -157,9 +152,6 @@ After completing a step and pushing to GitHub, summarize the progress using this
 - [ ] Commit and push to GitHub repository.
 - [ ] Output structured progress summary.
 - [ ] Stop and request user approval to proceed.
----
 
-## 6. Language & Communication Rules
 
-1. **Autonomous Execution**: Complete tasks decisively without asking questions in the conversation. Make standard engineering decisions autonomously according to the implementation plan.
-2. **Arabic Explanations**: When explaining progress and changes, write the explanation in clear, professional Arabic with clean left-to-right formatting.
+and finaly i want you answer me into arabic when you explain me what you done and why  with good arabic format from left to right  .
