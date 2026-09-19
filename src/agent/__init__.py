@@ -12,9 +12,21 @@ from src.agent.prompts import (
     build_greeting_message,
     build_handoff_message,
     build_error_fallback_message,
+    build_interruption_acknowledgment,
+)
+from src.agent.session_manager import (
+    CallMetrics,
+    CallSession,
+    CallStatus,
+    ExtractedContext,
+    MessageRole,
+    SessionManager,
+    TurnMessage,
+    session_manager,
 )
 
 __all__ = [
+    # Prompts & Guidelines
     "DEFAULT_SYSTEM_PROMPT",
     "VOICE_STYLE_GUIDELINES",
     "TOOL_USAGE_GUIDELINES",
@@ -22,4 +34,15 @@ __all__ = [
     "build_greeting_message",
     "build_handoff_message",
     "build_error_fallback_message",
+    "build_interruption_acknowledgment",
+    # Session Management
+    "CallMetrics",
+    "CallSession",
+    "CallStatus",
+    "ExtractedContext",
+    "MessageRole",
+    "SessionManager",
+    "TurnMessage",
+    "session_manager",
 ]
+

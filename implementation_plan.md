@@ -50,7 +50,7 @@ The agent can:
 
 ### **Phase 4: Real-Time LiveKit Voice Agent Pipeline**
 - [x] Define persona & system prompts in `src/agent/prompts.py`.
-- [ ] Build session state manager in `src/agent/session_manager.py`.
+- [x] Build session state manager in `src/agent/session_manager.py`.
 - [ ] Implement the LiveKit voice worker (`src/agent/voice_agent.py`) integrating Deepgram STT + Groq LLM + ElevenLabs TTS + Silero VAD + Registered Tools.
 - [ ] Build local CLI console runner (`scripts/test_call.py`) for end-to-end testing.
 
