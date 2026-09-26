@@ -42,6 +42,8 @@ htmlcov/
 recordings/
 temp/
 scratch/
+data/calls/
+data/*.json
 
 # IDE
 .idea/

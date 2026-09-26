@@ -27,7 +27,7 @@
 - [x] src/agent/prompts.py — persona, system prompts, and conversation guidelines
 - [x] src/agent/session_manager.py — call session state, turn memory, and context tracking
 - [x] src/agent/voice_agent.py — LiveKit pipeline (Deepgram STT + Groq LLM + ElevenLabs TTS + Silero VAD + Tools)
-- [ ] scripts/test_call.py — CLI voice agent simulation runner
+- [x] scripts/test_call.py — CLI voice agent simulation runner
 - [ ] tests/test_agent.py — session orchestration and agent pipeline tests
 
 ## Phase 5: Streamlit Admin & Analytics Dashboard

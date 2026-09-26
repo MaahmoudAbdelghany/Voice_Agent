@@ -203,34 +203,34 @@ def create_voice_tools(session: Optional[CallSession] = None) -> List[Any]:
     @function_tool
     async def book_reservation(
         customer_name: str,
-        phone: str,
+        phone_number: str,
         party_size: int,
-        reservation_date: str,
-        time_slot: str,
-        branch: str = "Downtown",
+        date: str,
+        time: str,
+        branch: str = "الفرع الرئيسي",
         special_requests: str = "",
     ) -> str:
         """Check table availability and book a dining reservation for a customer.
 
         Args:
             customer_name: Full name of the primary guest.
-            phone: Mobile phone number for reservation confirmation and SMS reminders.
+            phone_number: Mobile phone number for reservation confirmation and SMS reminders.
             party_size: Number of guests (1 to 30).
-            reservation_date: Date of dining in YYYY-MM-DD format (e.g. 2026-09-23).
-            time_slot: Time slot in HH:MM format (e.g. 19:30 or 07:30 PM).
-            branch: Target restaurant branch name. Defaults to 'Downtown'.
+            date: Date of dining in YYYY-MM-DD format (or 'today', 'tomorrow').
+            time: Time slot in HH:MM format (e.g. 19:30 or 20:00).
+            branch: Target restaurant branch name. Defaults to 'الفرع الرئيسي'.
             special_requests: Optional seating requests, celebrations, high chair, or outdoor seating.
         """
         logger.info(
-            f"Tool invoked: book_reservation(name='{customer_name}', guests={party_size}, date={reservation_date}, time={time_slot})"
+            f"Tool invoked: book_reservation(name='{customer_name}', guests={party_size}, date={date}, time={time})"
         )
         try:
             res = await async_book_reservation(
                 customer_name=customer_name,
-                phone=phone,
+                phone_number=phone_number,
                 party_size=party_size,
-                reservation_date=reservation_date,
-                time_slot=time_slot,
+                date=date,
+                time=time,
                 branch=branch,
                 special_requests=special_requests or None,
             )
@@ -240,10 +240,10 @@ def create_voice_tools(session: Optional[CallSession] = None) -> List[Any]:
                     "book_reservation",
                     {
                         "customer_name": customer_name,
-                        "phone": phone,
+                        "phone_number": phone_number,
                         "party_size": party_size,
-                        "reservation_date": reservation_date,
-                        "time_slot": time_slot,
+                        "date": date,
+                        "time": time,
                         "branch": branch,
                         "special_requests": special_requests,
                     },
