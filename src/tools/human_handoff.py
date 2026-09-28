@@ -235,6 +235,18 @@ class HumanHandoffTool:
         final_department = department or inferred_dept
         final_urgency = urgency or inferred_urg
 
+        if isinstance(final_department, str):
+            try:
+                final_department = HandoffDepartmentEnum(final_department)
+            except ValueError:
+                final_department = HandoffDepartmentEnum.CUSTOMER_SUPPORT
+
+        if isinstance(final_urgency, str):
+            try:
+                final_urgency = HandoffUrgencyEnum(final_urgency)
+            except ValueError:
+                final_urgency = HandoffUrgencyEnum.MEDIUM
+
         # Select agent and calculate wait
         assigned_agent = self._pick_agent(final_department)
         wait_seconds = self._estimate_wait_time(final_urgency)

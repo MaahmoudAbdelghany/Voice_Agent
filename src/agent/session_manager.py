@@ -231,9 +231,11 @@ class CallSession(BaseModel):
         elif tool_name == "book_reservation":
             if result.get("success") or result.get("reservation_id"):
                 self.context.reservation_draft = {**arguments, **result}
-                if "customer_name" in arguments:
+                if "customer_name" in arguments and arguments["customer_name"]:
                     self.context.customer_name = arguments["customer_name"]
-                if "phone" in arguments:
+                if "phone_number" in arguments and arguments["phone_number"]:
+                    self.context.customer_phone = arguments["phone_number"]
+                elif "phone" in arguments and arguments["phone"]:
                     self.context.customer_phone = arguments["phone"]
 
         elif tool_name == "escalate_to_human":

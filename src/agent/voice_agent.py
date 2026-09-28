@@ -187,7 +187,8 @@ def create_voice_tools(session: Optional[CallSession] = None) -> List[Any]:
         logger.info(f"Tool invoked: get_order_status(order_id='{clean_order_id}', phone='{clean_phone}')")
 
         try:
-            res = await async_get_order_status(order_id=clean_order_id, phone=clean_phone)
+            lookup_id = clean_order_id or clean_phone or ""
+            res = await async_get_order_status(order_id=lookup_id, phone_number=clean_phone)
             payload = res.model_dump()
             if session:
                 session.record_tool_call(
@@ -294,8 +295,9 @@ def create_voice_tools(session: Optional[CallSession] = None) -> List[Any]:
                     payload,
                 )
             # Spoken confirmation before handoff transfer
+            dept_name = res.department.value if hasattr(res.department, "value") else str(res.department)
             spoken_handoff = build_handoff_message(
-                department_name=res.department.value,
+                department_name=dept_name,
                 estimated_wait_seconds=res.estimated_wait_seconds,
                 language=session.context.language if session else "ar",
             )

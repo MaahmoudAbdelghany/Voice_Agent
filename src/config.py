@@ -137,23 +137,32 @@ class Settings(BaseSettings):
 
     def is_livekit_configured(self) -> bool:
         """Check if LiveKit credentials are provided."""
-        return bool(self.livekit_url and self.livekit_api_key and self.livekit_api_secret)
+        return bool(
+            self.livekit_url
+            and self.livekit_api_key
+            and self.livekit_api_secret
+            and "your_" not in self.livekit_api_key
+        )
 
     def is_stt_configured(self) -> bool:
         """Check if STT credentials are provided."""
-        return bool(self.deepgram_api_key)
+        return bool(self.deepgram_api_key and "your_" not in self.deepgram_api_key)
 
     def is_llm_configured(self) -> bool:
         """Check if LLM credentials are provided."""
-        return bool(self.groq_api_key)
+        return bool(self.groq_api_key and "your_" not in self.groq_api_key)
 
     def is_tts_configured(self) -> bool:
         """Check if TTS credentials are provided."""
-        return bool(self.eleven_api_key)
+        return bool(self.eleven_api_key and "your_" not in self.eleven_api_key)
 
     def is_qdrant_cloud(self) -> bool:
         """Check if using Qdrant Cloud or local in-memory."""
-        return bool(self.qdrant_url and self.qdrant_api_key)
+        if not self.qdrant_url or not self.qdrant_api_key:
+            return False
+        if "your-cluster-id" in self.qdrant_url or "your_" in self.qdrant_api_key:
+            return False
+        return True
 
 
 # Global singleton settings instance
