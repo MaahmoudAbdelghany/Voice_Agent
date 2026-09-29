@@ -32,6 +32,48 @@ import livekit.plugins.deepgram as dg
 import livekit.plugins.elevenlabs as el
 import livekit.plugins.groq as gq
 import livekit.plugins.silero as sil
+import livekit.api.access_token as _lat
+import calendar
+import datetime
+import email.utils
+import httpx
+import jwt
+
+# Compensate for system clock skew (prevents 401 Unauthorized from time drift)
+def _apply_livekit_clock_skew_patch() -> None:
+    skew_seconds = 0
+    try:
+        res = httpx.get("https://www.google.com", timeout=3.0)
+        server_dt = email.utils.parsedate_to_datetime(res.headers["date"])
+        local_dt = datetime.datetime.now(datetime.timezone.utc)
+        skew_seconds = int((local_dt - server_dt).total_seconds())
+    except Exception:
+        pass
+
+    def _safe_to_jwt(self: Any) -> str:
+        video = self.claims.video
+        if video and video.room_join and (not self.identity or not video.room):
+            raise ValueError("identity and room must be set when joining a room")
+
+        jwt_claims = self.claims.asdict()
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        if skew_seconds:
+            now_utc = now_utc - datetime.timedelta(seconds=skew_seconds)
+
+        nbf_ts = calendar.timegm((now_utc - datetime.timedelta(seconds=60)).utctimetuple())
+        exp_ts = calendar.timegm((now_utc + self.ttl).utctimetuple())
+
+        jwt_claims.update({
+            "sub": self.identity,
+            "iss": self.api_key,
+            "nbf": nbf_ts,
+            "exp": exp_ts,
+        })
+        return jwt.encode(jwt_claims, self.api_secret, algorithm="HS256")
+
+    _lat.AccessToken.to_jwt = _safe_to_jwt
+
+_apply_livekit_clock_skew_patch()
 
 # Project configurations, prompts, session manager, and tools
 from src.config import settings
