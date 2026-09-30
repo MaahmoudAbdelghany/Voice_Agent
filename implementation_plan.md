@@ -29,18 +29,23 @@ The agent can:
 
 ---
 
-## 3. Phased Implementation Roadmap
+## 3. Spec-Driven Development (SDD) & Phased Roadmap
+
+### **Spec-Driven Governance (specs/)**
+- [x] `specs/mission.md`: What, Why, Target Users, Scope, Boundaries.
+- [x] `specs/tech.md`: Tech stack, Architectural invariants, Latency budgets.
+- [x] `specs/roadmap.md`: Living product roadmap & feature specifications.
 
 ### **Phase 1: Project Foundation & Core Environment Setup**
-- [ ] Initialize Python environment (`pyproject.toml`, `.gitignore`, `.env.example`).
-- [ ] Configure centralized settings via `Pydantic BaseSettings` in `src/config.py`.
-- [ ] Verify environment variables and credentials loading.
+- [x] Initialize Python environment (`pyproject.toml`, `.gitignore`, `.env.example`).
+- [x] Configure centralized settings via `Pydantic BaseSettings` in `src/config.py`.
+- [x] Verify environment variables and credentials loading.
 
 ### **Phase 2: RAG Knowledge Base Engine (Qdrant + FastEmbed)**
-- [ ] Implement embedding generator (`src/rag/embeddings.py`).
-- [ ] Build Qdrant vector store connection & hybrid search retriever (`src/rag/retriever.py`).
-- [ ] Create restaurant domain knowledge base (menu, ingredients, allergens, operating hours, delivery policies) in `knowledge_base/`.
-- [ ] Build automated ingestion pipeline (`src/rag/ingestion.py` and `scripts/ingest_knowledge.py`).
+- [x] Implement embedding generator (`src/rag/embeddings.py`).
+- [x] Build Qdrant vector store connection & hybrid search retriever (`src/rag/retriever.py`).
+- [x] Create restaurant domain knowledge base (menu, ingredients, allergens, operating hours, delivery policies) in `knowledge_base/`.
+- [x] Build automated ingestion pipeline (`src/rag/ingestion.py` and `scripts/ingest_knowledge.py`).
 
 ### **Phase 3: Agent Tools & Domain Logic**
 - [x] Build Knowledge Retrieval tool (`src/tools/knowledge_search.py`).
