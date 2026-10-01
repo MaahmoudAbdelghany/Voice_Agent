@@ -31,10 +31,11 @@ The agent can:
 
 ## 3. Spec-Driven Development (SDD) & Phased Roadmap
 
-### **Spec-Driven Governance (specs/)**
-- [x] `specs/mission.md`: What, Why, Target Users, Scope, Boundaries.
-- [x] `specs/tech.md`: Tech stack, Architectural invariants, Latency budgets.
-- [x] `specs/roadmap.md`: Living product roadmap & feature specifications.
+### **Spec-Driven Governance (spec/)**
+- [x] `spec/mission.md`: What, Why, Target Users, Scope, Boundaries.
+- [x] `spec/tech.md`: Tech stack, Architectural invariants, Latency budgets.
+- [x] `spec/roadmap.md`: Living product roadmap & feature specifications.
+- [x] `.agents/skills/feature-validation/SKILL.md`: Pre-implementation SDD Feature Validation Skill.
 
 ### **Phase 1: Project Foundation & Core Environment Setup**
 - [x] Initialize Python environment (`pyproject.toml`, `.gitignore`, `.env.example`).

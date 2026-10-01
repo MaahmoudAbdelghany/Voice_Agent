@@ -1,9 +1,10 @@
 # Voice Agent — Task Plan
 
 ## Spec-Driven Development (SDD) Constitution & Governance
-- [x] specs/mission.md — Product Mission, Problem, Target Users & Scope
-- [x] specs/tech.md — Tech Constitution, Architecture Invariants & SLA Budgets
-- [x] specs/roadmap.md — Product Roadmap & Phased Feature Tracker
+- [x] spec/mission.md — Product Mission, Problem, Target Users & Scope
+- [x] spec/tech.md — Tech Constitution, Architecture Invariants & SLA Budgets
+- [x] spec/roadmap.md — Product Roadmap & Phased Feature Tracker
+- [x] .agents/skills/feature-validation/SKILL.md — Pre-implementation SDD Feature Validation Skill
 
 ## Phase 1: Project Foundation & Configuration
 - [x] pyproject.toml — dependencies and packaging configuration (Hatchling)
