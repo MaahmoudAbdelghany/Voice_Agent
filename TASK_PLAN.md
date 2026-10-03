@@ -4,7 +4,8 @@
 - [x] spec/mission.md — Product Mission, Problem, Target Users & Scope
 - [x] spec/tech.md — Tech Constitution, Architecture Invariants & SLA Budgets
 - [x] spec/roadmap.md — Product Roadmap & Phased Feature Tracker
-- [x] .agents/skills/feature-validation/SKILL.md — Pre-implementation SDD Feature Validation Skill
+- [x] .agents/skills/my-rule/SKILL.md — Pre-implementation SDD Feature Validation Skill
+- [x] .agents/skills/testing-standards/SKILL.md — Comprehensive Testing & QA Standards Skill
 
 ## Phase 1: Project Foundation & Configuration
 - [x] pyproject.toml — dependencies and packaging configuration (Hatchling)

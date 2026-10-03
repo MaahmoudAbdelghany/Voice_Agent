@@ -35,7 +35,8 @@ The agent can:
 - [x] `spec/mission.md`: What, Why, Target Users, Scope, Boundaries.
 - [x] `spec/tech.md`: Tech stack, Architectural invariants, Latency budgets.
 - [x] `spec/roadmap.md`: Living product roadmap & feature specifications.
-- [x] `.agents/skills/feature-validation/SKILL.md`: Pre-implementation SDD Feature Validation Skill.
+- [x] `.agents/skills/my-rule/SKILL.md`: Pre-implementation SDD Feature Validation Skill.
+- [x] `.agents/skills/testing-standards/SKILL.md`: Comprehensive Testing & QA Standards Skill (Unit, Integration, Edge Case, Test Isolation, 7 Invariant Rules, and SDD alignment).
 
 ### **Phase 1: Project Foundation & Core Environment Setup**
 - [x] Initialize Python environment (`pyproject.toml`, `.gitignore`, `.env.example`).
