@@ -79,6 +79,14 @@ flowchart TD
   - **Tier 3: Error & Edge Case Tests**:
     - Simulate failures (database outages, API timeouts, invalid inputs).
     - Assert defensive resilience: system must never crash and must return polite fallback responses.
+  - **Applicability & Exemption Rule** ⚖️:
+    - Do **not** fabricate artificial tests across all 3 tiers if one tier is genuinely not applicable.
+    - **Rule**: All *applicable* testing tiers MUST be defined.
+    - **Exemption Requirement**: If a tier is not applicable, `validation.md` MUST explicitly declare the exemption with a clear technical justification.
+    - *Example*:
+      > **Tier 2: Integration Tests**  
+      > *Status*: Not Applicable  
+      > *Justification*: This feature contains a pure, isolated formatting utility with no cross-component behavior or persistent state mutation.
   - **Test Isolation Invariant**:
     - Mandate pristine test fixtures (e.g., `fresh_session`) to guarantee zero cross-test pollution and order-independent execution.
   - **Automated Verification Commands**:

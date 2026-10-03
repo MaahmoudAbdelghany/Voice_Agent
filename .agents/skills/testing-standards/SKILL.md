@@ -156,6 +156,15 @@ Every feature's `validation.md` must organize its automated verification section
 | **Tier 2: Integration** | `### Automated Integration Tests` | End-to-end data flow across Session, Tool, and Storage |
 | **Tier 3: Error & Edge Cases** | `### Automated Edge Case & Resilience Tests` | Disconnections, API timeouts, invalid inputs, fallback behavior |
 
+> ⚖️ **Applicability & Exemption Rule**:  
+> Do **not** fabricate artificial tests across all 3 tiers if one tier is genuinely not applicable to the feature.  
+> - **Mandate**: All *applicable* testing tiers MUST be defined.  
+> - **Exemption Requirement**: If a tier is not applicable, `validation.md` MUST explicitly state the exemption with a clear technical justification.  
+> - *Example*:  
+>   `### Tier 2: Integration Tests`  
+>   `> **Status**: Not Applicable`  
+>   `> **Justification**: Pure, isolated formatting utility with no cross-component behavior or persistent state mutation.`
+
 ### 4.2 Standard Test Execution Commands
 - Run all tests:
   ```powershell
