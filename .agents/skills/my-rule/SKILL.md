@@ -1,6 +1,6 @@
 ---
 name: feature-validation
-description: Enforces the 7-step pre-implementation Spec-Driven Development (SDD) workflow before writing any feature code. Automatically reads the spec/ folder (mission, tech, roadmap), identifies the next feature, asks clarification questions, creates plan.md, requirements.md, and validation.md, and pauses for human review.
+description: Enforces the 7-step pre-implementation Spec-Driven Development (SDD) workflow before writing any feature code. Automatically reads the spec/ folder (mission, tech, roadmap), identifies the next feature, asks clarification questions, creates plan.md, requirements.md, and validation.md with 3-tier testing standards, and pauses for human review.
 ---
 
 # SDD Feature Validation Skill (`feature-validation`)
@@ -21,7 +21,7 @@ flowchart TD
     D --> E[Human Provides Clarifications]
     E --> F[4. Generate Feature Plan: plan.md]
     F --> G[5. Generate Requirements: requirements.md]
-    G --> H[6. Generate Validation: validation.md]
+    G --> H[6. Generate Validation: validation.md with 3-Tier Testing]
     H --> I[7. Halt & Wait for Human Review]
     I --> J{Human Approved?}
     J -- Revisions Requested --> D
@@ -67,13 +67,24 @@ flowchart TD
   - **Constraints**: What the feature must *not* do or change.
 - **Rule**: Document decisions and behaviors, NOT trivial implementation micro-details (e.g. variable names).
 
-### 6. Generate Validation Criteria (`validation.md`)
+### 6. Generate Validation Criteria (`validation.md`) with 3-Tier Testing
 - Create `spec/features/feature-XXX-<feature-name>/validation.md`.
-- Define explicit, falsifiable criteria to verify correctness:
-  - **Automated Verification**: Commands to run (`pytest tests/...`, CLI runner scripts).
-  - **Expected Results**: Return codes, JSON schemas, UI component presence.
-  - **Edge Case Tests**: Negative inputs, timeout handling, disconnection resilience.
-  - **Manual / Visual Checks**: Specific browser actions (`streamlit run src/dashboard/app.py`), expected visuals, and interactive behaviors.
+- Enforce the testing architecture defined in [`.agents/skills/testing-standards/SKILL.md`](file:///d:/AI%20Projects/voice_agent/.agents/skills/testing-standards/SKILL.md):
+  - **Tier 1: Unit Tests**:
+    - Isolated tests for factories, helpers, schemas, and configurations.
+    - Validate defaults and parameter overrides without external dependencies.
+  - **Tier 2: Integration Tests**:
+    - Multi-component collaboration (e.g., Tool + `CallSession` + Storage/RAG).
+    - Verify state mutations, conversation messages, and telemetry metrics.
+  - **Tier 3: Error & Edge Case Tests**:
+    - Simulate failures (database outages, API timeouts, invalid inputs).
+    - Assert defensive resilience: system must never crash and must return polite fallback responses.
+  - **Test Isolation Invariant**:
+    - Mandate pristine test fixtures (e.g., `fresh_session`) to guarantee zero cross-test pollution and order-independent execution.
+  - **Automated Verification Commands**:
+    - Exact pytest CLI commands (e.g., `uv run pytest tests/test_... -v`).
+  - **Manual / Visual Checks**:
+    - Browser interactions (`streamlit run src/dashboard/app.py`), UI layout verification, and CLI runners (`python scripts/test_call.py`).
 
 ### 7. Wait for Human Review (Mandatory Gate) 🛑
 - **Halt all coding activity immediately.**
@@ -86,7 +97,7 @@ flowchart TD
 ## Post-Implementation Checklist
 
 Once human approval is granted and code is written:
-1. **Execute Validation**: Run every test and validation command specified in `validation.md`.
+1. **Execute Validation**: Run every test across all 3 tiers (Unit, Integration, Edge/Exception) and manual checks specified in `validation.md` (`uv run pytest -v`).
 2. **Review Diff**: Ensure changes are clean, minimal, and free of architectural drift.
 3. **Update Tracking**: Mark completed checkboxes in [`spec/roadmap.md`](file:///d:/AI%20Projects/voice_agent/spec/roadmap.md) and [`TASK_PLAN.md`](file:///d:/AI%20Projects/voice_agent/TASK_PLAN.md).
 4. **Git Checkpoint**: Commit with semantic commit message and push to GitHub repository.
