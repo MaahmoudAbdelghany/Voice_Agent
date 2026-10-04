@@ -36,8 +36,7 @@
 - [x] scripts/test_call.py — CLI voice agent simulation runner
 - [x] tests/test_agent.py — session orchestration and agent pipeline tests
 
-## Phase 5: Streamlit Admin & Analytics Dashboard
-- [ ] src/dashboard/app.py — main Streamlit dashboard entry point & styling
+- [x] src/dashboard/app.py — main Streamlit dashboard entry point & styling
 - [ ] src/dashboard/pages/01_calls.py — call logs, audio playback & transcript viewer
 - [ ] src/dashboard/pages/02_analytics.py — metrics, latency charts & call volume analytics
 - [ ] src/dashboard/pages/03_knowledge.py — knowledge base management & live ingestion UI

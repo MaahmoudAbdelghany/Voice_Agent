@@ -60,8 +60,7 @@ The agent can:
 - [x] Implement the LiveKit voice worker (`src/agent/voice_agent.py`) integrating Deepgram STT + Groq LLM + ElevenLabs TTS + Silero VAD + Registered Tools.
 - [x] Build local CLI console runner (`scripts/test_call.py`) for end-to-end testing.
 
-### **Phase 5: Streamlit Admin & Analytics Dashboard**
-- [ ] Build main dashboard entry point (`src/dashboard/app.py`).
+- [x] Build main dashboard entry point (`src/dashboard/app.py`).
 - [ ] Build Call Logs & Transcripts page (`src/dashboard/pages/01_calls.py`).
 - [ ] Build Metrics & Analytics page (`src/dashboard/pages/02_analytics.py`).
 - [ ] Build Knowledge Base Management page (`src/dashboard/pages/03_knowledge.py`).
