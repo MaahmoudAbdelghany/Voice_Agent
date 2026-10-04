@@ -69,7 +69,7 @@ flowchart TD
 
 ### 6. Generate Validation Criteria (`validation.md`) with 3-Tier Testing
 - Create `spec/features/feature-XXX-<feature-name>/validation.md`.
-- Enforce the testing architecture defined in `.agents/skills/testing-standards/SKILL.md`:
+- Enforce the 3-tier testing architecture:
   - **Tier 1: Unit Tests**:
     - Isolated tests for factories, helpers, schemas, and configurations.
     - Validate defaults and parameter overrides without external dependencies.
