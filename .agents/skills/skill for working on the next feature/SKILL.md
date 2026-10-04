@@ -110,3 +110,6 @@ Once human approval is granted and code is written:
 3. **Update Tracking**: Mark completed checkboxes in `spec/roadmap.md` and `TASK_PLAN.md`.
 4. **Git Checkpoint**: Commit with semantic commit message and push to GitHub repository.
 5. **Replanning**: Pause to reflect on lessons learned and update specs before starting the next feature cycle.
+
+
+and finaly make conversation between us in arabic
