@@ -34,12 +34,12 @@ flowchart TD
 
 ### 1. Read `spec/` Folder in Root Directory
 - Always read the project constitution files using `view_file`:
-  - [`spec/mission.md`](file:///d:/AI%20Projects/voice_agent/spec/mission.md): Understand the WHAT, WHY, target users, and boundaries.
-  - [`spec/tech.md`](file:///d:/AI%20Projects/voice_agent/spec/tech.md): Verify architectural invariants, tech stack selections, and SLA budgets (e.g. voice latency < 800ms, barge-in rules).
-  - [`spec/roadmap.md`](file:///d:/AI%20Projects/voice_agent/spec/roadmap.md): Understand completed milestones and current project trajectory.
+  - `spec/mission.md`: Understand the WHAT, WHY, target users, and boundaries.
+  - `spec/tech.md`: Verify architectural invariants, tech stack selections, and SLA budgets (e.g. voice latency < 800ms, barge-in rules).
+  - `spec/roadmap.md`: Understand completed milestones and current project trajectory.
 
 ### 2. Identify Next Feature in `roadmap.md`
-- Inspect [`spec/roadmap.md`](file:///d:/AI%20Projects/voice_agent/spec/roadmap.md) to locate the active phase.
+- Inspect `spec/roadmap.md` to locate the active phase.
 - Select the first uncompleted feature (e.g., `Feature 5.1: Main Dashboard Entry`).
 - Confirm that all prerequisite phases and foundational components are satisfied.
 
@@ -69,7 +69,7 @@ flowchart TD
 
 ### 6. Generate Validation Criteria (`validation.md`) with 3-Tier Testing
 - Create `spec/features/feature-XXX-<feature-name>/validation.md`.
-- Enforce the testing architecture defined in [`.agents/skills/testing-standards/SKILL.md`](file:///d:/AI%20Projects/voice_agent/.agents/skills/testing-standards/SKILL.md):
+- Enforce the testing architecture defined in `.agents/skills/testing-standards/SKILL.md`:
   - **Tier 1: Unit Tests**:
     - Isolated tests for factories, helpers, schemas, and configurations.
     - Validate defaults and parameter overrides without external dependencies.
@@ -107,6 +107,6 @@ flowchart TD
 Once human approval is granted and code is written:
 1. **Execute Validation**: Run every test across all 3 tiers (Unit, Integration, Edge/Exception) and manual checks specified in `validation.md` (`uv run pytest -v`).
 2. **Review Diff**: Ensure changes are clean, minimal, and free of architectural drift.
-3. **Update Tracking**: Mark completed checkboxes in [`spec/roadmap.md`](file:///d:/AI%20Projects/voice_agent/spec/roadmap.md) and [`TASK_PLAN.md`](file:///d:/AI%20Projects/voice_agent/TASK_PLAN.md).
+3. **Update Tracking**: Mark completed checkboxes in `spec/roadmap.md` and `TASK_PLAN.md`.
 4. **Git Checkpoint**: Commit with semantic commit message and push to GitHub repository.
 5. **Replanning**: Pause to reflect on lessons learned and update specs before starting the next feature cycle.
