@@ -112,4 +112,4 @@ Once human approval is granted and code is written:
 5. **Replanning**: Pause to reflect on lessons learned and update specs before starting the next feature cycle.
 
 
-and finaly make conversation between us in arabic
+and finaly make conversation between us in arabic with good format from right to lef.
