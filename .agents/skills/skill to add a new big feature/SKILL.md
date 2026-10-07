@@ -1,17 +1,14 @@
+We are going to add a new big feature i want add the feature in roadmap as a phase  , the feature is: [FEATURE NAME]
 
-### 1. Read `spec/` Folder in Root Directory
+
+
+### 1. Read `spec/` Folder in Root Directory to make a new feature  matching the spec mission , spec tech and roadmap . and not effect on the architecture of the project
 - Always read the project constitution files using `view_file`:
   - `spec/mission.md`: Understand the WHAT, WHY, target users, and boundaries or scope
   - `spec/tech.md`: Verify architectural invariants, tech stack selections
   - `spec/roadmap.md`: Understand completed milestones and current project trajectory.
 
   
-### 2. Identify Next Feature in `roadmap.md`
-- Inspect `spec/roadmap.md` to locate the next feature
-- Confirm that all prerequisite phases and foundational components are satisfied.
-
-
-
 ### 3. Ask Clarification Questions
 - Analyze potential ambiguities, design trade-offs, and underspecified requirements.
 - Formulate clear, concise questions for the human supervisor:
@@ -56,8 +53,3 @@
 - Present the generated specification files (`plan.md`, `requirements.md`) to the human supervisor.
 - Highlight key decisions, trade-offs, and open questions.
 - **Strict Prohibition**: Never write application code or make edits before receiving explicit approval (e.g., *"go ahead"*, *"approved"*, *"اعتمد"*).
-
-
-
-
-
