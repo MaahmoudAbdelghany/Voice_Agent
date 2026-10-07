@@ -37,6 +37,7 @@
 - [x] tests/test_agent.py — session orchestration and agent pipeline tests
 
 - [x] src/dashboard/app.py — main Streamlit dashboard entry point & styling
+- [x] spec/features/feature-502-call-logs-transcript-viewer/ — Feature 5.2 Plan, Requirements & 3-Tier Validation Specification
 - [ ] src/dashboard/pages/01_calls.py — call logs, audio playback & transcript viewer
 - [ ] src/dashboard/pages/02_analytics.py — metrics, latency charts & call volume analytics
 - [ ] src/dashboard/pages/03_knowledge.py — knowledge base management & live ingestion UI
@@ -48,3 +49,6 @@
 - [ ] infra/ecs-task-definition.json — AWS ECS Fargate task definition
 - [ ] infra/deploy.sh — AWS deployment automation script
 - [ ] tests/test_e2e.py — end-to-end simulated call flow verification
+
+
+finaly i want make our conversation in arabic
