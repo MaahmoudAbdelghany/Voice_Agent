@@ -45,7 +45,7 @@ This roadmap is a **Living Document** under Spec-Driven Development (SDD). Each 
 *Goal: Provide a rich, real-time web portal for monitoring calls, viewing latency breakdowns, testing knowledge retrieval, and updating prompt configurations.*
 
 - [x] **Feature 5.1**: Main Dashboard Entry & Design System (`src/dashboard/app.py`) ✅
-- **Feature 5.2**: Call Logs, Audio Playback & Transcript Viewer (`src/dashboard/pages/01_calls.py`)
+- [x] **Feature 5.2**: Call Logs, Audio Playback & Transcript Viewer (`src/dashboard/pages/01_calls.py`) ✅
 - **Feature 5.3**: Latency Charts & Call Volume Analytics (`src/dashboard/pages/02_analytics.py`)
 - **Feature 5.4**: Knowledge Base Management & Live Ingestion UI (`src/dashboard/pages/03_knowledge.py`)
 - **Feature 5.5**: Prompt Playground & Runtime Configuration (`src/dashboard/pages/04_settings.py`)

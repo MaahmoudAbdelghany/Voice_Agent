@@ -39,8 +39,8 @@
 - [x] src/dashboard/app.py — main Streamlit dashboard entry point & styling
 - [x] spec/features/feature-502-call-logs-transcript-viewer/ — Feature 5.2 Plan, Requirements & 3-Tier Validation Specification
 - [x] Step 5.2.1: src/dashboard/calls_data.py, i18n & CSS — data layer, demo seeder, audio resolver & styles
-- [ ] Step 5.2.2: src/dashboard/pages/01_calls.py — call logs, audio playback & transcript viewer page
-- [ ] Step 5.2.3: tests/test_calls_page.py — 3-Tier automated validation suite
+- [x] Step 5.2.2: src/dashboard/pages/01_calls.py — call logs, audio playback & transcript viewer page
+- [x] Step 5.2.3: tests/test_calls_page.py — 3-Tier automated validation suite
 - [ ] src/dashboard/pages/02_analytics.py — metrics, latency charts & call volume analytics
 - [ ] src/dashboard/pages/03_knowledge.py — knowledge base management & live ingestion UI
 - [ ] src/dashboard/pages/04_settings.py — prompt playground & runtime configuration
