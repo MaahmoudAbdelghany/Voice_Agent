@@ -254,3 +254,190 @@ body, .stMarkdown, .stText, p, span, div {
     border-top: 1px solid var(--card-border);
     margin-top: 2rem;
 }
+
+/* =====================================================================
+   Feature 5.2 — Call Logs, Audio Playback & Transcript Viewer Styles
+   ===================================================================== */
+
+/* Call Status Badges & Pills */
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.status-pill-ended {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #34D399;
+}
+
+.status-pill-active {
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    color: #60A5FA;
+}
+
+.status-pill-escalated {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #F87171;
+}
+
+/* Context & Slot Tags */
+.slot-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--card-border);
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    color: var(--text-primary);
+    margin-right: 6px;
+    margin-bottom: 6px;
+}
+
+/* Escalation Alert Card */
+.escalation-banner {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(185, 28, 28, 0.25) 100%);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+    color: #FCA5A5;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+}
+
+/* Audio Player Card */
+.audio-card {
+    background: rgba(22, 27, 34, 0.7);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    backdrop-filter: blur(12px);
+}
+
+.audio-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.demo-audio-tag {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    color: #FBBF24;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.real-audio-tag {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #34D399;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Chat Transcript Bubble Styles */
+.transcript-box {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    margin-top: 1rem;
+}
+
+.chat-turn {
+    display: flex;
+    flex-direction: column;
+    max-width: 82%;
+    margin-bottom: 0.25rem;
+}
+
+.chat-turn-user {
+    align-self: flex-start;
+}
+
+.chat-turn-assistant {
+    align-self: flex-end;
+}
+
+.chat-bubble {
+    border-radius: 14px;
+    padding: 0.85rem 1.15rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.chat-bubble-user {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(20, 30, 45, 0.85) 100%);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    color: #E2E8F0;
+    border-top-left-radius: 4px;
+}
+
+.chat-bubble-assistant {
+    background: linear-gradient(135deg, rgba(38, 25, 75, 0.85) 0%, rgba(24, 20, 50, 0.9) 100%);
+    border: 1px solid rgba(167, 139, 250, 0.35);
+    color: #F5F3FF;
+    border-top-right-radius: 4px;
+}
+
+.chat-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.turn-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    color: #94A3B8;
+}
+
+.turn-interrupted {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #F87171;
+    font-weight: 600;
+}
+
+/* Tool Callout Accordion Styling */
+.tool-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(14, 165, 233, 0.12);
+    border: 1px solid rgba(14, 165, 233, 0.35);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #38BDF8;
+    margin: 0.4rem 0;
+}
+

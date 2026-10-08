@@ -34,7 +34,7 @@
 - Manageable execution groups.
 - Risks and trade-offs.
 
-  - **Execution Breakdown**: Atomic sub-steps for implementation.
+  - **Execution Breakdown**: Atomic sub-steps for implementation. if feature is big we well make it in multiple features each feature in execution group.
 
 
 ### 5. Generate Requirements (`requirements.md`)
@@ -53,11 +53,11 @@
 
 ### 6. Wait for Human Review (Mandatory Gate) 🛑
 - **Halt all coding activity immediately.**
-- Present the generated specification files (`plan.md`, `requirements.md`) to the human supervisor.
+- Present the generated specification files (`plan.md`, `requirements.md`, `validation.md`) to the human supervisor.
 - Highlight key decisions, trade-offs, and open questions.
 - **Strict Prohibition**: Never write application code or make edits before receiving explicit approval (e.g., *"go ahead"*, *"approved"*, *"اعتمد"*).
 
-
+### 7 when human approved the spec we start working on the feature step by step according to plan.md FOR the feature and requirements.md for the feature and make validation on the feature according to validation.md for the feature . 
 
 
 
