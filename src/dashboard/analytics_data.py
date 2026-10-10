@@ -6,24 +6,20 @@ time-series volume bucketing (hourly/daily), sentiment and tool invocation analy
 and automated multi-day call session seeding for rich dashboard visualizations.
 """
 
-from datetime import datetime, timezone, timedelta
 import logging
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
 import uuid
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
 
 import numpy as np
-import pandas as pd
 
 from src.agent.session_manager import (
     CallSession,
     CallStatus,
     MessageRole,
     SessionManager,
-    TurnMessage,
-    session_manager as global_session_manager,
 )
-from src.dashboard.calls_data import load_all_call_sessions
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +35,9 @@ SLA_BUDGET_TTS_MS: float = 250.0
 # ==============================================================================
 
 def seed_analytics_call_sessions(
-    storage_dir: Optional[Union[str, Path]] = None,
+    storage_dir: str | Path | None = None,
     min_threshold: int = 10,
-) -> List[CallSession]:
+) -> list[CallSession]:
     """
     Generate realistic, time-distributed mock call sessions spanning the last 7 days.
     Triggered when stored call records are fewer than min_threshold to ensure
@@ -60,7 +56,7 @@ def seed_analytics_call_sessions(
     if len(existing) >= min_threshold:
         return existing
 
-    seeded: List[CallSession] = []
+    seeded: list[CallSession] = []
     now = datetime.now(timezone.utc)
 
     # Scenarios template pool
@@ -230,10 +226,10 @@ def seed_analytics_call_sessions(
 # ==============================================================================
 
 def filter_by_time_range(
-    sessions: List[CallSession],
+    sessions: list[CallSession],
     time_range: str = "7d",
-    reference_time: Optional[datetime] = None,
-) -> List[CallSession]:
+    reference_time: datetime | None = None,
+) -> list[CallSession]:
     """
     Filter call sessions by a rolling time window.
     
@@ -263,11 +259,11 @@ def filter_by_time_range(
 
 
 def filter_analytics_sessions(
-    sessions: List[CallSession],
+    sessions: list[CallSession],
     time_range: str = "7d",
-    language: Optional[str] = None,
-    status: Optional[str] = None,
-) -> List[CallSession]:
+    language: str | None = None,
+    status: str | None = None,
+) -> list[CallSession]:
     """
     Apply combined filtering for analytics views: time range, language, and call status.
     """
@@ -296,7 +292,7 @@ def filter_analytics_sessions(
 # 3. KPI & Statistical Aggregators
 # ==============================================================================
 
-def calculate_analytics_kpis(sessions: List[CallSession]) -> Dict[str, Any]:
+def calculate_analytics_kpis(sessions: list[CallSession]) -> dict[str, Any]:
     """
     Compute executive summary KPIs from a list of call sessions.
     
@@ -329,7 +325,7 @@ def calculate_analytics_kpis(sessions: List[CallSession]) -> Dict[str, Any]:
     total_duration_minutes = float(sum(durations)) / 60.0 if durations else 0.0
 
     # Extract all measured assistant turn latencies
-    assistant_latencies: List[float] = []
+    assistant_latencies: list[float] = []
     total_turns_count = 0
     for s in sessions:
         total_turns_count += len(s.messages)
@@ -367,15 +363,15 @@ def calculate_analytics_kpis(sessions: List[CallSession]) -> Dict[str, Any]:
     }
 
 
-def aggregate_latency_breakdown(sessions: List[CallSession]) -> Dict[str, Any]:
+def aggregate_latency_breakdown(sessions: list[CallSession]) -> dict[str, Any]:
     """
     Decompose voice latency into constituent pipeline layers: STT, LLM, TTS, and Total.
     """
-    stt_vals: List[float] = []
-    llm_vals: List[float] = []
-    tts_vals: List[float] = []
-    tot_vals: List[float] = []
-    turn_records: List[Dict[str, Any]] = []
+    stt_vals: list[float] = []
+    llm_vals: list[float] = []
+    tts_vals: list[float] = []
+    tot_vals: list[float] = []
+    turn_records: list[dict[str, Any]] = []
 
     for s in sessions:
         for m in s.messages:
@@ -413,14 +409,14 @@ def aggregate_latency_breakdown(sessions: List[CallSession]) -> Dict[str, Any]:
     }
 
 
-def aggregate_daily_volume(sessions: List[CallSession]) -> List[Dict[str, Any]]:
+def aggregate_daily_volume(sessions: list[CallSession]) -> list[dict[str, Any]]:
     """
     Group sessions by calendar day with completed vs escalated call volume counts.
     """
     if not sessions:
         return []
 
-    data: Dict[str, Dict[str, int]] = {}
+    data: dict[str, dict[str, int]] = {}
     for s in sessions:
         date_str = s.start_time.strftime("%Y-%m-%d")
         if date_str not in data:
@@ -443,7 +439,7 @@ def aggregate_daily_volume(sessions: List[CallSession]) -> List[Dict[str, Any]]:
     return result
 
 
-def aggregate_hourly_volume(sessions: List[CallSession]) -> List[Dict[str, Any]]:
+def aggregate_hourly_volume(sessions: list[CallSession]) -> list[dict[str, Any]]:
     """
     Aggregate calls across 24 hourly buckets (00:00 to 23:00) with peak rush hour flags.
     """
@@ -464,7 +460,7 @@ def aggregate_hourly_volume(sessions: List[CallSession]) -> List[Dict[str, Any]]
     return result
 
 
-def aggregate_sentiment_distribution(sessions: List[CallSession]) -> Dict[str, int]:
+def aggregate_sentiment_distribution(sessions: list[CallSession]) -> dict[str, int]:
     """
     Count customer sentiments across filtered calls (positive, neutral, negative).
     """
@@ -478,11 +474,11 @@ def aggregate_sentiment_distribution(sessions: List[CallSession]) -> Dict[str, i
     return dist
 
 
-def aggregate_tool_invocations(sessions: List[CallSession]) -> List[Dict[str, Any]]:
+def aggregate_tool_invocations(sessions: list[CallSession]) -> list[dict[str, Any]]:
     """
     Aggregate and rank tool calls made across all sessions.
     """
-    counts: Dict[str, int] = {}
+    counts: dict[str, int] = {}
     total_tool_calls = 0
 
     for s in sessions:
@@ -503,7 +499,7 @@ def aggregate_tool_invocations(sessions: List[CallSession]) -> List[Dict[str, An
     return result
 
 
-def aggregate_language_distribution(sessions: List[CallSession]) -> Dict[str, int]:
+def aggregate_language_distribution(sessions: list[CallSession]) -> dict[str, int]:
     """
     Count distribution of Arabic vs English sessions.
     """

@@ -57,7 +57,32 @@
 - Highlight key decisions, trade-offs, and open questions.
 - **Strict Prohibition**: Never write application code or make edits before receiving explicit approval (e.g., *"go ahead"*, *"approved"*, *"اعتمد"*).
 
-### 7 when human approved the spec we start working on the feature step by step according to plan.md FOR the feature and requirements.md for the feature and make validation on the feature according to validation.md for the feature . 
+### 7 when human approved the spec feature :
+
+- Always read using `view_file`
+
+ plan.md for the current feature and requirements.md
+
+
+and i want you working on the feature based on the cuurent plan.md  feature and requirements.md and tell me what you done and wait to give you approval to make validation
+
+
+### 8 after done working on the feature :
+
+- Always read using `view_file`
+
+ validation.md for the current feature
+
+ tell me what you done and wait to give you approval to make review of the feature 
+
+### 9 after done working on the validation of the feature :
+
+- Always read using `view_file`
+
+ .agents\skills\review after validation\SKILL.md to make review on the feature
+
+
+
 
 
 

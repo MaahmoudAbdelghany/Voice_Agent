@@ -61,8 +61,8 @@ The agent can:
 - [x] Build local CLI console runner (`scripts/test_call.py`) for end-to-end testing.
 
 - [x] Build main dashboard entry point (`src/dashboard/app.py`).
-- [ ] Build Call Logs & Transcripts page (`src/dashboard/pages/01_calls.py`).
-- [ ] Build Metrics & Analytics page (`src/dashboard/pages/02_analytics.py`).
+- [x] Build Call Logs & Transcripts page (`src/dashboard/pages/01_calls.py`).
+- [x] Build Metrics & Analytics page (`src/dashboard/pages/02_analytics.py`).
 - [ ] Build Knowledge Base Management page (`src/dashboard/pages/03_knowledge.py`).
 - [ ] Build Settings & Prompt Playground page (`src/dashboard/pages/04_settings.py`).
 
