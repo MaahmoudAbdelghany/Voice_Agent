@@ -42,7 +42,7 @@
 - [x] Step 5.2.2: src/dashboard/pages/01_calls.py — call logs, audio playback & transcript viewer page
 - [x] Step 5.2.3: tests/test_calls_page.py — 3-Tier automated validation suite
 - [x] spec/features/feature-503-latency-charts-call-volume-analytics/ — Feature 5.3 Plan, Requirements & 3-Tier Validation Specification
-- [ ] Step 5.3.1: src/dashboard/analytics_data.py, i18n & CSS — data aggregator, 7-day seeder, translations & styles
+- [x] Step 5.3.1: src/dashboard/analytics_data.py, i18n & CSS — data aggregator, 7-day seeder, translations & styles
 - [ ] Step 5.3.2: src/dashboard/pages/02_analytics.py — executive KPI cards, Plotly latency breakdown & volume charts
 - [ ] Step 5.3.3: tests/test_analytics_page.py — 3-Tier automated validation suite & regression checks
 - [ ] src/dashboard/pages/03_knowledge.py — knowledge base management & live ingestion UI
