@@ -28,6 +28,10 @@ dependencies = [
     "pandas>=2.2.0",
     "plotly>=5.22.0",
     
+    # Relational Database (Async)
+    "sqlalchemy[asyncio]>=2.0.0",
+    "aiosqlite>=0.20.0",
+    
     # HTTP & Async utils
     "httpx>=0.27.0",
     "aiohttp>=3.9.0",

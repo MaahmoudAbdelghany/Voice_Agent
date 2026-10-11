@@ -5,9 +5,10 @@ Loads settings from environment variables and .env file using Pydantic Settings.
 Provides type safety, default values, and credential validation.
 """
 
-import os
-from typing import Optional
-from pydantic import Field
+from pathlib import Path
+from typing import Any
+
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -86,16 +87,16 @@ class Settings(BaseSettings):
     )
 
     # --- Vector Database & RAG - Qdrant ---
-    qdrant_url: Optional[str] = Field(
+    qdrant_url: str | None = Field(
         default=None,
         description="Qdrant Cloud URL (or None for local in-memory storage)",
     )
-    qdrant_api_key: Optional[str] = Field(
+    qdrant_api_key: str | None = Field(
         default=None,
         description="Qdrant Cloud API Key",
     )
     qdrant_collection: str = Field(
-        default="restaurant_kb",
+        default="clinic_kb",
         description="Target Qdrant collection name for knowledge base",
     )
     embedding_model: str = Field(
@@ -103,26 +104,44 @@ class Settings(BaseSettings):
         description="FastEmbed multilingual model for generating dense text vectors (supports Arabic)",
     )
 
-    # --- Restaurant Business Domain Settings ---
-    restaurant_name: str = Field(
-        default="السوري",
-        description="Name of the restaurant",
+    # --- Egyptian Polyclinic Domain Settings ---
+    clinic_name: str = Field(
+        default="مجمع عيادات النور التخصصي",
+        description="Name of the polyclinic / medical center",
+    )
+    clinic_tagline: str = Field(
+        default="رعايتكم أولويتنا",
+        description="Tagline or slogan of the clinic",
+    )
+    clinic_phone: str = Field(
+        default="+20 2 3345 6789",
+        description="Contact phone number of the clinic",
+    )
+    clinic_address: str = Field(
+        default="شارع النصر، المعادي، القاهرة، مصر",
+        description="Physical location of the clinic",
+    )
+    clinic_working_hours: str = Field(
+        default="السبت - الخميس: 9:00 ص - 10:00 م | الجمعة: 2:00 م - 10:00 م",
+        description="Clinic shift and operating hours",
     )
     agent_name: str = Field(
-        default="السوري",
+        default="نور",
         description="Name of the voice AI assistant persona",
     )
-    restaurant_phone: str = Field(
-        default="+1 (555) 234-5678",
-        description="Contact phone number",
+    emergency_phone: str = Field(
+        default="123",
+        description="Egyptian emergency ambulance hotline number",
     )
-    restaurant_address: str = Field(
-        default="123 Culinary Boulevard, Downtown",
-        description="Physical location of restaurant",
+
+    # --- Relational Database Settings (Async SQLAlchemy) ---
+    database_url: str = Field(
+        default="sqlite+aiosqlite:///./data/clinic.db",
+        description="Async database connection URL (SQLite or PostgreSQL)",
     )
-    restaurant_hours: str = Field(
-        default="Monday-Sunday: 11:00 AM - 10:00 PM",
-        description="Operating hours",
+    database_echo: bool = Field(
+        default=False,
+        description="Echo SQL queries to logger for debugging",
     )
 
     # --- App & Observability ---
@@ -134,6 +153,42 @@ class Settings(BaseSettings):
         default="INFO",
         description="Logging level (DEBUG, INFO, WARNING, ERROR)",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy_fields(cls, data: Any) -> Any:
+        """Map legacy restaurant keys to clinic fields if clinic keys are absent or overridden."""
+        if isinstance(data, dict):
+            if "restaurant_name" in data and ("clinic_name" not in data or data.get("clinic_name") == "مجمع عيادات النور التخصصي"):
+                data["clinic_name"] = data["restaurant_name"]
+            if "restaurant_phone" in data and ("clinic_phone" not in data or data.get("clinic_phone") == "+20 2 3345 6789"):
+                data["clinic_phone"] = data["restaurant_phone"]
+            if "restaurant_address" in data and ("clinic_address" not in data or data.get("clinic_address") == "شارع النصر، المعادي، القاهرة، مصر"):
+                data["clinic_address"] = data["restaurant_address"]
+            if "restaurant_hours" in data and ("clinic_working_hours" not in data or "السبت" in str(data.get("clinic_working_hours", ""))):
+                data["clinic_working_hours"] = data["restaurant_hours"]
+        return data
+
+    # --- Backward-Compatibility Aliases ---
+    @property
+    def restaurant_name(self) -> str:
+        """Legacy alias delegating to clinic_name."""
+        return self.clinic_name
+
+    @property
+    def restaurant_phone(self) -> str:
+        """Legacy alias delegating to clinic_phone."""
+        return self.clinic_phone
+
+    @property
+    def restaurant_address(self) -> str:
+        """Legacy alias delegating to clinic_address."""
+        return self.clinic_address
+
+    @property
+    def restaurant_hours(self) -> str:
+        """Legacy alias delegating to clinic_working_hours."""
+        return self.clinic_working_hours
 
     def is_livekit_configured(self) -> bool:
         """Check if LiveKit credentials are provided."""
@@ -160,9 +215,33 @@ class Settings(BaseSettings):
         """Check if using Qdrant Cloud or local in-memory."""
         if not self.qdrant_url or not self.qdrant_api_key:
             return False
-        if "your-cluster-id" in self.qdrant_url or "your_" in self.qdrant_api_key:
-            return False
-        return True
+        return not (
+            "your-cluster-id" in self.qdrant_url or "your_" in self.qdrant_api_key
+        )
+
+    def is_database_configured(self) -> bool:
+        """Check if relational database URL is configured."""
+        return bool(self.database_url)
+
+    def get_sqlite_db_path(self) -> str | None:
+        """Extract SQLite file path from URL and guarantee parent directory exists."""
+        if not self.database_url or "sqlite" not in self.database_url:
+            return None
+        url = self.database_url
+        if ":///" in url:
+            path_part = url.split(":///", 1)[1]
+        elif "://" in url:
+            path_part = url.split("://", 1)[1]
+        else:
+            return None
+
+        clean_path = path_part.split("?", 1)[0]
+        if clean_path in (":memory:", ""):
+            return None
+
+        db_path = Path(clean_path).resolve()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return str(db_path)
 
 
 # Global singleton settings instance

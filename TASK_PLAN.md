@@ -5,8 +5,8 @@
 - [x] Step 1.2: Align `implementation_plan.md` and `TASK_PLAN.md` in workspace root
 
 ## Phase 1: Foundation & Async Relational Database Layer
-- [ ] Step 1.3: Update `src/config.py` with clinic parameters and database settings
-- [ ] Step 1.4: Implement Async SQLAlchemy engine & base session in `src/db/session.py`
+- [x] Step 1.3: Update `src/config.py` with clinic parameters and database settings
+- [x] Step 1.4: Implement Async SQLAlchemy engine & base session in `src/db/session.py`
 - [ ] Step 1.5: Define relational models in `src/db/models.py` (`Specialty`, `Doctor`, `DoctorSchedule`, `Patient`, `Appointment`)
 - [ ] Step 1.6: Build database repository & seeding script with realistic Egyptian clinic data in `src/db/repository.py` & `scripts/seed_clinic_db.py`
 - [ ] Step 1.7: Write and run automated unit tests for database transactions & capacity management in `tests/test_database.py`

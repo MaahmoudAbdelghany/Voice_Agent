@@ -12,7 +12,7 @@ This roadmap is a **Living Document** under Spec-Driven Development (SDD). Each 
 *Goal: Establish environment configuration for polyclinics and build a robust, async relational database for doctors, specialties, schedules, and patient appointments.*
 
 - [x] **Feature 1.1**: Spec Constitution & Governance Pivot (`spec/mission.md`, `spec/tech.md`, `spec/roadmap.md`).
-- [ ] **Feature 1.2**: Configuration & Database Engine (`src/config.py`, Async SQLAlchemy with SQLite / PostgreSQL connection).
+- [x] **Feature 1.2**: Configuration & Database Engine (`src/config.py`, Async SQLAlchemy with SQLite / PostgreSQL connection).
 - [ ] **Feature 1.3**: Relational Models & Schemas (`Specialty`, `Doctor`, `DoctorSchedule`, `Patient`, `Appointment`).
 - [ ] **Feature 1.4**: Database Seeder & Repository Layer (Realistic Egyptian doctors, specialties, shift hours, and capacity management).
 - [ ] **Feature 1.5**: Automated Database & Concurrency Test Suite (`tests/test_database.py`).

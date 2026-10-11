@@ -54,6 +54,14 @@ class QdrantKnowledgeRetriever:
                         distance=qmodels.Distance.COSINE,
                     ),
                 )
+                try:
+                    self.client.create_payload_index(
+                        collection_name=self.collection_name,
+                        field_name="category",
+                        field_schema=qmodels.PayloadSchemaType.KEYWORD,
+                    )
+                except Exception as idx_err:
+                    logger.debug(f"Payload index creation info for '{self.collection_name}': {idx_err}")
         except Exception as e:
             logger.error(f"Error checking/creating collection '{self.collection_name}': {e}")
 

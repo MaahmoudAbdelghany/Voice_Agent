@@ -46,8 +46,8 @@ The agent can:
 ### **Phase 1: Project Foundation & Async Database Layer**
 - [x] Step 1.1: Pivot project specifications to Egyptian Polyclinics.
 - [x] Step 1.2: Align `implementation_plan.md` and `TASK_PLAN.md`.
-- [ ] Step 1.3: Update `src/config.py` with clinic parameters and database URL settings.
-- [ ] Step 1.4: Implement Async SQLAlchemy session manager (`src/db/session.py`).
+- [x] Step 1.3: Update `src/config.py` with clinic parameters and database URL settings.
+- [x] Step 1.4: Implement Async SQLAlchemy session manager (`src/db/session.py`).
 - [ ] Step 1.5: Define relational models (`Specialty`, `Doctor`, `DoctorSchedule`, `Patient`, `Appointment`).
 - [ ] Step 1.6: Build database repository & seed script with realistic Egyptian clinic data.
 - [ ] Step 1.7: Write and run automated unit tests for database transactions.
