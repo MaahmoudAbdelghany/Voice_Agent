@@ -1,59 +1,45 @@
-# Voice Agent — Task Plan
+# Voice Agent (Egyptian Polyclinics) — Task Plan
 
-## Spec-Driven Development (SDD) Constitution & Governance
-- [x] spec/mission.md — Product Mission, Problem, Target Users & Scope
-- [x] spec/tech.md — Tech Constitution, Architecture Invariants & SLA Budgets
-- [x] spec/roadmap.md — Product Roadmap & Phased Feature Tracker
-- [x] .agents/skills/skill for working on the next feature/SKILL.md — Pre-implementation SDD Feature Validation & 3-Tier Testing Skill
+## Spec-Driven Development (SDD) Constitution & Governance Pivot
+- [x] Step 1.1: Pivot project specifications to Egyptian Polyclinics (`spec/mission.md`, `spec/tech.md`, `spec/roadmap.md`)
+- [x] Step 1.2: Align `implementation_plan.md` and `TASK_PLAN.md` in workspace root
 
-## Phase 1: Project Foundation & Configuration
-- [x] pyproject.toml — dependencies and packaging configuration (Hatchling)
-- [x] .gitignore & .env.example — environment templates & security exclusions
-- [x] src/config.py — centralized settings with Pydantic BaseSettings
-- [x] README.md — project overview and architecture documentation
+## Phase 1: Foundation & Async Relational Database Layer
+- [ ] Step 1.3: Update `src/config.py` with clinic parameters and database settings
+- [ ] Step 1.4: Implement Async SQLAlchemy engine & base session in `src/db/session.py`
+- [ ] Step 1.5: Define relational models in `src/db/models.py` (`Specialty`, `Doctor`, `DoctorSchedule`, `Patient`, `Appointment`)
+- [ ] Step 1.6: Build database repository & seeding script with realistic Egyptian clinic data in `src/db/repository.py` & `scripts/seed_clinic_db.py`
+- [ ] Step 1.7: Write and run automated unit tests for database transactions & capacity management in `tests/test_database.py`
 
-## Phase 2: RAG Knowledge Base Engine (Qdrant + FastEmbed)
-- [x] knowledge_base/restaurant_kb.md — rich restaurant domain knowledge base
-- [x] src/rag/embeddings.py — FastEmbed multilingual embedding service (paraphrase-multilingual-MiniLM-L12-v2)
-- [x] src/rag/retriever.py — Qdrant vector store connection & hybrid search
-- [x] src/rag/ingestion.py — markdown header-aware chunking pipeline
-- [x] scripts/ingest_knowledge.py — CLI ingestion & retrieval verification script
-- [x] tests/test_rag.py — unit tests for embeddings, retriever, and ingestion
+## Phase 2: Egyptian Clinic Knowledge Base Engine (Qdrant RAG)
+- [ ] Step 2.1: Author rich Egyptian clinic knowledge base in `knowledge_base/clinic_kb.md`
+- [ ] Step 2.2: Build CLI ingestion script for `clinic_kb` collection in `scripts/ingest_clinic_knowledge.py`
+- [ ] Step 2.3: Verify vector embeddings and search with unit tests in `tests/test_clinic_rag.py`
 
-## Phase 3: Agent Tools & Domain Execution Logic
-- [x] src/tools/schemas.py — Pydantic schemas for tool inputs and outputs
-- [x] src/tools/knowledge_search.py — RAG knowledge search tool for menu and policies
-- [x] src/tools/order_status.py — order lookup & live delivery tracking tool
-- [x] src/tools/reservation.py — table booking & availability reservation tool
-- [x] src/tools/human_handoff.py — human supervisor escalation & handoff tool
-- [x] src/tools/__init__.py — tool registry and exports
-- [x] tests/test_tools.py — unit tests for all domain execution tools
+## Phase 3: Clinic Domain Execution Tools
+- [ ] Step 3.1: Define strongly-typed Pydantic schemas in `src/tools/schemas.py`
+- [ ] Step 3.2: Implement doctor availability tool in `src/tools/doctor_availability.py`
+- [ ] Step 3.3: Implement appointment booking tool with atomic queue assignment in `src/tools/appointment_booking.py`
+- [ ] Step 3.4: Implement appointment query, reschedule & cancellation tool in `src/tools/manage_appointment.py`
+- [ ] Step 3.5: Adapt clinic knowledge search tool in `src/tools/knowledge_search.py`
+- [ ] Step 3.6: Adapt receptionist escalation tool with dashboard notification in `src/tools/human_handoff.py`
+- [ ] Step 3.7: Write and run unit tests for all medical tools in `tests/test_clinic_tools.py`
 
-## Phase 4: Real-Time LiveKit Voice Agent Core
-- [x] src/agent/prompts.py — persona, system prompts, and conversation guidelines
-- [x] src/agent/session_manager.py — call session state, turn memory, and context tracking
-- [x] src/agent/voice_agent.py — LiveKit pipeline (Deepgram STT + Groq LLM + ElevenLabs TTS + Silero VAD + Tools)
-- [x] scripts/test_call.py — CLI voice agent simulation runner
-- [x] tests/test_agent.py — session orchestration and agent pipeline tests
+## Phase 4: Real-Time LiveKit Voice Agent Core & Medical Persona
+- [ ] Step 4.1: Author Egyptian medical receptionist persona & system prompts with strict guardrails in `src/agent/prompts.py`
+- [ ] Step 4.2: Update call session manager & metrics tracking in `src/agent/session_manager.py`
+- [ ] Step 4.3: Wire LiveKit voice pipeline worker with registered clinic tools in `src/agent/voice_agent.py`
+- [ ] Step 4.4: Update CLI call simulation runner for clinic scenarios in `scripts/test_call.py`
+- [ ] Step 4.5: Write and run agent pipeline and guardrail tests in `tests/test_agent.py`
 
-- [x] src/dashboard/app.py — main Streamlit dashboard entry point & styling
-- [x] spec/features/feature-502-call-logs-transcript-viewer/ — Feature 5.2 Plan, Requirements & 3-Tier Validation Specification
-- [x] Step 5.2.1: src/dashboard/calls_data.py, i18n & CSS — data layer, demo seeder, audio resolver & styles
-- [x] Step 5.2.2: src/dashboard/pages/01_calls.py — call logs, audio playback & transcript viewer page
-- [x] Step 5.2.3: tests/test_calls_page.py — 3-Tier automated validation suite
-- [x] spec/features/feature-503-latency-charts-call-volume-analytics/ — Feature 5.3 Plan, Requirements & 3-Tier Validation Specification
-- [x] Step 5.3.1: src/dashboard/analytics_data.py, i18n & CSS — data aggregator, 7-day seeder, translations & styles
-- [x] Step 5.3.2: src/dashboard/pages/02_analytics.py — executive KPI cards, Plotly latency breakdown & volume charts
-- [x] Step 5.3.3: tests/test_analytics_page.py — 3-Tier automated validation suite & regression checks
-- [ ] src/dashboard/pages/03_knowledge.py — knowledge base management & live ingestion UI
-- [ ] src/dashboard/pages/04_settings.py — prompt playground & runtime configuration
+## Phase 5: Clinic Admin & Analytics Dashboard
+- [ ] Step 5.1: Update main dashboard portal, RTL theme & clinic branding in `src/dashboard/app.py`
+- [ ] Step 5.2: Update call logs, audio playback & transcript viewer in `src/dashboard/pages/01_calls.py`
+- [ ] Step 5.3: Build appointments & queue management view in `src/dashboard/pages/02_appointments.py`
+- [ ] Step 5.4: Adapt latency & call analytics in `src/dashboard/pages/03_analytics.py`
+- [ ] Step 5.5: Build receptionist escalations alert drawer in `src/dashboard/pages/04_escalations.py`
 
-## Phase 6: Production Containerization & AWS Deployment
-- [ ] Dockerfile — multi-stage production container build
-- [ ] docker-compose.yml — local multi-container orchestration
-- [ ] infra/ecs-task-definition.json — AWS ECS Fargate task definition
-- [ ] infra/deploy.sh — AWS deployment automation script
-- [ ] tests/test_e2e.py — end-to-end simulated call flow verification
-
-
-finaly i want make our conversation in arabic
+## Phase 6: Production Containerization & Cloud Deployment
+- [ ] Step 6.1: Multi-stage Dockerfile and docker-compose.yml with PostgreSQL and Qdrant
+- [ ] Step 6.2: AWS ECS Fargate task definition & deployment automation scripts
+- [ ] Step 6.3: End-to-end simulated call verification in `tests/test_e2e.py`

@@ -1,34 +1,41 @@
-# Project Mission — Voice AI Agent for Restaurant & Food Delivery
+# Project Mission — Voice AI Agent for Egyptian Polyclinics & Medical Centers
 
 ## 1. Product (WHAT)
-**Voice AI Agent** is an enterprise-grade, ultra-low-latency conversational voice assistant designed for restaurants and food delivery services. It operates over real-time WebRTC audio streams, handling incoming phone calls and audio interactions with human-like responsiveness, contextual memory, and domain tool execution.
+**Voice AI Medical Receptionist (مساعد العيادة الصوتي الذكي)** is an enterprise-grade, ultra-low-latency conversational voice assistant designed specifically for Egyptian polyclinics, medical centers, and specialized healthcare practices. Operating over real-time WebRTC audio streams, the agent communicates fluently in professional, polite Egyptian Arabic (العامية المصرية المهذبة والمرحبة) alongside Modern Standard Arabic and English, managing incoming patient phone calls with human-like responsiveness, contextual memory, and database execution.
 
 ## 2. Problem Statement (WHY)
-Restaurants and food delivery operations suffer from high peak-hour call volumes, resulting in:
-- Missed customer orders and reservation inquiries.
-- Inconsistent answers regarding menu items, allergens, and branch policies.
-- High operational overhead and staff burnout during busy rush hours.
-- Slow legacy IVR phone trees that frustrate customers.
+Egyptian clinics and healthcare centers face severe communication bottlenecks during peak operating hours:
+- High telephone call drop rates resulting in missed patient bookings and lost clinic revenue.
+- Front-desk receptionist overload handling repetitive questions about doctor schedules, specialty availability, fees, and preparation guidelines.
+- Disorganized patient queues and booking disputes due to manual, paper-based, or fragmented scheduling.
+- Patient frustration with long hold times or rigid legacy IVR phone trees.
 
 ## 3. Target Users (WHO)
-- **Callers / Customers**: Hungry customers seeking fast menu recommendations, order delivery status updates, table reservations, or human assistance.
-- **Restaurant Operators & Managers**: Staff needing reduced phone load and an operational dashboard for call monitoring, transcripts, and analytics.
+- **Patients & Callers (المرضى والمراجعون)**: Individuals seeking rapid inquiry about doctor availability, booking examination appointments, checking queue/shift hours, managing existing appointments, or requesting directions and clinic fees.
+- **Clinic Administrators & Receptionists (إدارة العيادة وموظفو الاستقبال)**: Healthcare staff benefiting from automated triage, instant handoff for urgent cases, a unified booking database, and real-time call analytics.
+- **Doctors & Medical Specialists (الأطباء والاستشاريون)**: Physicians with predictable patient queues, controlled shift capacities, and zero manual scheduling distractions.
 
 ## 4. Core Value Proposition & Goals
-- **Sub-Second Voice Latency**: Sub-500ms conversational turn turnaround via streaming STT, high-speed LLM reasoning, and streaming TTS.
-- **Natural Voice Barge-In**: Real-time voice activity detection (VAD) allowing callers to interrupt the AI naturally.
-- **Domain Tools Execution**: Grounded actions for menu search (RAG), live order tracking, table booking, and seamless supervisor handoff.
-- **Bilingual Capability**: Native support for Arabic and English customer interactions.
+- **Sub-Second Voice Latency (<800ms)**: Streaming STT, high-speed LLM reasoning, and streaming TTS deliver seamless, natural conversational turns without awkward pauses.
+- **Egyptian Clinic Shift Scheduling**: Native support for clinic shift windows (e.g. 6:00 PM – 9:00 PM) with first-come first-served queue numbers (نمرة الحجز) and shift capacity caps.
+- **Relational Booking Integrity**: Direct connection to an ACID-compliant database to prevent double bookings, track patient visits (new examination vs consultation/follow-up), and record cancellations.
+- **Grounded Medical Knowledge & Strict Guardrails**: Accurate answers regarding specialties, doctor credentials, examination fees, accepted health insurance, and pre-visit instructions (e.g. fasting), paired with a **strict ban on medical diagnosis or drug prescriptions**.
+- **Human Receptionist Escalation**: Immediate transfer and alert mechanism to front-desk staff whenever a patient requests human assistance or presents emergency/complex symptoms.
 
 ## 5. Scope & Boundaries
-### In Scope (Current & Planned MVP):
-- Real-time WebRTC voice pipeline (LiveKit, Deepgram STT, Groq Llama 3.3, ElevenLabs TTS, Silero VAD).
-- Local / Cloud RAG Knowledge Base powered by Qdrant and FastEmbed multilingual embeddings.
-- Structured execution tools: `search_knowledge_base`, `check_order_status`, `book_reservation`, `escalate_to_human`.
-- Call session memory, turn-taking state management, and metrics collection.
-- Streamlit administrative dashboard for live logs, metrics, prompt engineering, and KB management.
-- Docker multi-stage containerization and AWS ECS Fargate deployment specs.
+### In Scope (MVP & Production):
+- Real-time WebRTC streaming voice pipeline (LiveKit, Deepgram STT, Groq Llama 3.3, ElevenLabs TTS, Silero VAD).
+- Async Relational Database (SQLite for local dev / PostgreSQL for production) with tables for `Specialties`, `Doctors`, `DoctorSchedules`, `Appointments`, and `Patients`.
+- Specialized Clinic Tools:
+  - `check_doctor_availability`: Query upcoming shift dates, hours, and remaining capacity by doctor or specialty.
+  - `book_appointment`: Reserve a confirmed queue slot for a patient (new examination or follow-up).
+  - `manage_appointment`: Query, reschedule, or cancel existing bookings by caller phone number.
+  - `search_clinic_knowledge`: RAG retrieval for clinic policies, fees, tests, insurances, and address.
+  - `transfer_to_receptionist`: Escalate to front-desk staff with summary and live dashboard notification.
+- Streamlit Clinical Dashboard for live call monitoring, audio playback, appointment logs, and latency KPIs.
+- Containerization and production AWS deployment specs.
 
 ### Out of Scope:
-- Direct credit card processing over voice (PCI-DSS compliance deferred to external payment links/SMS).
-- Multi-tenant enterprise RBAC (Single restaurant branch / franchise model for initial release).
+- Direct over-the-phone medical diagnosis, triage of life-threatening emergencies (routed immediately to emergency hotlines/reception), or prescription advice.
+- Direct credit card processing over audio (deferred to clinic arrival or external SMS payment links).
+- Direct bi-directional integration with complex proprietary hospital EHR/EMR systems (e.g. Epic/Cerner) during the MVP phase.
