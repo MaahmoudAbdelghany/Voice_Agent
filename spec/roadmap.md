@@ -15,7 +15,7 @@ This roadmap is a **Living Document** under Spec-Driven Development (SDD). Each 
 - [x] **Feature 1.2**: Configuration & Database Engine (`src/config.py`, Async SQLAlchemy with SQLite / PostgreSQL connection).
 - [x] **Feature 1.3**: Relational Models & Schemas (`Specialty`, `Doctor`, `DoctorSchedule`, `Patient`, `Appointment`).
 - [x] **Feature 1.4**: Database Seeder & Repository Layer (Realistic Egyptian doctors, specialties, shift hours, and capacity management).
-- [ ] **Feature 1.5**: Automated Database & Concurrency Test Suite (`tests/test_database.py`).
+- [x] **Feature 1.5**: Automated Database & Concurrency Test Suite (`tests/test_database.py`).
 
 ### Phase 2: Egyptian Clinic Knowledge Base Engine (Qdrant RAG) 📚
 *Goal: Provide instant, grounded semantic search for specialty questions, clinic services, test preparation, doctor credentials, and insurance.*

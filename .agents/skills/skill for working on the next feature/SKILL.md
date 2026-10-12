@@ -1,6 +1,7 @@
 
 ### 1. Read `spec/` Folder in Root Directory
 - Always read the project constitution files using `view_file`:
+ - `implementation_plan.md`: Understand the implementation plan
   - `spec/mission.md`: Understand the WHAT, WHY, target users, and boundaries or scope
   - `spec/tech.md`: Verify architectural invariants, tech stack selections
   - `spec/roadmap.md`: Understand completed milestones and current project trajectory.
@@ -51,13 +52,16 @@
 - Always use the `view_file` to read the validation skill in validation folder in workspace root
 
 
-### 6. Wait for Human Review (Mandatory Gate) 🛑
+after create plan.md and requirements.md and validation.md:i want you put plan.md , requirements.md , validation.md  into artifacts in arabic with good format arabic from right to left
+
+
+### 7. Wait for Human Review (Mandatory Gate) 🛑
 - **Halt all coding activity immediately.**
 - Present the generated specification files (`plan.md`, `requirements.md`, `validation.md`) to the human supervisor.
 - Highlight key decisions, trade-offs, and open questions.
 - **Strict Prohibition**: Never write application code or make edits before receiving explicit approval (e.g., *"go ahead"*, *"approved"*, *"اعتمد"*).
 
-### 7 when human approved the spec feature :
+### 8 when human approved the spec feature :
 
 - Always read using `view_file`
 
@@ -67,7 +71,7 @@
 and i want you working on the feature based on the cuurent plan.md  feature and requirements.md and tell me what you done and wait to give you approval to make validation
 
 
-### 8 after done working on the feature :
+### 9 after done working on the feature :
 
 - Always read using `view_file`
 
@@ -75,7 +79,7 @@ and i want you working on the feature based on the cuurent plan.md  feature and 
 
  tell me what you done and wait to give you approval to make review of the feature 
 
-### 9 after done working on the validation of the feature :
+### 10 after done working on the validation of the feature :
 
 - Always read using `view_file`
 

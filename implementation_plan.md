@@ -50,7 +50,7 @@ The agent can:
 - [x] Step 1.4: Implement Async SQLAlchemy session manager (`src/db/session.py`).
 - [x] Step 1.5: Define relational models (`Specialty`, `Doctor`, `DoctorSchedule`, `Patient`, `Appointment`).
 - [x] Step 1.6: Build database repository & seed script with realistic Egyptian clinic data.
-- [ ] Step 1.7: Write and run automated unit tests for database transactions.
+- [x] Step 1.7: Write and run automated unit tests for database transactions.
 
 ### **Phase 2: Egyptian Clinic Knowledge Base Engine (Qdrant RAG)**
 - [ ] Step 2.1: Author rich Egyptian clinic knowledge base (`knowledge_base/clinic_kb.md`).

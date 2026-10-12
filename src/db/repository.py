@@ -9,8 +9,10 @@ Provides an asynchronous, transactional data access abstraction for:
 - Booking lookups and cancellations
 """
 
+import asyncio
 from collections.abc import Sequence
 from datetime import date
+from typing import ClassVar
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -61,6 +63,17 @@ class AppointmentNotFoundError(ClinicRepositoryError):
 
 class ClinicRepository:
     """Async repository managing clinic entities, transactions, and bookings."""
+
+    _shift_locks: ClassVar[dict[tuple[asyncio.AbstractEventLoop, int, date], asyncio.Lock]] = {}
+
+    @classmethod
+    async def _get_shift_lock(cls, doctor_id: int, appointment_date: date) -> asyncio.Lock:
+        """Retrieve or create an asyncio.Lock per doctor shift date bound to the running event loop."""
+        loop = asyncio.get_running_loop()
+        key = (loop, doctor_id, appointment_date)
+        if key not in cls._shift_locks:
+            cls._shift_locks[key] = asyncio.Lock()
+        return cls._shift_locks[key]
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -282,81 +295,89 @@ class ClinicRepository:
         appointment_date: date,
         visit_type: VisitType | str = VisitType.EXAMINATION,
         notes: str | None = None,
+        auto_commit: bool = True,
     ) -> Appointment:
         """
         Atomically reserve a patient appointment inside a database transaction.
 
+        - Uses per-shift asyncio lock to prevent race conditions across concurrent callers
         - Verifies patient and doctor exist
         - Verifies doctor shift exists on target appointment_date
         - Enforces shift maximum capacity
         - Assigns next sequential queue number starting at 1
         - Generates unique booking code: APT-YYYYMMDD-D{doctor_id}Q{queue_number}
+        - Commits transaction by default (auto_commit=True) for immediate multi-session consistency
         """
-        # 1. Verify Patient
-        stmt_p = select(Patient).where(Patient.id == patient_id)
-        res_p = await self.session.execute(stmt_p)
-        patient = res_p.scalars().first()
-        if not patient:
-            raise PatientNotFoundError(f"Patient with ID {patient_id} does not exist.")
+        lock = await self._get_shift_lock(doctor_id, appointment_date)
+        async with lock:
+            # 1. Verify Patient
+            stmt_p = select(Patient).where(Patient.id == patient_id)
+            res_p = await self.session.execute(stmt_p)
+            patient = res_p.scalars().first()
+            if not patient:
+                raise PatientNotFoundError(f"Patient with ID {patient_id} does not exist.")
 
-        # 2. Check Doctor Availability & Shift Capacity
-        avail = await self.get_doctor_availability(doctor_id, appointment_date)
-        if not avail.has_shift or not avail.schedule_id:
-            raise ShiftNotFoundError(
-                f"الطبيب ليس لديه شفت عمل مجدول في يوم {avail.day_name_ar} ({appointment_date})."
+            # 2. Check Doctor Availability & Shift Capacity
+            avail = await self.get_doctor_availability(doctor_id, appointment_date)
+            if not avail.has_shift or not avail.schedule_id:
+                raise ShiftNotFoundError(
+                    f"الطبيب ليس لديه شفت عمل مجدول في يوم {avail.day_name_ar} ({appointment_date})."
+                )
+
+            if not avail.is_available:
+                raise ShiftCapacityExceededError(
+                    f"شفت الطبيب {avail.doctor_name_ar} مكتمل بالكامل في تاريخ {appointment_date} "
+                    f"(السعة القصوى {avail.max_capacity} مريض)."
+                )
+
+            # 3. Determine Visit Type and Fee
+            if isinstance(visit_type, VisitType):
+                v_type_str = visit_type.value
+            else:
+                v_type_str = str(visit_type).lower()
+
+            fee = (
+                avail.consultation_fee
+                if v_type_str == VisitType.CONSULTATION.value
+                else avail.examination_fee
             )
 
-        if not avail.is_available:
-            raise ShiftCapacityExceededError(
-                f"شفت الطبيب {avail.doctor_name_ar} مكتمل بالكامل في تاريخ {appointment_date} "
-                f"(السعة القصوى {avail.max_capacity} مريض)."
+            # 4. Atomically Calculate Next Queue Number
+            stmt_max = select(func.coalesce(func.max(Appointment.queue_number), 0)).where(
+                Appointment.doctor_id == doctor_id,
+                Appointment.appointment_date == appointment_date,
+            )
+            max_res = await self.session.execute(stmt_max)
+            current_max = max_res.scalar_one() or 0
+            next_queue = current_max + 1
+
+            # 5. Generate Human-Readable Booking Code
+            # Format: APT-YYYYMMDD-XXX (e.g. APT-20261015-001)
+            date_str = appointment_date.strftime("%Y%m%d")
+            booking_code = f"APT-{date_str}-{doctor_id:02d}{next_queue:03d}"
+
+            # 6. Instantiate Appointment
+            appointment = Appointment(
+                booking_code=booking_code,
+                patient_id=patient_id,
+                doctor_id=doctor_id,
+                schedule_id=avail.schedule_id,
+                appointment_date=appointment_date,
+                queue_number=next_queue,
+                visit_type=v_type_str,
+                status=AppointmentStatus.CONFIRMED.value,
+                fee=fee,
+                notes=notes,
             )
 
-        # 3. Determine Visit Type and Fee
-        if isinstance(visit_type, VisitType):
-            v_type_str = visit_type.value
-        else:
-            v_type_str = str(visit_type).lower()
+            self.session.add(appointment)
+            if auto_commit:
+                await self.session.commit()
+            else:
+                await self.session.flush()
 
-        fee = (
-            avail.consultation_fee
-            if v_type_str == VisitType.CONSULTATION.value
-            else avail.examination_fee
-        )
-
-        # 4. Atomically Calculate Next Queue Number
-        stmt_max = select(func.coalesce(func.max(Appointment.queue_number), 0)).where(
-            Appointment.doctor_id == doctor_id,
-            Appointment.appointment_date == appointment_date,
-        )
-        max_res = await self.session.execute(stmt_max)
-        current_max = max_res.scalar_one() or 0
-        next_queue = current_max + 1
-
-        # 5. Generate Human-Readable Booking Code
-        # Format: APT-YYYYMMDD-XXX (e.g. APT-20261015-001)
-        date_str = appointment_date.strftime("%Y%m%d")
-        booking_code = f"APT-{date_str}-{doctor_id:02d}{next_queue:03d}"
-
-        # 6. Instantiate Appointment
-        appointment = Appointment(
-            booking_code=booking_code,
-            patient_id=patient_id,
-            doctor_id=doctor_id,
-            schedule_id=avail.schedule_id,
-            appointment_date=appointment_date,
-            queue_number=next_queue,
-            visit_type=v_type_str,
-            status=AppointmentStatus.CONFIRMED.value,
-            fee=fee,
-            notes=notes,
-        )
-
-        self.session.add(appointment)
-        await self.session.flush()
-
-        # Eagerly refresh to populate relationships
-        return await self.get_appointment_by_code(booking_code) or appointment
+            # Eagerly refresh to populate relationships
+            return await self.get_appointment_by_code(booking_code) or appointment
 
     async def get_appointment_by_code(self, booking_code: str) -> Appointment | None:
         """Retrieve an appointment by its unique booking code."""
@@ -400,6 +421,7 @@ class ClinicRepository:
         self,
         booking_code: str,
         reason: str | None = None,
+        auto_commit: bool = True,
     ) -> Appointment | None:
         """Cancel an appointment and record cancellation reason."""
         appointment = await self.get_appointment_by_code(booking_code)
@@ -415,5 +437,8 @@ class ClinicRepository:
                 else f"سبب الإلغاء: {reason}"
             )
 
-        await self.session.flush()
+        if auto_commit:
+            await self.session.commit()
+        else:
+            await self.session.flush()
         return appointment
