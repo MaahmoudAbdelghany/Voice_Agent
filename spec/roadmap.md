@@ -21,7 +21,7 @@ This roadmap is a **Living Document** under Spec-Driven Development (SDD). Each 
 *Goal: Provide instant, grounded semantic search for specialty questions, clinic services, test preparation, doctor credentials, and insurance.*
 
 - [x] **Feature 2.1**: Egyptian Clinic Knowledge Base document (`knowledge_base/clinic_kb.md`).
-- [ ] **Feature 2.2**: Vector Store Ingestion & CLI Pipeline for `clinic_kb` collection (`scripts/ingest_clinic_knowledge.py`).
+- [x] **Feature 2.2**: Vector Store Ingestion & CLI Pipeline for `clinic_kb` collection (`scripts/ingest_clinic_knowledge.py`).
 - [ ] **Feature 2.3**: Knowledge Retrieval Verification & Tests (`tests/test_clinic_rag.py`).
 
 ### Phase 3: Clinic Domain Execution Tools 🛠️

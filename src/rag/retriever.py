@@ -65,6 +65,17 @@ class QdrantKnowledgeRetriever:
         except Exception as e:
             logger.error(f"Error checking/creating collection '{self.collection_name}': {e}")
 
+    def recreate_collection(self) -> None:
+        """Deletes existing collection if present and creates a fresh collection."""
+        try:
+            collections = self.client.get_collections().collections
+            if any(col.name == self.collection_name for col in collections):
+                logger.info(f"Deleting existing collection '{self.collection_name}'...")
+                self.client.delete_collection(collection_name=self.collection_name)
+        except Exception as e:
+            logger.warning(f"Error deleting collection '{self.collection_name}': {e}")
+        self._ensure_collection()
+
     def upsert_chunks(self, chunks: List[Dict[str, Any]]) -> int:
         """
         Embed and upsert knowledge chunks into Qdrant collection.

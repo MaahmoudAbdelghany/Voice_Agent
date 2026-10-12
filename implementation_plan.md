@@ -54,7 +54,7 @@ The agent can:
 
 ### **Phase 2: Egyptian Clinic Knowledge Base Engine (Qdrant RAG)**
 - [x] Step 2.1: Author rich Egyptian clinic knowledge base (`knowledge_base/clinic_kb.md`).
-- [ ] Step 2.2: Build CLI ingestion pipeline for `clinic_kb` collection.
+- [x] Step 2.2: Build CLI ingestion pipeline for `clinic_kb` collection.
 - [ ] Step 2.3: Verify vector embeddings and search with unit tests.
 
 ### **Phase 3: Clinic Domain Execution Tools**
