@@ -51,6 +51,14 @@ class DayOfWeek(int, Enum):
         }
         return names.get(self.value, "")
 
+    @classmethod
+    def from_date(cls, d: date) -> "DayOfWeek":
+        """Convert a standard Python date to Egyptian DayOfWeek (0=Saturday..6=Friday)."""
+        # Python weekday: Mon=0, Tue=1, Wed=2, Thu=3, Fri=4, Sat=5, Sun=6
+        # Egyptian DayOfWeek: Sat=0, Sun=1, Mon=2, Tue=3, Wed=4, Thu=5, Fri=6
+        val = (d.weekday() + 2) % 7
+        return cls(val)
+
 
 class DoctorTitle(str, Enum):
     """Medical professional hierarchy."""
@@ -250,3 +258,31 @@ class AppointmentRead(AppointmentBase):
     doctor: DoctorRead | None = None
     schedule: DoctorScheduleRead | None = None
     model_config = ConfigDict(from_attributes=True)
+
+
+# ==============================================================================
+# Availability Schemas
+# ==============================================================================
+
+
+class DoctorAvailabilityRead(BaseModel):
+    """Calculated shift availability and remaining capacity for a doctor on a specific date."""
+
+    doctor_id: int
+    doctor_name_ar: str
+    specialty_name_ar: str
+    target_date: date
+    day_of_week: DayOfWeek
+    day_name_ar: str
+    has_shift: bool
+    schedule_id: int | None = None
+    shift_start: time | None = None
+    shift_end: time | None = None
+    formatted_shift: str | None = None
+    max_capacity: int = 0
+    booked_count: int = 0
+    remaining_capacity: int = 0
+    is_available: bool = False
+    examination_fee: float = 0.0
+    consultation_fee: float = 0.0
+

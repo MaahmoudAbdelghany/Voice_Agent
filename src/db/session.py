@@ -126,15 +126,23 @@ async def get_async_session(
         await session.close()
 
 
-async def init_db(engine: AsyncEngine | None = None) -> None:
+async def init_db(engine: AsyncEngine | None = None, reset: bool = False) -> None:
     """
     Initialize all tables registered with DeclarativeBase.
+
+    If reset is True, drops all tables before creating them fresh.
     """
     target_engine = engine or get_engine()
+    if reset:
+        logger.warning("Dropping all existing database tables (reset=True)...")
+        async with target_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+
     logger.info("Initializing database schemas registered on Base.metadata...")
     async with target_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database schemas initialized successfully.")
+
 
 
 async def close_db(engine: AsyncEngine | None = None) -> None:

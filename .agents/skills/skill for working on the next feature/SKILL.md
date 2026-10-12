@@ -82,6 +82,8 @@ and i want you working on the feature based on the cuurent plan.md  feature and 
  .agents\skills\review after validation\SKILL.md to make review on the feature
 
 
+make sure to make conversation between us in arabic with good format  from right to left
+
 
 
 

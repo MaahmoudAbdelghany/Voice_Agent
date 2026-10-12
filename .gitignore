@@ -44,6 +44,10 @@ temp/
 scratch/
 data/calls/
 data/*.json
+data/*.db
+*.db
+*.sqlite
+*.sqlite3
 
 # IDE
 .idea/

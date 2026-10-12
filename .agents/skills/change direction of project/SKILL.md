@@ -1,7 +1,7 @@
 We need to change the direction of this existing project.
 
 **Current direction:**
-[Right now I'm working on a voice agent that serves restaurants, but I want to change the product direction to serve Egyptian clinics instead. For example, I'd need to handle questions like checking doctor availability, booking appointments, and answering inquiries about specialties. I'd need agents for appointment scheduling, handling patient inquiries, and routing calls to a human receptionist when needed. The system should connect to a database for bookings, doctor schedules, and availability. ]
+[ ]
 
 
 Analyze and report:
