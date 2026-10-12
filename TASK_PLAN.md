@@ -12,7 +12,7 @@
 - [x] Step 1.7: Write and run automated unit tests for database transactions & capacity management in `tests/test_database.py`
 
 ## Phase 2: Egyptian Clinic Knowledge Base Engine (Qdrant RAG)
-- [ ] Step 2.1: Author rich Egyptian clinic knowledge base in `knowledge_base/clinic_kb.md`
+- [x] Step 2.1: Author rich Egyptian clinic knowledge base in `knowledge_base/clinic_kb.md`
 - [ ] Step 2.2: Build CLI ingestion script for `clinic_kb` collection in `scripts/ingest_clinic_knowledge.py`
 - [ ] Step 2.3: Verify vector embeddings and search with unit tests in `tests/test_clinic_rag.py`
 
