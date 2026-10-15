@@ -68,7 +68,8 @@ after create plan.md and requirements.md and validation.md:i want you put plan.m
  plan.md for the current feature and requirements.md
 
 
-and i want you working on the feature based on the cuurent plan.md  feature and requirements.md and tell me what you done and wait to give you approval to make validation
+and i want you working on the feature based on the cuurent plan.md  feature and requirements.md and explain to me what you done , and why you done this  and wait to give you approval to make validation
+
 
 
 ### 9 after done working on the feature :
@@ -77,7 +78,7 @@ and i want you working on the feature based on the cuurent plan.md  feature and 
 
  validation.md for the current feature
 
- tell me what you done and wait to give you approval to make review of the feature 
+ explain to me what you done , and why you done this  and wait to give you approval to make validation 
 
 ### 10 after done working on the validation of the feature :
 
@@ -86,7 +87,7 @@ and i want you working on the feature based on the cuurent plan.md  feature and 
  .agents\skills\review after validation\SKILL.md to make review on the feature
 
 
-make sure to make conversation between us in arabic with good format  from right to left
+make sure to make conversation between us in arabic with good format  from right to left 
 
 
 

@@ -22,7 +22,7 @@ This roadmap is a **Living Document** under Spec-Driven Development (SDD). Each 
 
 - [x] **Feature 2.1**: Egyptian Clinic Knowledge Base document (`knowledge_base/clinic_kb.md`).
 - [x] **Feature 2.2**: Vector Store Ingestion & CLI Pipeline for `clinic_kb` collection (`scripts/ingest_clinic_knowledge.py`).
-- [ ] **Feature 2.3**: Knowledge Retrieval Verification & Tests (`tests/test_clinic_rag.py`).
+- [x] **Feature 2.3**: Knowledge Retrieval Verification & Tests (`tests/test_clinic_rag.py`).
 
 ### Phase 3: Clinic Domain Execution Tools 🛠️
 *Goal: Implement strongly-typed, voice-friendly tools for live appointment booking, schedule lookup, appointment management, and receptionist transfer.*
