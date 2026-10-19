@@ -8,7 +8,7 @@ from src.tools.reservation import (
     book_reservation,
     async_book_reservation,
 )
-from src.tools.schemas import ReservationStatusEnum
+from src.tools.legacy_schemas import ReservationStatusEnum
 
 
 @pytest.fixture

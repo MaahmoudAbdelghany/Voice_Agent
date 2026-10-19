@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from src.config import settings
 from src.rag.retriever import QdrantKnowledgeRetriever, retriever as default_retriever
-from src.tools.schemas import (
+from src.tools.legacy_schemas import (
     KnowledgeChunk,
     KnowledgeSearchInput,
     KnowledgeSearchOutput,

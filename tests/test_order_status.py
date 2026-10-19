@@ -8,7 +8,7 @@ from src.tools.order_status import (
     get_order_status,
     async_get_order_status,
 )
-from src.tools.schemas import OrderStatusEnum, OrderItem
+from src.tools.legacy_schemas import OrderStatusEnum, OrderItem
 
 
 @pytest.fixture

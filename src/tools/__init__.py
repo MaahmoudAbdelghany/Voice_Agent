@@ -12,8 +12,28 @@ from typing import Any, Callable, Dict, List, Optional, Type
 
 from pydantic import BaseModel
 
-# Schemas
+# Clinic domain schemas (Feature 3.1)
 from src.tools.schemas import (
+    AppointmentBookingInput,
+    AppointmentBookingOutput,
+    AppointmentCancelInput,
+    AppointmentLookupInput,
+    AppointmentRescheduleInput,
+    ClinicKnowledgeSearchInput,
+    ClinicKnowledgeSearchOutput,
+    DoctorAvailabilityInput,
+    DoctorAvailabilityOutput,
+    ManageAppointmentAction,
+    ManageAppointmentInput,
+    ManageAppointmentOutput,
+    ReceptionistHandoffInput,
+    ReceptionistHandoffOutput,
+    ToolResult,
+    parse_colloquial_date,
+)
+
+# Legacy restaurant schemas (deprecated; removed once Features 3.2-3.6 land)
+from src.tools.legacy_schemas import (
     HandoffDepartmentEnum,
     HandoffUrgencyEnum,
     HumanHandoffInput,
@@ -28,7 +48,6 @@ from src.tools.schemas import (
     ReservationInput,
     ReservationOutput,
     ReservationStatusEnum,
-    ToolResult,
 )
 
 # Tools implementations
@@ -239,8 +258,24 @@ async def async_execute_tool(tool_name: str, arguments: Dict[str, Any]) -> ToolR
 
 
 __all__ = [
-    # Schemas
+    # Clinic Schemas (Feature 3.1)
     "ToolResult",
+    "parse_colloquial_date",
+    "DoctorAvailabilityInput",
+    "DoctorAvailabilityOutput",
+    "AppointmentBookingInput",
+    "AppointmentBookingOutput",
+    "AppointmentLookupInput",
+    "AppointmentCancelInput",
+    "AppointmentRescheduleInput",
+    "ManageAppointmentAction",
+    "ManageAppointmentInput",
+    "ManageAppointmentOutput",
+    "ClinicKnowledgeSearchInput",
+    "ClinicKnowledgeSearchOutput",
+    "ReceptionistHandoffInput",
+    "ReceptionistHandoffOutput",
+    # Legacy Schemas (deprecated)
     "KnowledgeSearchInput",
     "KnowledgeSearchOutput",
     "KnowledgeChunk",

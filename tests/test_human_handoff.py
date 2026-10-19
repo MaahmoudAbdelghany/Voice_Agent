@@ -8,7 +8,7 @@ from src.tools.human_handoff import (
     escalate_to_human,
     async_escalate_to_human,
 )
-from src.tools.schemas import HandoffDepartmentEnum, HandoffUrgencyEnum
+from src.tools.legacy_schemas import HandoffDepartmentEnum, HandoffUrgencyEnum
 
 
 @pytest.fixture

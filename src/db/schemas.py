@@ -116,7 +116,7 @@ class AppointmentStatus(str, Enum):
 def clean_egyptian_phone(phone: str) -> str:
     """Normalize and validate Egyptian mobile numbers (010, 011, 012, 015)."""
     cleaned = re.sub(r"[\s\-\(\)\.]", "", phone.strip())
-    pattern = r"^(?:\+?20|0)?(1[0125]\d{8})$"
+    pattern = r"^(?:0020|\+?20|0)?(1[0125]\d{8})$"
     match = re.match(pattern, cleaned)
     if not match:
         raise ValueError(

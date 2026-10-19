@@ -7,7 +7,7 @@ import pytest
 from src.rag.ingestion import KnowledgeIngestionPipeline
 from src.rag.retriever import QdrantKnowledgeRetriever
 from src.tools.knowledge_search import KnowledgeSearchTool, search_knowledge, async_search_knowledge
-from src.tools.schemas import KnowledgeSearchOutput
+from src.tools.legacy_schemas import KnowledgeSearchOutput
 
 
 @pytest.fixture(scope="module")

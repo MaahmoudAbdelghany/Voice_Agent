@@ -13,7 +13,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from src.tools.schemas import (
+from src.tools.legacy_schemas import (
     HandoffDepartmentEnum,
     HandoffUrgencyEnum,
     HumanHandoffInput,
