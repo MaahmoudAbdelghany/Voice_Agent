@@ -26,7 +26,10 @@ from src.tools import (
 @pytest.fixture(scope="module", autouse=True)
 def setup_knowledge_tool():
     """Ensure knowledge_search_tool has an in-memory collection for tool execution tests."""
-    kb_path = Path(__file__).resolve().parent.parent / "knowledge_base" / "restaurant_kb.md"
+    kb_dir = Path(__file__).resolve().parent.parent / "knowledge_base"
+    kb_path = kb_dir / "restaurant_kb.md"
+    if not kb_path.exists():
+        kb_path = kb_dir / "clinic_kb.md"
     pipeline = KnowledgeIngestionPipeline()
     chunks = pipeline.parse_markdown(kb_path)
 
@@ -131,9 +134,14 @@ def test_execute_human_handoff_tool_success():
 
 def test_execute_knowledge_search_tool_success():
     """Verify synchronous execution of search_restaurant_knowledge via central dispatcher."""
+    query = (
+        "ما هي مواعيد العيادة ومواعيد العمل؟"
+        if not (Path(__file__).resolve().parent.parent / "knowledge_base" / "restaurant_kb.md").exists()
+        else "ما هي مكونات شاورما الدجاج؟"
+    )
     result = execute_tool(
         tool_name="search_restaurant_knowledge",
-        arguments={"query": "ما هي مكونات شاورما الدجاج؟"},
+        arguments={"query": query},
     )
     assert isinstance(result, ToolResult)
     assert result.success is True

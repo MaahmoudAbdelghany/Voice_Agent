@@ -7,10 +7,64 @@ for real-time LLM function calling (LiveKit Agents, Groq, and OpenAI formats).
 
 import inspect
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 
 from pydantic import BaseModel
+
+from src.tools.doctor_availability import (
+    DoctorAvailabilityTool,
+    async_check_doctor_availability,
+    check_doctor_availability,
+    doctor_availability_tool,
+)
+from src.tools.human_handoff import (
+    HumanHandoffTool,
+    async_escalate_to_human,
+    escalate_to_human,
+    human_handoff_tool,
+)
+
+# Tools implementations
+from src.tools.knowledge_search import (
+    KnowledgeSearchTool,
+    async_search_knowledge,
+    async_search_restaurant_knowledge,
+    knowledge_search_tool,
+    search_knowledge,
+    search_restaurant_knowledge,
+)
+
+# Legacy restaurant schemas (deprecated; removed once Features 3.2-3.6 land)
+from src.tools.legacy_schemas import (
+    HandoffDepartmentEnum,
+    HandoffUrgencyEnum,
+    HumanHandoffInput,
+    HumanHandoffOutput,
+    KnowledgeChunk,
+    KnowledgeSearchInput,
+    KnowledgeSearchOutput,
+    OrderItem,
+    OrderStatusEnum,
+    OrderStatusInput,
+    OrderStatusOutput,
+    ReservationInput,
+    ReservationOutput,
+    ReservationStatusEnum,
+)
+from src.tools.order_status import (
+    OrderStatusTool,
+    async_get_order_status,
+    get_order_status,
+    order_status_tool,
+)
+from src.tools.reservation import (
+    ReservationTool,
+    async_book_reservation,
+    book_reservation,
+    reservation_tool,
+)
 
 # Clinic domain schemas (Feature 3.1)
 from src.tools.schemas import (
@@ -32,52 +86,6 @@ from src.tools.schemas import (
     parse_colloquial_date,
 )
 
-# Legacy restaurant schemas (deprecated; removed once Features 3.2-3.6 land)
-from src.tools.legacy_schemas import (
-    HandoffDepartmentEnum,
-    HandoffUrgencyEnum,
-    HumanHandoffInput,
-    HumanHandoffOutput,
-    KnowledgeChunk,
-    KnowledgeSearchInput,
-    KnowledgeSearchOutput,
-    OrderItem,
-    OrderStatusEnum,
-    OrderStatusInput,
-    OrderStatusOutput,
-    ReservationInput,
-    ReservationOutput,
-    ReservationStatusEnum,
-)
-
-# Tools implementations
-from src.tools.knowledge_search import (
-    KnowledgeSearchTool,
-    async_search_knowledge,
-    async_search_restaurant_knowledge,
-    knowledge_search_tool,
-    search_knowledge,
-    search_restaurant_knowledge,
-)
-from src.tools.order_status import (
-    OrderStatusTool,
-    async_get_order_status,
-    get_order_status,
-    order_status_tool,
-)
-from src.tools.reservation import (
-    ReservationTool,
-    async_book_reservation,
-    book_reservation,
-    reservation_tool,
-)
-from src.tools.human_handoff import (
-    HumanHandoffTool,
-    async_escalate_to_human,
-    escalate_to_human,
-    human_handoff_tool,
-)
-
 logger = logging.getLogger(__name__)
 
 
@@ -87,12 +95,12 @@ class ToolDefinition:
 
     name: str
     description: str
-    input_schema: Type[BaseModel]
-    output_schema: Type[BaseModel]
+    input_schema: type[BaseModel]
+    output_schema: type[BaseModel]
     sync_callable: Callable[..., Any]
     async_callable: Callable[..., Any]
 
-    def to_openai_dict(self) -> Dict[str, Any]:
+    def to_openai_dict(self) -> dict[str, Any]:
         """Format as OpenAI/Groq function calling schema."""
         parameters = self.input_schema.model_json_schema()
         # Remove top-level title and schema version for compact clean payload
@@ -111,7 +119,7 @@ class ToolDefinition:
 # Master Tool Registry
 # ==============================================================================
 
-TOOL_REGISTRY: Dict[str, ToolDefinition] = {
+TOOL_REGISTRY: dict[str, ToolDefinition] = {
     "search_restaurant_knowledge": ToolDefinition(
         name="search_restaurant_knowledge",
         description=(
@@ -157,22 +165,33 @@ TOOL_REGISTRY: Dict[str, ToolDefinition] = {
         sync_callable=escalate_to_human,
         async_callable=async_escalate_to_human,
     ),
+    "check_doctor_availability": ToolDefinition(
+        name="check_doctor_availability",
+        description=(
+            "Check doctor availability, weekly shift hours, remaining patient slots, "
+            "and examination fees for Egyptian polyclinic doctors and specialties."
+        ),
+        input_schema=DoctorAvailabilityInput,
+        output_schema=DoctorAvailabilityOutput,
+        sync_callable=check_doctor_availability,
+        async_callable=async_check_doctor_availability,
+    ),
 }
 
 
-def get_registered_tools() -> Dict[str, ToolDefinition]:
+def get_registered_tools() -> dict[str, ToolDefinition]:
     """Retrieve all currently registered tools."""
     return TOOL_REGISTRY
 
 
-def get_tool_definitions() -> List[Dict[str, Any]]:
+def get_tool_definitions() -> list[dict[str, Any]]:
     """
     Get all tool definitions formatted for OpenAI / Groq function calling.
     """
     return [tool.to_openai_dict() for tool in TOOL_REGISTRY.values()]
 
 
-def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> ToolResult:
+def execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolResult:
     """
     Synchronously execute a registered tool by name with given arguments.
 
@@ -196,6 +215,9 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> ToolResult:
 
         result = tool_def.sync_callable(**args_dict)
 
+        if isinstance(result, ToolResult):
+            return result
+
         # Convert tool output to dict payload
         payload = result.model_dump() if hasattr(result, "model_dump") else result
         voice_msg = getattr(result, "message", "تم تنفيذ العملية بنجاح.")
@@ -214,7 +236,7 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> ToolResult:
         )
 
 
-async def async_execute_tool(tool_name: str, arguments: Dict[str, Any]) -> ToolResult:
+async def async_execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolResult:
     """
     Asynchronously execute a registered tool by name (non-blocking for LiveKit turns).
 
@@ -239,6 +261,9 @@ async def async_execute_tool(tool_name: str, arguments: Dict[str, Any]) -> ToolR
             result = await tool_def.async_callable(**args_dict)
         else:
             result = tool_def.async_callable(**args_dict)
+
+        if isinstance(result, ToolResult):
+            return result
 
         payload = result.model_dump() if hasattr(result, "model_dump") else result
         voice_msg = getattr(result, "message", "تم تنفيذ العملية بنجاح.")
@@ -291,6 +316,8 @@ __all__ = [
     "HandoffUrgencyEnum",
     "HandoffDepartmentEnum",
     # Tools Classes & Singletons
+    "DoctorAvailabilityTool",
+    "doctor_availability_tool",
     "KnowledgeSearchTool",
     "knowledge_search_tool",
     "OrderStatusTool",
@@ -300,6 +327,8 @@ __all__ = [
     "HumanHandoffTool",
     "human_handoff_tool",
     # Functions
+    "check_doctor_availability",
+    "async_check_doctor_availability",
     "search_knowledge",
     "async_search_knowledge",
     "search_restaurant_knowledge",
