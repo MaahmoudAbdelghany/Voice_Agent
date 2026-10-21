@@ -13,6 +13,12 @@ from typing import Any, Dict, List, Optional, Type
 
 from pydantic import BaseModel
 
+from src.tools.appointment_booking import (
+    AppointmentBookingTool,
+    appointment_booking_tool,
+    async_book_appointment,
+    book_appointment,
+)
 from src.tools.doctor_availability import (
     DoctorAvailabilityTool,
     async_check_doctor_availability,
@@ -176,6 +182,19 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         sync_callable=check_doctor_availability,
         async_callable=async_check_doctor_availability,
     ),
+    "book_appointment": ToolDefinition(
+        name="book_appointment",
+        description=(
+            "Book a confirmed clinic appointment (queue number) for a patient with a doctor "
+            "on a specific date. Requires patient name, Egyptian mobile number, doctor ID or "
+            "name, date, and visit type ('examination' or 'consultation'). Never books an "
+            "alternative date automatically; confirm with the caller first."
+        ),
+        input_schema=AppointmentBookingInput,
+        output_schema=AppointmentBookingOutput,
+        sync_callable=book_appointment,
+        async_callable=async_book_appointment,
+    ),
 }
 
 
@@ -318,6 +337,8 @@ __all__ = [
     # Tools Classes & Singletons
     "DoctorAvailabilityTool",
     "doctor_availability_tool",
+    "AppointmentBookingTool",
+    "appointment_booking_tool",
     "KnowledgeSearchTool",
     "knowledge_search_tool",
     "OrderStatusTool",
@@ -329,6 +350,8 @@ __all__ = [
     # Functions
     "check_doctor_availability",
     "async_check_doctor_availability",
+    "book_appointment",
+    "async_book_appointment",
     "search_knowledge",
     "async_search_knowledge",
     "search_restaurant_knowledge",

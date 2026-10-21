@@ -19,7 +19,7 @@
 ## Phase 3: Clinic Domain Execution Tools
 - [x] Step 3.1: Define strongly-typed Pydantic schemas in `src/tools/schemas.py`
 - [x] Step 3.2: Implement doctor availability tool in `src/tools/doctor_availability.py`
-- [ ] Step 3.3: Implement appointment booking tool with atomic queue assignment in `src/tools/appointment_booking.py`
+- [x] Step 3.3: Implement appointment booking tool with atomic queue assignment in `src/tools/appointment_booking.py`
 - [ ] Step 3.4: Implement appointment query, reschedule & cancellation tool in `src/tools/manage_appointment.py`
 - [ ] Step 3.5: Adapt clinic knowledge search tool in `src/tools/knowledge_search.py`
 - [ ] Step 3.6: Adapt receptionist escalation tool with dashboard notification in `src/tools/human_handoff.py`
