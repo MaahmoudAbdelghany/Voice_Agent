@@ -52,7 +52,6 @@
 - Always use the `view_file` to read the validation skill in validation folder in workspace root
 
 
-after create plan.md and requirements.md and validation.md:i want you put plan.md , requirements.md , validation.md  into artifacts in arabic with good format arabic from right to left
 
 
 ### 7. Wait for Human Review (Mandatory Gate) 🛑
@@ -78,7 +77,7 @@ and i want you working on the feature based on the cuurent plan.md  feature and 
 
  validation.md for the current feature
 
- explain to me what you done , and why you done this  and wait to give you approval to make validation 
+ explain to me what you done , and why you done this  and wait to give you approval to make review after validation .
 
 ### 10 after done working on the validation of the feature :
 
