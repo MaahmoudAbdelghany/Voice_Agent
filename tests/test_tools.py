@@ -3,23 +3,22 @@ Unit Tests for Centralized Tools Registry and Function Calling Dispatchers.
 """
 
 from pathlib import Path
+
 import pytest
 
 from src.rag.ingestion import KnowledgeIngestionPipeline
 from src.rag.retriever import QdrantKnowledgeRetriever
 from src.tools import (
-    TOOL_REGISTRY,
-    KnowledgeSearchTool,
     ToolDefinition,
     ToolResult,
     async_execute_tool,
     execute_tool,
     get_registered_tools,
     get_tool_definitions,
+    human_handoff_tool,
     knowledge_search_tool,
     order_status_tool,
     reservation_tool,
-    human_handoff_tool,
 )
 
 
@@ -47,7 +46,7 @@ def test_tool_registry_contains_all_tools():
     """Verify all 4 core domain tools are registered with complete bindings."""
     registry = get_registered_tools()
     expected_tools = {
-        "search_restaurant_knowledge",
+        "search_clinic_knowledge",
         "get_order_status",
         "book_reservation",
         "escalate_to_human",
@@ -133,14 +132,10 @@ def test_execute_human_handoff_tool_success():
 
 
 def test_execute_knowledge_search_tool_success():
-    """Verify synchronous execution of search_restaurant_knowledge via central dispatcher."""
-    query = (
-        "ما هي مواعيد العيادة ومواعيد العمل؟"
-        if not (Path(__file__).resolve().parent.parent / "knowledge_base" / "restaurant_kb.md").exists()
-        else "ما هي مكونات شاورما الدجاج؟"
-    )
+    """Verify synchronous execution of search_clinic_knowledge via central dispatcher."""
+    query = "ما هي مواعيد العيادة ومواعيد العمل؟"
     result = execute_tool(
-        tool_name="search_restaurant_knowledge",
+        tool_name="search_clinic_knowledge",
         arguments={"query": query},
     )
     assert isinstance(result, ToolResult)

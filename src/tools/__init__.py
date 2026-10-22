@@ -9,7 +9,7 @@ import inspect
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Type
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -18,12 +18,6 @@ from src.tools.appointment_booking import (
     appointment_booking_tool,
     async_book_appointment,
     book_appointment,
-)
-from src.tools.manage_appointment import (
-    ManageAppointmentTool,
-    async_manage_appointment,
-    manage_appointment,
-    manage_appointment_tool,
 )
 from src.tools.doctor_availability import (
     DoctorAvailabilityTool,
@@ -40,10 +34,14 @@ from src.tools.human_handoff import (
 
 # Tools implementations
 from src.tools.knowledge_search import (
+    ClinicKnowledgeSearchTool,
     KnowledgeSearchTool,
+    async_search_clinic_knowledge,
     async_search_knowledge,
     async_search_restaurant_knowledge,
+    clinic_knowledge_search_tool,
     knowledge_search_tool,
+    search_clinic_knowledge,
     search_knowledge,
     search_restaurant_knowledge,
 )
@@ -64,6 +62,12 @@ from src.tools.legacy_schemas import (
     ReservationInput,
     ReservationOutput,
     ReservationStatusEnum,
+)
+from src.tools.manage_appointment import (
+    ManageAppointmentTool,
+    async_manage_appointment,
+    manage_appointment,
+    manage_appointment_tool,
 )
 from src.tools.order_status import (
     OrderStatusTool,
@@ -132,16 +136,17 @@ class ToolDefinition:
 # ==============================================================================
 
 TOOL_REGISTRY: dict[str, ToolDefinition] = {
-    "search_restaurant_knowledge": ToolDefinition(
-        name="search_restaurant_knowledge",
+    "search_clinic_knowledge": ToolDefinition(
+        name="search_clinic_knowledge",
         description=(
-            "Search restaurant menu items, ingredients, prices, allergens, "
-            "operating hours, delivery areas, and branch policies via RAG."
+            "Search Egyptian polyclinic medical center knowledge base for specialties, "
+            "doctor shifts, diagnostic preparation (fasting, sonar), consultation and "
+            "examination fees, accepted health insurance networks, address, and clinic policies."
         ),
-        input_schema=KnowledgeSearchInput,
-        output_schema=KnowledgeSearchOutput,
-        sync_callable=search_restaurant_knowledge,
-        async_callable=async_search_restaurant_knowledge,
+        input_schema=ClinicKnowledgeSearchInput,
+        output_schema=ClinicKnowledgeSearchOutput,
+        sync_callable=search_clinic_knowledge,
+        async_callable=async_search_clinic_knowledge,
     ),
     "get_order_status": ToolDefinition(
         name="get_order_status",
@@ -266,7 +271,7 @@ def execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolResult:
             data=payload if isinstance(payload, dict) else {"result": payload},
         )
     except Exception as e:
-        logger.exception(f"Error executing tool '{tool_name}' with args {arguments}: {e}")
+        logger.exception("Error executing tool '%s' with args %s", tool_name, arguments)
         return ToolResult(
             success=False,
             message="عذراً، حدث خطأ أثناء تنفيذ هذا الإجراء. هل يمكنك إعادة المحاولة؟",
@@ -312,7 +317,7 @@ async def async_execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolR
             data=payload if isinstance(payload, dict) else {"result": payload},
         )
     except Exception as e:
-        logger.exception(f"Error in async tool execution '{tool_name}': {e}")
+        logger.exception("Error in async tool execution '%s'", tool_name)
         return ToolResult(
             success=False,
             message="عذراً، حدث خطأ أثناء تنفيذ هذا الإجراء. هل يمكنك إعادة المحاولة؟",
@@ -320,7 +325,7 @@ async def async_execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolR
         )
 
 
-__all__ = [
+__all__ = [  # noqa: RUF022
     # Clinic Schemas (Feature 3.1)
     "ToolResult",
     "parse_colloquial_date",
@@ -360,6 +365,8 @@ __all__ = [
     "appointment_booking_tool",
     "ManageAppointmentTool",
     "manage_appointment_tool",
+    "ClinicKnowledgeSearchTool",
+    "clinic_knowledge_search_tool",
     "KnowledgeSearchTool",
     "knowledge_search_tool",
     "OrderStatusTool",
@@ -375,6 +382,8 @@ __all__ = [
     "async_book_appointment",
     "manage_appointment",
     "async_manage_appointment",
+    "search_clinic_knowledge",
+    "async_search_clinic_knowledge",
     "search_knowledge",
     "async_search_knowledge",
     "search_restaurant_knowledge",

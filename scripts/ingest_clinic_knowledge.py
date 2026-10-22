@@ -29,6 +29,7 @@ WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 if str(WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(WORKSPACE_ROOT))
 
+from src.rag.embeddings import embedding_service
 from src.rag.ingestion import ingestion_pipeline
 from src.rag.retriever import retriever
 
@@ -73,6 +74,13 @@ def main() -> None:
 
     if not kb_path.exists():
         sys.stderr.write(f"Error: Knowledge base file not found at '{kb_path}'\n")
+        sys.exit(1)
+
+    if not embedding_service.is_semantic:
+        sys.stderr.write(
+            "Error: EmbeddingService is running in fallback mode (model failed to load). "
+            "Refusing to ingest chunks to prevent corrupting collection with pseudo-embeddings.\n"
+        )
         sys.exit(1)
 
     print("=" * 65)

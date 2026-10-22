@@ -13,16 +13,10 @@
 
 
 
-### 3. Ask Clarification Questions
-- Analyze potential ambiguities, design trade-offs, and underspecified requirements.
-- Formulate clear, concise questions for the human supervisor:
-  - Scope boundaries (what is in/out of scope for this specific feature).
-  -
-- **Do not guess or assume intent.** Wait for human input when ambiguity exists.
 
 
 
-### 4. Generate Feature Plan (`plan.md`)
+### 3. Generate Feature Plan (`plan.md`)
 - Create `spec/features/feature-XXX-<feature-name>/plan.md`.
 
 
@@ -38,7 +32,7 @@
   - **Execution Breakdown**: Atomic sub-steps for implementation. if feature is big we well make it in multiple features each feature in execution group.
 
 
-### 5. Generate Requirements (`requirements.md`)
+### 4. Generate Requirements (`requirements.md`)
 - Create `spec/features/feature-XXX-<feature-name>/requirements.md`.
 - Write testable, clear requirements:
   - **Functional Requirements (R1, R2, ...)**: What the system must do.
@@ -47,14 +41,14 @@
 - **Rule**: Document decisions and behaviors, NOT trivial implementation micro-details (e.g. variable names).
 
 
-### 6. Generate Validation Criteria (`validation.md`) with 3-Tier Testing
+### 5. Generate Validation Criteria (`validation.md`) with 3-Tier Testing
 - Create `spec/features/feature-XXX-<feature-name>/validation.md`. based on the rules in the validation skill in validation folder in workspace root `
 - Always use the `view_file` to read the validation skill in validation folder in workspace root
 
 
 
 
-### 7. Wait for Human Review (Mandatory Gate) 🛑
+### 6. Wait for Human Review (Mandatory Gate) 🛑
 - **Halt all coding activity immediately.**
 - Present the generated specification files (`plan.md`, `requirements.md`, `validation.md`) to the human supervisor.
 - Highlight key decisions, trade-offs, and open questions.
@@ -71,7 +65,7 @@ and i want you working on the feature based on the cuurent plan.md  feature and 
 
 
 
-### 9 after done working on the feature :
+###  7 after done working on the feature :
 
 - Always read using `view_file`
 
@@ -79,11 +73,9 @@ and i want you working on the feature based on the cuurent plan.md  feature and 
 
  explain to me what you done , and why you done this  and wait to give you approval to make review after validation .
 
-### 10 after done working on the validation of the feature :
+### 8 after done working on the validation of the feature :
 
-- Always read using `view_file`
-
- .agents\skills\review after validation\SKILL.md to make review on the feature
+commit the changes in git and push into my repo on github and update the roadmap.md file to mark this feature as completed  .
 
 
 make sure to make conversation between us in arabic with good format  from right to left 

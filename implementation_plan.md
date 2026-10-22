@@ -58,11 +58,11 @@ The agent can:
 - [x] Step 2.3: Verify vector embeddings and search with unit tests.
 
 ### **Phase 3: Clinic Domain Execution Tools**
-- [ ] Step 3.1: Define strongly-typed Pydantic schemas in `src/tools/schemas.py`.
-- [ ] Step 3.2: Implement doctor availability tool (`src/tools/doctor_availability.py`).
-- [ ] Step 3.3: Implement appointment booking tool (`src/tools/appointment_booking.py`).
-- [ ] Step 3.4: Implement appointment query, reschedule & cancellation tool (`src/tools/manage_appointment.py`).
-- [ ] Step 3.5: Adapt clinic knowledge search tool (`src/tools/knowledge_search.py`).
+- [x] Step 3.1: Define strongly-typed Pydantic schemas in `src/tools/schemas.py`.
+- [x] Step 3.2: Implement doctor availability tool (`src/tools/doctor_availability.py`).
+- [x] Step 3.3: Implement appointment booking tool (`src/tools/appointment_booking.py`).
+- [x] Step 3.4: Implement appointment query, reschedule & cancellation tool (`src/tools/manage_appointment.py`).
+- [x] Step 3.5: Adapt clinic knowledge search tool (`src/tools/knowledge_search.py`).
 - [ ] Step 3.6: Adapt receptionist escalation tool (`src/tools/human_handoff.py`).
 - [ ] Step 3.7: Write and run unit tests for all medical tools.
 

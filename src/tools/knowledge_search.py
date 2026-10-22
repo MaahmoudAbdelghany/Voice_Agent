@@ -1,126 +1,287 @@
 """
-Knowledge Base Search Tool for Voice Agent.
+Clinic Knowledge Base Search Tool for Egyptian Polyclinics.
 
-Provides semantic retrieval over restaurant menu, ingredients, allergens,
-operating hours, delivery zones, and customer service policies using Qdrant vector database.
-Designed for low-latency execution during real-time voice turns.
+Provides strongly-typed, low-latency semantic retrieval over clinic specialties,
+doctor schedules, diagnostic lab/radiology preparation, examination fees,
+health insurance networks, and medical safety guardrails via Qdrant vector database.
 """
+
+from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any
 
-from src.config import settings
-from src.rag.retriever import QdrantKnowledgeRetriever, retriever as default_retriever
-from src.tools.legacy_schemas import (
+from src.rag.embeddings import embedding_service as default_embedding_service
+from src.rag.retriever import QdrantKnowledgeRetriever
+from src.rag.retriever import retriever as default_retriever
+from src.tools.schemas import (
+    ClinicKnowledgeSearchOutput,
     KnowledgeChunk,
-    KnowledgeSearchInput,
-    KnowledgeSearchOutput,
     ToolResult,
 )
 
 logger = logging.getLogger(__name__)
 
+# Validated categories in clinic_kb.md
+ALLOWED_CATEGORIES: set[str] = {
+    "general",
+    "specialties",
+    "doctors",
+    "pricing",
+    "lab_radiology",
+    "insurance",
+    "booking_queue",
+    "safety_guardrails",
+    "faqs",
+}
 
-class KnowledgeSearchTool:
+_HTML_TAGS = re.compile(r"<[^>]+>")
+_MD_HEADER = re.compile(r"^#+\s*", re.MULTILINE)
+_MARKDOWN_STYLING = re.compile(r"[*_~`]")
+
+
+def clean_markdown_for_speech(text: str) -> str:
     """
-    RAG-powered Knowledge Search tool for restaurant voice inquiries.
-    Searches indexed menu items, policies, allergens, and FAQs.
+    Remove Markdown tables, headers, HTML tags, and styling characters,
+    producing fluent plain text appropriate for voice synthesis.
+    """
+    lines: list[str] = []
+    for line in text.splitlines():
+        trimmed = line.strip()
+        # Skip table divider rows like |---|---|
+        if re.match(r"^\|?[-:\s|]+\|?$", trimmed):
+            continue
+        if trimmed.startswith("|") and trimmed.endswith("|"):
+            line = trimmed.strip("|").replace("|", " - ")
+        lines.append(line)
+
+    text = "\n".join(lines)
+    text = _HTML_TAGS.sub(" ", text)
+    text = _MD_HEADER.sub("", text)
+    text = re.sub(r"^\s*[-*•]\s+", "", text, flags=re.MULTILINE)
+    text = _MARKDOWN_STYLING.sub("", text)
+    text = re.sub(r"-{2,}", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def trim_to_sentence_boundary(text: str, max_chars: int = 250) -> str:
+    """
+    Trim text to at most max_chars, preferably cutting at a sentence or clause boundary.
+    """
+    if len(text) <= max_chars:
+        return text
+
+    truncated = text[:max_chars]
+    boundary_idx = -1
+    for punct in [".", "!", "؟", "،", ",", "؛", ";", "\n"]:
+        idx = truncated.rfind(punct)
+        if idx > boundary_idx and idx >= max_chars // 2:
+            boundary_idx = idx
+
+    if boundary_idx != -1:
+        return truncated[: boundary_idx + 1].strip()
+
+    space_idx = truncated.rfind(" ")
+    if space_idx > max_chars // 2:
+        return truncated[:space_idx].strip() + "..."
+    return truncated.strip() + "..."
+
+
+def is_emergency_content(text: str) -> bool:
+    """Check if snippet relates to emergency protocols, ambulance, or acute symptoms."""
+    lower = text.lower()
+    return any(
+        kw in lower for kw in ["123", "١٢٣", "طوارئ", "طوارىء", "إسعاف", "اسعاف", "صدر", "تنفس"]
+    )
+
+
+class ClinicKnowledgeSearchTool:
+    """
+    RAG-powered Knowledge Search tool for Egyptian Polyclinics.
+    Performs semantic vector retrieval against Qdrant with medical guardrails.
     """
 
-    def __init__(self, retriever_instance: Optional[QdrantKnowledgeRetriever] = None):
-        """Initialize the tool with a Qdrant retriever instance."""
+    def __init__(
+        self,
+        retriever_instance: QdrantKnowledgeRetriever | None = None,
+        embeddings: Any | None = None,
+        timeout_s: float = 0.4,
+    ):
         self.retriever = retriever_instance or default_retriever
+        self.embeddings = embeddings or default_embedding_service
+        self.timeout_s = timeout_s
+
+    def warm_up(self) -> bool:
+        """Pre-load the embedding model into memory for fast tool calls."""
+        try:
+            self.embeddings.embed_query("warm up")
+            return getattr(self.embeddings, "is_semantic", True)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Knowledge search warm_up warning: {e}")
+            return False
 
     def execute(
         self,
         query: str,
         limit: int = 3,
-        score_threshold: float = 0.25,
-        category: Optional[str] = None,
-    ) -> KnowledgeSearchOutput:
+        score_threshold: float = 0.35,
+        category: str | None = None,
+    ) -> ToolResult:
         """
-        Synchronously search the knowledge base.
+        Synchronously search the clinic knowledge base.
 
         Args:
-            query: Natural language question or search phrase.
-            limit: Maximum number of knowledge snippets to return.
-            score_threshold: Minimum vector similarity score (0.0 - 1.0).
-            category: Optional filter (e.g., 'menu', 'allergens', 'delivery', 'policies').
+            query: Caller question or search phrase.
+            limit: Maximum snippets to return (1-10, default 3).
+            score_threshold: Minimum vector similarity score (default 0.35).
+            category: Optional category filter.
 
         Returns:
-            KnowledgeSearchOutput containing matching chunks and voice summary.
+            ToolResult containing ClinicKnowledgeSearchOutput and spoken response.
         """
-        clean_query = query.strip()
-        logger.info(f"Executing knowledge search for query: '{clean_query}' (limit={limit})")
+        clean_query = query.strip() if isinstance(query, str) else ""
 
+        # FR-1.2: Empty query validation
         if not clean_query:
-            return KnowledgeSearchOutput(
-                query=query,
-                found=False,
-                total_results=0,
-                chunks=[],
-                context_text="",
-                message="\u0639\u0630\u0631\u0627\u064b\u060c \u0644\u0645 \u0623\u062a\u0645\u0643\u0646 \u0645\u0646 \u0633\u0645\u0627\u0639 \u0633\u0624\u0627\u0644\u0643 \u0628\u0648\u0636\u0648\u062d. \u0647\u0644 \u064a\u0645\u0643\u0646\u0643 \u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0633\u0624\u0627\u0644 \u0639\u0646 \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0623\u0648 \u0627\u0644\u062e\u062f\u0645\u0627\u062a\u061f",
+            msg = "عذراً، لم أتمكن من سماع سؤالك بوضوح. ممكن تعيد استفسارك عن تخصصات العيادة أو الأسعار أو مواعيد العمل؟"
+            return ToolResult(
+                success=False,
+                message=msg,
+                error="empty_query",
+                data=ClinicKnowledgeSearchOutput(
+                    query=query or "",
+                    found=False,
+                    total_results=0,
+                    chunks=[],
+                    context_text="",
+                    message=msg,
+                ).model_dump()
+                | {"escalation_recommended": False},
             )
 
-        # Relax threshold when filtering by a specific category since category match ensures topical domain
-        effective_threshold = min(score_threshold, 0.15) if category else score_threshold
-
-        try:
-            hits = self.retriever.search(
-                query=clean_query,
-                limit=limit,
-                score_threshold=effective_threshold,
-                category=category,
-            )
-
-            if not hits:
-                logger.info(f"No knowledge hits found for query: '{clean_query}'")
-                return KnowledgeSearchOutput(
+        # FR-2.2: Degraded-mode guard
+        is_semantic = getattr(self.embeddings, "is_semantic", True)
+        if not is_semantic:
+            logger.warning("Rejecting knowledge search because embeddings are in fallback mode")
+            msg = "عذراً، خدمة الاستعلام عن معلومات العيادة غير متاحة حالياً، تحب أحولك لموظف الاستقبال؟"
+            return ToolResult(
+                success=False,
+                message=msg,
+                error="embeddings_unavailable",
+                data=ClinicKnowledgeSearchOutput(
                     query=clean_query,
                     found=False,
                     total_results=0,
                     chunks=[],
                     context_text="",
-                    message=(
-                        "\u0639\u0630\u0631\u0627\u064b\u060c \u0644\u0645 \u0623\u062c\u062f \u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0645\u0624\u0643\u062f\u0629 \u062d\u0648\u0644 \u0630\u0644\u0643 \u0641\u064a \u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0637\u0639\u0627\u0645 \u0623\u0648 \u0627\u0644\u0633\u064a\u0627\u0633\u0627\u062a \u0627\u0644\u062d\u0627\u0644\u064a\u0629. "
-                        "\u064a\u0645\u0643\u0646\u0646\u064a \u0645\u0633\u0627\u0639\u062f\u062a\u0643 \u0641\u064a \u0627\u0633\u062a\u0639\u0631\u0627\u0636 \u0627\u0644\u0623\u0637\u0628\u0627\u0642 \u0627\u0644\u0623\u0643\u062b\u0631 \u0637\u0644\u0628\u0627\u064b \u0623\u0648 \u0633\u0627\u0639\u0627\u062a \u0627\u0644\u0639\u0645\u0644 \u0648\u0627\u0644\u062a\u0648\u0635\u064a\u0644."
-                    ),
+                    message=msg,
+                ).model_dump()
+                | {"escalation_recommended": False},
+            )
+
+        # FR-1.3: Category filter validation
+        effective_category: str | None = None
+        if category:
+            cat_norm = str(category).strip().lower()
+            if cat_norm in ALLOWED_CATEGORIES:
+                effective_category = cat_norm
+            else:
+                logger.warning(
+                    f"Unknown category filter '{category}' requested. Searching across all categories."
                 )
 
-            chunks: List[KnowledgeChunk] = []
-            context_blocks: List[str] = []
+        logger.debug(
+            f"Executing clinic knowledge search: query='{clean_query}', category={effective_category}"
+        )
+
+        try:
+            hits = self.retriever.search(
+                query=clean_query,
+                limit=limit,
+                score_threshold=score_threshold,
+                category=effective_category,
+            )
+
+            # FR-3.2: No hits
+            if not hits:
+                logger.info(
+                    f"No knowledge hits found for query: length={len(clean_query)}, category={effective_category}"
+                )
+                msg = "عذراً، لم أجد معلومة مؤكدة حول ذلك في دليل العيادة الحالي. تحب أساعدك في حجز موعد مع الدكتور أو أحولك لموظف الاستقبال؟"
+                return ToolResult(
+                    success=True,
+                    message=msg,
+                    data=ClinicKnowledgeSearchOutput(
+                        query=clean_query,
+                        found=False,
+                        total_results=0,
+                        chunks=[],
+                        context_text="",
+                        message=msg,
+                    ).model_dump()
+                    | {"escalation_recommended": False},
+                )
+
+            chunks: list[KnowledgeChunk] = []
+            context_blocks: list[str] = []
+            current_ctx_len = 0
+            has_safety_hit = False
 
             for hit in hits:
+                cat = hit.get("category", "general")
+                if cat == "safety_guardrails":
+                    has_safety_hit = True
+
                 chunk = KnowledgeChunk(
                     id=str(hit.get("id", "")),
                     content=hit.get("text", ""),
                     score=float(hit.get("score", 0.0)),
-                    section=hit.get("section") or hit.get("category"),
+                    section=hit.get("section") or cat,
                     metadata={
-                        "category": hit.get("category", "general"),
+                        "category": cat,
                         "source": hit.get("source", ""),
                     },
                 )
                 chunks.append(chunk)
 
-                section_header = hit.get("section") or hit.get("category") or "\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0639\u0627\u0645\u0629"
-                context_blocks.append(f"[{section_header}]\n{hit.get('text', '')}")
+                # FR-3.4: context_text bounding (<= 1200 chars)
+                sec_header = hit.get("section") or cat or "معلومات عامة"
+                raw_text = hit.get("text", "").strip()
+                block = f"[{sec_header}]\n{raw_text}"
+                if current_ctx_len + len(block) <= 1200:
+                    context_blocks.append(block)
+                    current_ctx_len += len(block) + 2
+                elif not context_blocks:
+                    context_blocks.append(block[:1200])
+                    current_ctx_len = 1200
 
             context_text = "\n\n".join(context_blocks)
-
-            # Generate natural voice-ready summary
             top_hit = hits[0]
-            top_text = top_hit.get("text", "").strip()
+            top_cat = top_hit.get("category", "general")
+            top_text = top_hit.get("text", "")
 
-            voice_message = (
-                f"\u0628\u0646\u0627\u0621\u064b \u0639\u0644\u0649 \u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0645\u0637\u0639\u0645: {top_text}"
-                if len(top_text) <= 250
-                else f"\u0628\u0646\u0627\u0621\u064b \u0639\u0644\u0649 \u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0645\u0637\u0639\u0645: {top_text[:240]}..."
-            )
+            # FR-4: Safety escalation flag & messaging
+            escalation_recommended = has_safety_hit
 
-            return KnowledgeSearchOutput(
+            if top_cat == "safety_guardrails" or is_emergency_content(top_text):
+                if is_emergency_content(top_text):
+                    voice_message = (
+                        "لو حاسس بأي أعراض طوارئ زي ألم حاد في الصدر أو صعوبة في التنفس، "
+                        "يرجى التوجه فوراً لأقرب قسم طوارئ أو الاتصال بالإسعاف على 123. تحب أحولك للاستقبال حالاً؟"
+                    )
+                else:
+                    voice_message = (
+                        "ممنوع تقديم استشارات طبية أو تشخيص ووصف أدوية هاتفياً حرصاً على سلامتكم. "
+                        "نقدر نحجز لحضرتك موعد كشف مع الدكتور المختص، أو أحولك لموظف الاستقبال."
+                    )
+            else:
+                cleaned_text = clean_markdown_for_speech(top_text)
+                trimmed_summary = trim_to_sentence_boundary(cleaned_text, max_chars=220)
+                voice_message = f"بناءً على معلومات العيادة: {trimmed_summary}"
+
+            out = ClinicKnowledgeSearchOutput(
                 query=clean_query,
                 found=True,
                 total_results=len(chunks),
@@ -129,59 +290,76 @@ class KnowledgeSearchTool:
                 message=voice_message,
             )
 
-        except Exception as e:
-            logger.error(f"Error executing knowledge search for '{clean_query}': {e}", exc_info=True)
-            return KnowledgeSearchOutput(
-                query=clean_query,
-                found=False,
-                total_results=0,
-                chunks=[],
-                context_text="",
-                message="\u062d\u062f\u062b \u062e\u0637\u0623 \u0645\u0624\u0642\u062a \u0623\u062b\u0646\u0627\u0621 \u0627\u0644\u0628\u062d\u062b \u0641\u064a \u0642\u0627\u0639\u062f\u0629 \u0627\u0644\u0645\u0639\u0644\u0648\u0645\u0627\u062a\u060c \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.",
+            return ToolResult(
+                success=True,
+                message=voice_message,
+                data=out.model_dump() | {"escalation_recommended": escalation_recommended},
+            )
+
+        except Exception:
+            logger.exception("Error executing clinic knowledge search")
+            msg = "حدث خطأ غير متوقع أثناء البحث في دليل العيادة، يرجى المحاولة مرة أخرى أو التحويل للاستقبال."
+            return ToolResult(
+                success=False,
+                message=msg,
+                error="search_failed",
+                data=ClinicKnowledgeSearchOutput(
+                    query=clean_query,
+                    found=False,
+                    total_results=0,
+                    chunks=[],
+                    context_text="",
+                    message=msg,
+                ).model_dump()
+                | {"escalation_recommended": False},
             )
 
     async def aexecute(
         self,
         query: str,
         limit: int = 3,
-        score_threshold: float = 0.25,
-        category: Optional[str] = None,
-    ) -> KnowledgeSearchOutput:
+        score_threshold: float = 0.35,
+        category: str | None = None,
+    ) -> ToolResult:
         """
-        Asynchronously search the knowledge base (non-blocking for LiveKit voice turns).
+        Asynchronously search the clinic knowledge base with latency timeout guard (400ms).
         """
-        return await asyncio.to_thread(
-            self.execute,
-            query=query,
-            limit=limit,
-            score_threshold=score_threshold,
-            category=category,
-        )
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.execute,
+                    query=query,
+                    limit=limit,
+                    score_threshold=score_threshold,
+                    category=category,
+                ),
+                timeout=self.timeout_s,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"Clinic knowledge search timed out after {self.timeout_s}s")
+            filler_msg = "ثواني بس، بدوّر لحضرتك على المعلومة في النظام..."
+            return ToolResult(
+                success=False,
+                message=filler_msg,
+                error="timeout",
+                data=None,
+            )
 
 
-# Singleton tool instance
-knowledge_search_tool = KnowledgeSearchTool()
+# Global singleton instance
+clinic_knowledge_search_tool = ClinicKnowledgeSearchTool()
 
 
-def search_knowledge(
+def search_clinic_knowledge(
     query: str,
     limit: int = 3,
-    score_threshold: float = 0.25,
-    category: Optional[str] = None,
-) -> KnowledgeSearchOutput:
+    score_threshold: float = 0.35,
+    category: str | None = None,
+) -> ToolResult:
     """
-    Convenience function to query the restaurant knowledge base.
-
-    Args:
-        query: User question about menu, allergens, hours, prices, or delivery.
-        limit: Max knowledge chunks to return (default: 3).
-        score_threshold: Minimum cosine similarity score.
-        category: Optional category filter.
-
-    Returns:
-        KnowledgeSearchOutput with matching chunks and spoken message.
+    Search Egyptian polyclinic knowledge base for specialties, fees, tests, and policies.
     """
-    return knowledge_search_tool.execute(
+    return clinic_knowledge_search_tool.execute(
         query=query,
         limit=limit,
         score_threshold=score_threshold,
@@ -189,16 +367,16 @@ def search_knowledge(
     )
 
 
-async def async_search_knowledge(
+async def async_search_clinic_knowledge(
     query: str,
     limit: int = 3,
-    score_threshold: float = 0.25,
-    category: Optional[str] = None,
-) -> KnowledgeSearchOutput:
+    score_threshold: float = 0.35,
+    category: str | None = None,
+) -> ToolResult:
     """
-    Asynchronous convenience function to query the restaurant knowledge base.
+    Asynchronously search Egyptian polyclinic knowledge base.
     """
-    return await knowledge_search_tool.aexecute(
+    return await clinic_knowledge_search_tool.aexecute(
         query=query,
         limit=limit,
         score_threshold=score_threshold,
@@ -206,6 +384,29 @@ async def async_search_knowledge(
     )
 
 
-# Descriptive aliases for function calling registry
-search_restaurant_knowledge = search_knowledge
-async_search_restaurant_knowledge = async_search_knowledge
+# ==============================================================================
+# Backward-compatibility aliases (deprecated; replaced in Phase 5)
+# ==============================================================================
+KnowledgeSearchTool = ClinicKnowledgeSearchTool
+knowledge_search_tool = clinic_knowledge_search_tool
+search_knowledge = search_clinic_knowledge
+async_search_knowledge = async_search_clinic_knowledge
+search_restaurant_knowledge = search_clinic_knowledge
+async_search_restaurant_knowledge = async_search_clinic_knowledge
+
+__all__ = [
+    "ALLOWED_CATEGORIES",
+    "ClinicKnowledgeSearchTool",
+    "KnowledgeSearchTool",
+    "async_search_clinic_knowledge",
+    "async_search_knowledge",
+    "async_search_restaurant_knowledge",
+    "clean_markdown_for_speech",
+    "clinic_knowledge_search_tool",
+    "is_emergency_content",
+    "knowledge_search_tool",
+    "search_clinic_knowledge",
+    "search_knowledge",
+    "search_restaurant_knowledge",
+    "trim_to_sentence_boundary",
+]
