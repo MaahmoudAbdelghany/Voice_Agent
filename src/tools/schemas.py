@@ -539,8 +539,8 @@ class ManageAppointmentInput(BaseModel):
             if not self.booking_code and not self.phone:
                 raise ValueError("'lookup' requires 'booking_code' or 'phone'.")
         elif self.action == ManageAppointmentAction.CANCEL:
-            if not self.booking_code:
-                raise ValueError("'cancel' requires 'booking_code'.")
+            if not self.booking_code and not self.phone:
+                raise ValueError("'cancel' requires 'booking_code' or 'phone'.")
         elif (
             self.action == ManageAppointmentAction.RESCHEDULE
             and (not self.booking_code or self.new_date is None)

@@ -30,7 +30,7 @@ This roadmap is a **Living Document** under Spec-Driven Development (SDD). Each 
 - [x] **Feature 3.1**: Pydantic schemas for medical tool inputs and outputs (`src/tools/schemas.py`).
 - [x] **Feature 3.2**: Doctor Availability & Shift Lookup Tool (`src/tools/doctor_availability.py`).
 - [x] **Feature 3.3**: Appointment Booking Tool with atomic queue number assignment (`src/tools/appointment_booking.py`).
-- [ ] **Feature 3.4**: Appointment Query, Cancellation & Rescheduling Tool (`src/tools/manage_appointment.py`).
+- [x] **Feature 3.4**: Appointment Query, Cancellation & Rescheduling Tool (`src/tools/manage_appointment.py`).
 - [ ] **Feature 3.5**: Clinic Knowledge Search Tool (`src/tools/knowledge_search.py`).
 - [ ] **Feature 3.6**: Human Receptionist Escalation Tool with Dashboard Alert (`src/tools/human_handoff.py`).
 - [ ] **Feature 3.7**: Automated Unit & Integration Tests for Medical Tools (`tests/test_clinic_tools.py`).

@@ -19,6 +19,12 @@ from src.tools.appointment_booking import (
     async_book_appointment,
     book_appointment,
 )
+from src.tools.manage_appointment import (
+    ManageAppointmentTool,
+    async_manage_appointment,
+    manage_appointment,
+    manage_appointment_tool,
+)
 from src.tools.doctor_availability import (
     DoctorAvailabilityTool,
     async_check_doctor_availability,
@@ -195,6 +201,19 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         sync_callable=book_appointment,
         async_callable=async_book_appointment,
     ),
+    "manage_appointment": ToolDefinition(
+        name="manage_appointment",
+        description=(
+            "Look up, cancel, or reschedule existing patient clinic appointments. "
+            "Action 'lookup' queries by booking code or patient mobile phone. "
+            "Action 'cancel' cancels an appointment by booking code or phone number. "
+            "Action 'reschedule' moves a booking to a new date with the same doctor."
+        ),
+        input_schema=ManageAppointmentInput,
+        output_schema=ManageAppointmentOutput,
+        sync_callable=manage_appointment,
+        async_callable=async_manage_appointment,
+    ),
 }
 
 
@@ -339,6 +358,8 @@ __all__ = [
     "doctor_availability_tool",
     "AppointmentBookingTool",
     "appointment_booking_tool",
+    "ManageAppointmentTool",
+    "manage_appointment_tool",
     "KnowledgeSearchTool",
     "knowledge_search_tool",
     "OrderStatusTool",
@@ -352,6 +373,8 @@ __all__ = [
     "async_check_doctor_availability",
     "book_appointment",
     "async_book_appointment",
+    "manage_appointment",
+    "async_manage_appointment",
     "search_knowledge",
     "async_search_knowledge",
     "search_restaurant_knowledge",

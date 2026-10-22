@@ -380,11 +380,18 @@ def test_manage_appointment_requires_identifier():
     with pytest.raises(ValidationError, match="requires 'booking_code' or 'phone'"):
         ManageAppointmentInput(action=ManageAppointmentAction.LOOKUP)
 
-    with pytest.raises(ValidationError, match="'cancel' requires 'booking_code'"):
+    with pytest.raises(ValidationError, match="'cancel' requires 'booking_code' or 'phone'"):
         ManageAppointmentInput(action=ManageAppointmentAction.CANCEL)
+
+    valid_cancel_phone = ManageAppointmentInput(
+        action=ManageAppointmentAction.CANCEL,
+        phone="01012345678",
+    )
+    assert valid_cancel_phone.phone == "01012345678"
 
     with pytest.raises(ValidationError, match="'reschedule' requires 'booking_code' and 'new_date'"):
         ManageAppointmentInput(
             action=ManageAppointmentAction.RESCHEDULE,
             booking_code="APT-1",
         )
+
