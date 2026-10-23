@@ -71,7 +71,9 @@ class Doctor(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # Relationships
-    specialty: Mapped["Specialty"] = relationship("Specialty", back_populates="doctors", lazy="selectin")
+    specialty: Mapped["Specialty"] = relationship(
+        "Specialty", back_populates="doctors", lazy="selectin"
+    )
     schedules: Mapped[list["DoctorSchedule"]] = relationship(
         "DoctorSchedule",
         back_populates="doctor",
@@ -216,9 +218,15 @@ class Appointment(Base):
     )
 
     # Relationships
-    patient: Mapped["Patient"] = relationship("Patient", back_populates="appointments", lazy="selectin")
-    doctor: Mapped["Doctor"] = relationship("Doctor", back_populates="appointments", lazy="selectin")
-    schedule: Mapped["DoctorSchedule"] = relationship("DoctorSchedule", back_populates="appointments", lazy="selectin")
+    patient: Mapped["Patient"] = relationship(
+        "Patient", back_populates="appointments", lazy="selectin"
+    )
+    doctor: Mapped["Doctor"] = relationship(
+        "Doctor", back_populates="appointments", lazy="selectin"
+    )
+    schedule: Mapped["DoctorSchedule"] = relationship(
+        "DoctorSchedule", back_populates="appointments", lazy="selectin"
+    )
 
     def __init__(self, **kwargs):
         kwargs.setdefault("visit_type", "examination")
@@ -231,4 +239,41 @@ class Appointment(Base):
         return (
             f"<Appointment(code='{self.booking_code}', doctor_id={self.doctor_id}, "
             f"date='{self.appointment_date}', queue={self.queue_number}, status='{self.status}')>"
+        )
+
+
+class Escalation(Base):
+    """Receptionist escalation / supervisor handoff ticket."""
+
+    __tablename__ = "escalations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticket_id: Mapped[str] = mapped_column(String(30), unique=True, index=True, nullable=False)
+    session_id: Mapped[str | None] = mapped_column(String(100), index=True, nullable=True)
+    caller_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    caller_phone: Mapped[str | None] = mapped_column(String(20), index=True, nullable=True)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    department: Mapped[str] = mapped_column(String(50), default="reception", nullable=False)
+    urgency: Mapped[str] = mapped_column(String(20), default="medium", nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="queued", nullable=False)
+    estimated_wait_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now, nullable=False)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("department", "reception")
+        kwargs.setdefault("urgency", "medium")
+        kwargs.setdefault("status", "queued")
+        kwargs.setdefault("estimated_wait_seconds", 0)
+        kwargs.setdefault("created_at", _utc_now())
+        kwargs.setdefault("updated_at", _utc_now())
+        super().__init__(**kwargs)
+
+    def __repr__(self) -> str:
+        return (
+            f"<Escalation(id={self.id}, ticket_id='{self.ticket_id}', "
+            f"status='{self.status}', urgency='{self.urgency}', dept='{self.department}')>"
         )

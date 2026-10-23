@@ -63,9 +63,9 @@ class DayOfWeek(int, Enum):
 class DoctorTitle(str, Enum):
     """Medical professional hierarchy."""
 
-    SPECIALIST = "specialist"      # أخصائي
-    CONSULTANT = "consultant"      # استشاري
-    PROFESSOR = "professor"        # أستاذ دكتور
+    SPECIALIST = "specialist"  # أخصائي
+    CONSULTANT = "consultant"  # استشاري
+    PROFESSOR = "professor"  # أستاذ دكتور
 
     def label_ar(self) -> str:
         labels = {
@@ -79,7 +79,7 @@ class DoctorTitle(str, Enum):
 class VisitType(str, Enum):
     """Clinic visit categorization."""
 
-    EXAMINATION = "examination"    # كشف جديد
+    EXAMINATION = "examination"  # كشف جديد
     CONSULTATION = "consultation"  # استشارة / إعادة
 
     def label_ar(self) -> str:
@@ -93,10 +93,10 @@ class VisitType(str, Enum):
 class AppointmentStatus(str, Enum):
     """Lifecycle status of a patient appointment."""
 
-    CONFIRMED = "confirmed"        # مؤكد
-    COMPLETED = "completed"        # تم الكشف
-    CANCELLED = "cancelled"        # ملغي
-    NO_SHOW = "no_show"            # لم يحضر
+    CONFIRMED = "confirmed"  # مؤكد
+    COMPLETED = "completed"  # تم الكشف
+    CANCELLED = "cancelled"  # ملغي
+    NO_SHOW = "no_show"  # لم يحضر
 
     def label_ar(self) -> str:
         labels = {
@@ -106,6 +106,31 @@ class AppointmentStatus(str, Enum):
             "no_show": "لم يحضر",
         }
         return labels.get(self.value, self.value)
+
+
+class EscalationStatus(str, Enum):
+    """Lifecycle status of a receptionist escalation ticket."""
+
+    QUEUED = "queued"  # في قائمة انتظار الاستقبال
+    TRANSFERRED = "transferred"  # تحويل مباشر فوري (طوارئ)
+    CALLBACK = "callback"  # طلب إعادة اتصال خارج مواعيد العمل
+    ACKNOWLEDGED = "acknowledged"  # تم استلامه من قبل موظف الاستقبال
+    RESOLVED = "resolved"  # تم التعامل وإنهاء التذكرة
+
+    def label_ar(self) -> str:
+        labels = {
+            "queued": "في الانتظار",
+            "transferred": "تم التحويل",
+            "callback": "طلب اتصال",
+            "acknowledged": "قيد المتابعة",
+            "resolved": "تم الحل",
+        }
+        return labels.get(self.value, self.value)
+
+    @classmethod
+    def open_statuses(cls) -> set[str]:
+        """Return set of status string values that represent open tickets."""
+        return {cls.QUEUED.value, cls.TRANSFERRED.value, cls.CALLBACK.value}
 
 
 # ==============================================================================
@@ -232,13 +257,17 @@ class AppointmentBase(BaseModel):
     appointment_date: date = Field(..., description="Date of appointment")
     queue_number: int = Field(..., gt=0, description="Queue number within shift")
     visit_type: VisitType = Field(default=VisitType.EXAMINATION, description="Visit type")
-    status: AppointmentStatus = Field(default=AppointmentStatus.CONFIRMED, description="Booking status")
+    status: AppointmentStatus = Field(
+        default=AppointmentStatus.CONFIRMED, description="Booking status"
+    )
     fee: float = Field(default=0.0, ge=0, description="Total fee charged in EGP")
     notes: str | None = Field(None, description="Optional symptoms or caller notes")
 
 
 class AppointmentCreate(BaseModel):
-    booking_code: str | None = Field(None, description="Unique booking code (auto-generated if omitted)")
+    booking_code: str | None = Field(
+        None, description="Unique booking code (auto-generated if omitted)"
+    )
     patient_id: int
     doctor_id: int
     schedule_id: int
@@ -285,4 +314,3 @@ class DoctorAvailabilityRead(BaseModel):
     is_available: bool = False
     examination_fee: float = 0.0
     consultation_fee: float = 0.0
-

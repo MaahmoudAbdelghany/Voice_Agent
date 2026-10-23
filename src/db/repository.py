@@ -11,18 +11,27 @@ Provides an asynchronous, transactional data access abstraction for:
 
 import asyncio
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import ClassVar
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.db.models import Appointment, Doctor, DoctorSchedule, Patient, Specialty
+from src.db.models import (
+    Appointment,
+    Doctor,
+    DoctorSchedule,
+    Escalation,
+    Patient,
+    Specialty,
+)
 from src.db.schemas import (
     AppointmentStatus,
     DayOfWeek,
     DoctorAvailabilityRead,
+    EscalationStatus,
     VisitType,
     clean_egyptian_phone,
 )
@@ -56,6 +65,10 @@ class AppointmentNotFoundError(ClinicRepositoryError):
     """Raised when the requested appointment booking code is not found."""
 
 
+class EscalationNotFoundError(ClinicRepositoryError):
+    """Raised when the requested escalation ticket ID is not found."""
+
+
 # ==============================================================================
 # Clinic Repository
 # ==============================================================================
@@ -85,9 +98,7 @@ class ClinicRepository:
     async def get_specialties(self, active_only: bool = True) -> Sequence[Specialty]:
         """Retrieve all medical specialties ordered by Arabic name."""
         stmt = (
-            select(Specialty)
-            .options(selectinload(Specialty.doctors))
-            .order_by(Specialty.name_ar)
+            select(Specialty).options(selectinload(Specialty.doctors)).order_by(Specialty.name_ar)
         )
         result = await self.session.execute(stmt)
         return result.scalars().all()
@@ -442,3 +453,206 @@ class ClinicRepository:
         else:
             await self.session.flush()
         return appointment
+
+    # --------------------------------------------------------------------------
+    # Escalations & Receptionist Handoffs
+    # --------------------------------------------------------------------------
+
+    async def create_escalation(
+        self,
+        reason: str,
+        caller_name: str | None = None,
+        caller_phone: str | None = None,
+        department: str = "reception",
+        urgency: str = "medium",
+        status: str = "queued",
+        summary: str | None = None,
+        session_id: str | None = None,
+        estimated_wait_seconds: int = 0,
+        cairo_date: date | None = None,
+        auto_commit: bool = True,
+    ) -> Escalation:
+        """
+        Create a new persistent escalation ticket with an atomic sequential ticket_id.
+        Ticket format: ESC-YYYYMMDD-NNNN based on Cairo date.
+        """
+        today = cairo_date or datetime.now(timezone.utc).date()
+        prefix = f"ESC-{today.strftime('%Y%m%d')}-"
+
+        # Count existing tickets for this prefix
+        stmt_count = (
+            select(func.count())
+            .select_from(Escalation)
+            .where(Escalation.ticket_id.like(f"{prefix}%"))
+        )
+        res_count = await self.session.execute(stmt_count)
+        seq = (res_count.scalar() or 0) + 1
+        ticket_id = f"{prefix}{seq:04d}"
+
+        # In case seq already exists (due to race or deletion), advance until unique
+        stmt_exists = select(Escalation).where(Escalation.ticket_id == ticket_id)
+        if (await self.session.execute(stmt_exists)).scalar_one_or_none():
+            seq += 1
+            ticket_id = f"{prefix}{seq:04d}"
+
+        escalation = Escalation(
+            ticket_id=ticket_id,
+            session_id=session_id,
+            caller_name=caller_name,
+            caller_phone=caller_phone,
+            reason=reason,
+            summary=summary,
+            department=department,
+            urgency=urgency,
+            status=status,
+            estimated_wait_seconds=estimated_wait_seconds,
+        )
+        self.session.add(escalation)
+
+        try:
+            if auto_commit:
+                await self.session.commit()
+            else:
+                await self.session.flush()
+            await self.session.refresh(escalation)
+        except IntegrityError:
+            # Retry once with incremented sequence
+            await self.session.rollback()
+            seq += 1
+            escalation.ticket_id = f"{prefix}{seq:04d}"
+            self.session.add(escalation)
+            if auto_commit:
+                await self.session.commit()
+            else:
+                await self.session.flush()
+            await self.session.refresh(escalation)
+
+        return escalation
+
+    async def find_recent_open_escalation(
+        self,
+        phone: str,
+        since: datetime,
+    ) -> Escalation | None:
+        """
+        Find the newest open escalation ticket for this phone created at or after `since`.
+        Open statuses: queued, transferred, callback.
+        """
+        open_statuses = list(EscalationStatus.open_statuses())
+        stmt = (
+            select(Escalation)
+            .where(
+                Escalation.caller_phone == phone,
+                Escalation.status.in_(open_statuses),
+                Escalation.created_at >= since,
+            )
+            .order_by(Escalation.created_at.desc())
+            .limit(1)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def count_open_escalations(
+        self,
+        min_urgency: str | None = None,
+    ) -> int:
+        """
+        Count open escalation tickets (queued, transferred, callback).
+        If min_urgency is provided, only count tickets with urgency >= min_urgency.
+        Urgency order: low (1) < medium (2) < urgent (3) < emergency (4).
+        """
+        open_statuses = list(EscalationStatus.open_statuses())
+        stmt = (
+            select(func.count()).select_from(Escalation).where(Escalation.status.in_(open_statuses))
+        )
+        urgency_ranks = {
+            "low": 1,
+            "medium": 2,
+            "urgent": 3,
+            "emergency": 4,
+        }
+        if min_urgency and min_urgency in urgency_ranks:
+            min_rank = urgency_ranks[min_urgency]
+            allowed = [u for u, r in urgency_ranks.items() if r >= min_rank]
+            stmt = stmt.where(Escalation.urgency.in_(allowed))
+
+        res = await self.session.execute(stmt)
+        return res.scalar() or 0
+
+    async def list_open_escalations(
+        self,
+        limit: int = 50,
+    ) -> Sequence[Escalation]:
+        """
+        List open escalation tickets ordered by priority (emergency first) then created_at asc.
+        """
+        open_statuses = list(EscalationStatus.open_statuses())
+        priority_order = case(
+            (Escalation.urgency == "emergency", 1),
+            (Escalation.urgency == "urgent", 2),
+            (Escalation.urgency == "medium", 3),
+            (Escalation.urgency == "low", 4),
+            else_=5,
+        )
+        stmt = (
+            select(Escalation)
+            .where(Escalation.status.in_(open_statuses))
+            .order_by(priority_order.asc(), Escalation.created_at.asc())
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def update_escalation_status(
+        self,
+        ticket_id: str,
+        status: str | EscalationStatus,
+        auto_commit: bool = True,
+    ) -> Escalation:
+        """
+        Update escalation status to acknowledged or resolved, recording timestamps.
+        Raises EscalationNotFoundError if ticket not found.
+        Raises ClinicRepositoryError if ticket is already resolved.
+        """
+        status_val = status.value if isinstance(status, EscalationStatus) else str(status)
+        stmt = select(Escalation).where(Escalation.ticket_id == ticket_id)
+        result = await self.session.execute(stmt)
+        escalation = result.scalar_one_or_none()
+        if not escalation:
+            raise EscalationNotFoundError(f"Escalation ticket '{ticket_id}' not found.")
+
+        if escalation.status == EscalationStatus.RESOLVED.value:
+            raise ClinicRepositoryError(
+                f"Cannot update status of already resolved ticket '{ticket_id}'."
+            )
+
+        now = datetime.now(timezone.utc)
+        escalation.status = status_val
+        escalation.updated_at = now
+
+        if status_val == EscalationStatus.ACKNOWLEDGED.value and not escalation.acknowledged_at:
+            escalation.acknowledged_at = now
+        elif status_val == EscalationStatus.RESOLVED.value:
+            if not escalation.acknowledged_at:
+                escalation.acknowledged_at = now
+            escalation.resolved_at = now
+
+        if auto_commit:
+            await self.session.commit()
+        else:
+            await self.session.flush()
+
+        return escalation
+
+    async def save_escalation(
+        self,
+        escalation: Escalation,
+        auto_commit: bool = True,
+    ) -> Escalation:
+        """Save updates to an existing escalation entity."""
+        escalation.updated_at = datetime.now(timezone.utc)
+        if auto_commit:
+            await self.session.commit()
+        else:
+            await self.session.flush()
+        return escalation

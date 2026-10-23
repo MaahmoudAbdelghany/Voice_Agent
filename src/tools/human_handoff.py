@@ -1,433 +1,626 @@
 """
-Human Supervisor Escalation and Handoff Tool for Voice Agent.
+Receptionist Escalation and Handoff Tool for Egyptian Polyclinics (Feature 3.6).
 
-Handles call escalation to live human representatives, department routing
-(Customer Support, Kitchen Manager, Delivery Dispatch, Billing), urgency triage,
-and queue wait-time estimation with voice-friendly Arabic confirmation messages.
+Handles patient call escalation to clinic front-desk reception, department triage
+(Reception, Nursing, Billing, Emergency), emergency keyword safety net,
+reception working hours validation, ticket de-duplication, and deterministic
+wait estimation with polite Egyptian Arabic voice messages.
 """
 
-import asyncio
-import logging
-import random
-import re
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from __future__ import annotations
 
-from src.tools.legacy_schemas import (
+import asyncio
+import concurrent.futures
+import datetime as dt
+import logging
+import re
+import uuid
+from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from src.config import get_settings
+from src.db.repository import ClinicRepository
+from src.db.schemas import EscalationStatus, clean_egyptian_phone
+from src.db.session import get_async_session
+from src.tools.appointment_booking import get_cairo_now
+from src.tools.doctor_availability import get_cairo_today
+from src.tools.schemas import (
     HandoffDepartmentEnum,
     HandoffUrgencyEnum,
-    HumanHandoffInput,
-    HumanHandoffOutput,
     ToolResult,
+    _normalize_arabic,
 )
 
 logger = logging.getLogger(__name__)
 
-# Arabic display names for departments
-DEPARTMENT_NAMES_ARABIC: Dict[HandoffDepartmentEnum, str] = {
-    HandoffDepartmentEnum.CUSTOMER_SUPPORT: "خدمة العملاء والدعم المباشر",
-    HandoffDepartmentEnum.KITCHEN_MANAGER: "إدارة المطبخ وجودة الأغذية",
-    HandoffDepartmentEnum.DELIVERY_DISPATCH: "مشرف عمليات ومتابعة التوصيل",
-    HandoffDepartmentEnum.BILLING: "قسم الحسابات والمدفوعات",
+# ==============================================================================
+# Arabic Labels & Department Roster
+# ==============================================================================
+
+DEPARTMENT_NAMES_ARABIC: dict[str, str] = {
+    HandoffDepartmentEnum.RECEPTION.value: "الاستقبال",
+    HandoffDepartmentEnum.NURSING.value: "التمريض",
+    HandoffDepartmentEnum.BILLING.value: "الحسابات",
+    HandoffDepartmentEnum.EMERGENCY.value: "الطوارئ",
+    "reception": "الاستقبال",
+    "nursing": "التمريض",
+    "billing": "الحسابات",
+    "emergency": "الطوارئ",
+    # Legacy mappings
+    "customer_support": "الاستقبال",
+    "kitchen_manager": "الاستقبال",
+    "delivery_dispatch": "الاستقبال",
 }
 
-# Arabic display names for urgency levels
-URGENCY_NAMES_ARABIC: Dict[HandoffUrgencyEnum, str] = {
-    HandoffUrgencyEnum.LOW: "عادي",
-    HandoffUrgencyEnum.MEDIUM: "متوسط",
-    HandoffUrgencyEnum.HIGH: "عالي",
-    HandoffUrgencyEnum.CRITICAL: "طارئ جداً",
+URGENCY_RANKS: dict[str, int] = {
+    HandoffUrgencyEnum.LOW.value: 1,
+    HandoffUrgencyEnum.MEDIUM.value: 2,
+    HandoffUrgencyEnum.URGENT.value: 3,
+    HandoffUrgencyEnum.EMERGENCY.value: 4,
+    "low": 1,
+    "medium": 2,
+    "urgent": 3,
+    "emergency": 4,
+    # Legacy mappings
+    "high": 3,
+    "critical": 4,
 }
 
-# Department specialized agents roster
-DEPARTMENT_AGENTS: Dict[HandoffDepartmentEnum, List[str]] = {
-    HandoffDepartmentEnum.CUSTOMER_SUPPORT: [
-        "أحمد ممدوح (كبير مسؤولي خدمة العملاء)",
-        "رنا يوسف (أخصائي تجربة العملاء)",
-        "كريم سامي (مشرف الدعم)",
-    ],
-    HandoffDepartmentEnum.KITCHEN_MANAGER: [
-        "الشيف محمود عبد الغني (مدير الجودة)",
-        "الشيف سمير إبراهيم (مسؤول قسم الطهي)",
-    ],
-    HandoffDepartmentEnum.DELIVERY_DISPATCH: [
-        "خالد النجار (مشرف حركة التوصيل)",
-        "طارق مصطفى (مسؤول التوزيع السريع)",
-    ],
-    HandoffDepartmentEnum.BILLING: [
-        "وليد الشافعي (أخصائي التسويات والمدفوعات)",
-        "سارة كمال (مشرفة الفواتير)",
-    ],
-}
+# ==============================================================================
+# Pure Helper Functions (Unit-Testable)
+# ==============================================================================
 
-# In-memory handoff queue and history store
-MOCK_HANDOFF_QUEUE: Dict[str, Dict[str, Any]] = {
-    "ESC-1001": {
-        "handoff_id": "ESC-1001",
-        "reason": "عميل يطلب التحدث مع الإدارة بخصوص تأخر الطلب 50 دقيقة",
-        "customer_phone": "+966501112233",
-        "customer_name": "سامح فوزي",
-        "urgency": HandoffUrgencyEnum.HIGH,
-        "department": HandoffDepartmentEnum.DELIVERY_DISPATCH,
-        "department_arabic": "مشرف عمليات ومتابعة التوصيل",
-        "status": "transferred",
-        "assigned_agent": "خالد النجار (مشرف حركة التوصيل)",
-        "estimated_wait_seconds": 20,
-        "conversation_summary": "العميل طلب أوردر ORD-1001 ولم يصل في الموعد المحدد ومندوب التوصيل لا يجيب.",
-        "created_at": "2026-09-12T11:15:00",
-    },
-    "ESC-1002": {
-        "handoff_id": "ESC-1002",
-        "reason": "استفسار دقيق عن مكونات مسببة لحساسية السمسم في الصوص الخاص",
-        "customer_phone": "+966509998877",
-        "customer_name": "هدى كمال",
-        "urgency": HandoffUrgencyEnum.CRITICAL,
-        "department": HandoffDepartmentEnum.KITCHEN_MANAGER,
-        "department_arabic": "إدارة المطبخ وجودة الأغذية",
-        "status": "transferred",
-        "assigned_agent": "الشيف محمود عبد الغني (مدير الجودة)",
-        "estimated_wait_seconds": 10,
-        "conversation_summary": "العميلة تعاني من حساسية شديدة وتريد تأكيداً مباشراً من الشيف قبل بدء التحضير.",
-        "created_at": "2026-09-12T11:45:00",
-    },
-}
+# Compiled regex patterns for emergency detection (FR-2.1)
+_EMERGENCY_PATTERNS = [
+    # Chest pain / Heart attack
+    re.compile(r"(?:الم|وجع|تعب|ثقل|وجع جامد|الم شديد).*(?:صدر|قلب)"),
+    re.compile(r"(?:صدر|قلب).*(?:الم|وجع|بيوجع|تعب)"),
+    re.compile(r"ذبحة|ذبحه|ازمة قلبية|ازمه قلبيه|جلطة|جلطه|chest\s*pain|heart\s*attack"),
+    # Breathing difficulties / Choking
+    re.compile(r"(?:مش قادر|مش قادره|مش قادرين|صعوبة|صعوبه|ضيق|مش عارف).*(?:تنفس|اتنفس|نفس)"),
+    re.compile(
+        r"اختناق|بيختنق|بتختنق|شرقان|شرقانه|difficulty\s*breathing|shortness\s*of\s*breath|choking"
+    ),
+    # Severe bleeding
+    re.compile(r"نزيف|بينزف|بتنزف|دم\s*كتير|نزف|severe\s*bleeding|bleeding|hemorrhage"),
+    # Fainting / Unconsciousness / Coma
+    re.compile(r"اغما|اغم[يى]|مغم[يى]|غيبوب|faint|unconscious|coma"),
+    re.compile(r"(?:فقد|فقدان|فاقد|فاقده|فاقدة).*(?:وعي|الوعي)"),
+    re.compile(r"مش واعي|مش واعيه|مش واعية"),
+    # Seizures / Convulsions
+    re.compile(r"تشنج|صرع|seizure|convulsion|بيترعش جامد"),
+    # Stroke / Paralysis
+    re.compile(r"شلل|جلطة مخية|جلطه مخيه|stroke|paralysis"),
+    re.compile(r"اعوجاج.*فم"),
+    # Poisoning / Overdose
+    re.compile(r"تسمم|جرعة زائدة|جرعه زائده|جرعة زايدة|poison|poisoning|overdose"),
+    re.compile(r"شرب.*(?:كلور|دوا|دواء|منظف)"),
+    # Serious accident / Severe trauma
+    re.compile(r"حادث|حادثة|حادثه|كسر مضاعف|حرق خطير|severe\s*accident|trauma"),
+    # Self-harm / Suicide
+    re.compile(r"انتحار|هينتحر|هتنتحر|suicide"),
+]
 
 
-class HumanHandoffTool:
+def detect_emergency(text: str) -> bool:
     """
-    Tool for escalating live voice calls to human supervisors or specialist departments.
+    Detect life-threatening medical emergency symptoms in caller text (FR-2.1).
+    Evaluates Egyptian colloquial, Modern Standard Arabic, and English.
     """
+    if not text or not text.strip():
+        return False
 
-    def __init__(self, queue_store: Optional[Dict[str, Dict[str, Any]]] = None):
-        """Initialize with existing or new escalation queue store."""
-        self._queue = queue_store if queue_store is not None else MOCK_HANDOFF_QUEUE
-        self._counter = 2000
+    normalized = _normalize_arabic(text)
+    lower_raw = text.lower()
 
-    def _generate_handoff_id(self) -> str:
-        """Generate sequential escalation reference ID."""
-        self._counter += 1
-        return f"ESC-{self._counter}"
+    for pattern in _EMERGENCY_PATTERNS:
+        if pattern.search(normalized) or pattern.search(lower_raw):
+            return True
 
-    def infer_department_and_urgency(
-        self, reason: str, conversation_summary: Optional[str] = None
-    ) -> tuple[HandoffDepartmentEnum, HandoffUrgencyEnum]:
-        """
-        Analyze reason and conversation text to infer the most appropriate department and urgency.
+    return False
 
-        Args:
-            reason: Caller's reason for escalation.
-            conversation_summary: Optional previous dialog summary.
 
-        Returns:
-            Tuple of (HandoffDepartmentEnum, HandoffUrgencyEnum).
-        """
-        combined = f"{reason} {conversation_summary or ''}".lower()
+def is_reception_open(now_cairo: dt.datetime, settings_obj: Any = None) -> bool:
+    """
+    Determine if clinic reception desk is currently operating (FR-3.1).
+    Friday hours: reception_friday_open_time (14:00) to reception_close_time (22:00).
+    Sat-Thu hours: reception_open_time (09:00) to reception_close_time (22:00).
+    Boundary: inclusive at open, exclusive at close.
+    """
+    cfg = settings_obj or get_settings()
 
-        # Urgency detection
-        critical_keywords = [
-            "تسمم", "حساسية مفرطة", "مستشفى", "طوارئ", "حادث", "إغماء",
-            "poison", "emergency", "severe allergy", "hospital", "choking"
-        ]
-        high_keywords = [
-            "متأخر جداً", "بارد", "بايظ", "تالف", "أكل فاسد", "طلب خطأ",
-            "مندوب وقح", "سرقة", "لم يصل", "ساعة ونص", "غضبان", "angry", "complaint",
-            "شديد", "مرتين", "استرداد"
-        ]
+    def _parse_time(t_str: str, default_h: int, default_m: int) -> dt.time:
+        try:
+            parts = t_str.strip().split(":")
+            return dt.time(int(parts[0]), int(parts[1]))
+        except (ValueError, TypeError, IndexError):
+            return dt.time(default_h, default_m)
 
-        if any(kw in combined for kw in critical_keywords):
-            urgency = HandoffUrgencyEnum.CRITICAL
-        elif any(kw in combined for kw in high_keywords):
-            urgency = HandoffUrgencyEnum.HIGH
-        else:
-            urgency = HandoffUrgencyEnum.MEDIUM
+    open_norm = _parse_time(getattr(cfg, "reception_open_time", "09:00"), 9, 0)
+    close_norm = _parse_time(getattr(cfg, "reception_close_time", "22:00"), 22, 0)
+    open_friday = _parse_time(getattr(cfg, "reception_friday_open_time", "14:00"), 14, 0)
 
-        # Department detection with token-aware matching & scoring
-        kitchen_keywords = [
-            "مطبخ", "شيف", "طعام", "أكل", "محروق", "طعم", "مكونات",
-            "صلصة", "صوص", "حساسية", "جلوتين", "نباتي", "لحم", "دجاج",
-            "غير ناضج", "طازج", "taste", "kitchen", "chef", "cook", "allergen", "raw"
-        ]
-        delivery_keywords = [
-            "توصيل", "سائق", "سواق", "دليفري", "مندوب", "لوكيشن", "عنوان", "تأخر", "متأخر",
-            "طريق", "خريطة", "فين الأوردر", "لم يصل", "delivery", "driver", "courier", "delayed"
-        ]
-        billing_keywords = [
-            "حساب", "فاتورة", "فلوس", "فيزا", "بطاقة", "خصم", "استرداد", "دفع",
-            "بنك", "مرتجع", "كاش", "مبلغ", "محفظة", "bill", "invoice", "payment", "card", "refund", "charge"
-        ]
+    current_time = now_cairo.time()
 
-        def _count_matches(text: str, keywords: List[str]) -> int:
-            count = 0
-            for kw in keywords:
-                if " " in kw:
-                    if kw in text:
-                        count += 2
-                else:
-                    pattern = rf"(?:^|[^\w])(?:ال|و|ب|ف|لل|وال|بال)?{re.escape(kw)}(?:[^\w]|$)"
-                    if re.search(pattern, text):
-                        count += 1
-            return count
+    # Python weekday: Monday=0, Tuesday=1, Wednesday=2, Thursday=3, Friday=4, Saturday=5, Sunday=6
+    if now_cairo.weekday() == 4:  # Friday
+        return open_friday <= current_time < close_norm
+    else:  # Sat - Thu
+        return open_norm <= current_time < close_norm
 
-        scores = {
-            HandoffDepartmentEnum.KITCHEN_MANAGER: _count_matches(combined, kitchen_keywords),
-            HandoffDepartmentEnum.DELIVERY_DISPATCH: _count_matches(combined, delivery_keywords),
-            HandoffDepartmentEnum.BILLING: _count_matches(combined, billing_keywords),
-        }
 
-        best_dept = max(scores, key=scores.get)
-        if scores[best_dept] > 0:
-            department = best_dept
-        else:
-            department = HandoffDepartmentEnum.CUSTOMER_SUPPORT
+def estimate_wait_seconds(urgency: str | HandoffUrgencyEnum, open_ahead: int = 0) -> int:
+    """
+    Calculate deterministic estimated queue wait in seconds (FR-3.3).
+    Formula: base(urgency) + 30s * open_ahead, capped at 600s.
+    Emergency urgency is always 0.
+    """
+    u_str = urgency.value if hasattr(urgency, "value") else str(urgency).lower()
 
-        return department, urgency
+    if u_str in (HandoffUrgencyEnum.EMERGENCY.value, "emergency", "critical"):
+        return 0
 
-    def _estimate_wait_time(self, urgency: HandoffUrgencyEnum) -> int:
-        """Calculate estimated wait time in seconds based on urgency priority."""
-        if urgency == HandoffUrgencyEnum.CRITICAL:
-            return random.randint(10, 15)
-        elif urgency == HandoffUrgencyEnum.HIGH:
-            return random.randint(20, 35)
-        elif urgency == HandoffUrgencyEnum.MEDIUM:
-            return random.randint(40, 60)
-        else:
-            return random.randint(60, 90)
+    base_map = {
+        HandoffUrgencyEnum.URGENT.value: 30,
+        "urgent": 30,
+        "high": 30,
+        HandoffUrgencyEnum.MEDIUM.value: 60,
+        "medium": 60,
+        HandoffUrgencyEnum.LOW.value: 120,
+        "low": 120,
+    }
+    base = base_map.get(u_str, 60)
+    total = base + (30 * max(0, open_ahead))
+    return min(600, total)
 
-    def _pick_agent(self, department: HandoffDepartmentEnum) -> str:
-        """Select an active representative from the department roster."""
-        roster = DEPARTMENT_AGENTS.get(
-            department,
-            DEPARTMENT_AGENTS[HandoffDepartmentEnum.CUSTOMER_SUPPORT],
+
+def mask_phone_for_speech(phone: str | None) -> str:
+    """
+    Mask phone number for safe voice readback, speaking only the last 3 digits (NFR-3).
+    """
+    if not phone:
+        return ""
+    digits = re.sub(r"\D", "", str(phone))
+    if len(digits) >= 3:
+        return digits[-3:]
+    return phone
+
+
+def build_voice_message(
+    status: str,
+    urgency: str,
+    department: str,
+    ticket_id: str,
+    caller_name: str | None = None,
+    caller_phone: str | None = None,
+    wait_seconds: int = 0,
+    emergency_phone: str = "123",
+) -> str:
+    """
+    Generate reassuring, natural Egyptian Arabic spoken response (FR-6).
+    """
+    greeting = (
+        f"أهلاً بك يا {caller_name.strip()}. "
+        if caller_name and caller_name.strip()
+        else "تحت أمرك تماماً. "
+    )
+    dept_ar = DEPARTMENT_NAMES_ARABIC.get(department, "الاستقبال")
+
+    if status == EscalationStatus.TRANSFERRED.value or urgency in ("emergency", "critical"):
+        return (
+            f"{greeting}نظراً لأهمية الحالة وحرصاً على سلامتكم، يرجى الاتصال فوراً بالإسعاف على رقم "
+            f"{emergency_phone} أو التوجه لأقرب طوارئ. جاري تحويل مكالمتك الآن إلى {dept_ar}، "
+            f"ورقم التذكرة هو {ticket_id}."
         )
-        return random.choice(roster)
 
-    def execute(
+    if status == EscalationStatus.QUEUED.value:
+        if wait_seconds <= 45:
+            wait_text = f"حوالي {wait_seconds} ثانية"
+        elif wait_seconds <= 90:
+            wait_text = "حوالي دقيقة"
+        elif wait_seconds <= 150:
+            wait_text = "حوالي دقيقتين"
+        else:
+            mins = max(1, round(wait_seconds / 60))
+            wait_text = f"حوالي {mins} دقائق"
+
+        return (
+            f"{greeting}تم تسجيل طلبك وجاري تحويلك إلى قسم {dept_ar}. متوسط الانتظار {wait_text}، "
+            f"ورقم التذكرة {ticket_id}. يرجى البقاء على الخط."
+        )
+
+    # status == CALLBACK
+    if caller_phone and caller_phone.strip():
+        last3 = mask_phone_for_speech(caller_phone)
+        return (
+            f"{greeting}قسم الاستقبال غير متاح حالياً؛ مواعيد العمل من 9 صباحاً حتى 10 مساءً والجمعة من 2 ظهراً. "
+            f"تم تسجيل طلبك برقم {ticket_id} وسنعاود الاتصال بك على الرقم المنتهي بـ {last3} فور فتح العيادة."
+        )
+    else:
+        return (
+            f"{greeting}قسم الاستقبال غير متاح حالياً؛ مواعيد العمل من 9 صباحاً حتى 10 مساءً والجمعة من 2 ظهراً. "
+            f"تم تسجيل طلبك برقم {ticket_id}، ويرجى تزويدنا برقم الموبايل للتواصل معك فور فتح العيادة."
+        )
+
+
+# ==============================================================================
+# Tool Implementation
+# ==============================================================================
+
+
+class ReceptionistHandoffTool:
+    """
+    Production Receptionist Escalation Tool for Egyptian Polyclinics (Feature 3.6).
+    Creates persistent database tickets, applies emergency safety net, handles working hours,
+    and supports call de-duplication with 400ms resilient fallback.
+    """
+
+    def __init__(
         self,
-        reason: str,
-        customer_phone: Optional[str] = None,
-        customer_name: Optional[str] = None,
-        urgency: Optional[HandoffUrgencyEnum] = None,
-        department: Optional[HandoffDepartmentEnum] = None,
-        conversation_summary: Optional[str] = None,
-    ) -> HumanHandoffOutput:
-        """
-        Synchronously process a human escalation request and prepare caller transfer.
+        session_factory: async_sessionmaker[AsyncSession] | None = None,
+        timeout_s: float = 0.4,
+    ) -> None:
+        self.session_factory = session_factory
+        self.timeout_s = timeout_s
 
-        Args:
-            reason: Explicit reason for transferring to human.
-            customer_phone: Caller contact number.
-            customer_name: Name of customer if known.
-            urgency: Priority level (auto-inferred if omitted).
-            department: Target department (auto-inferred if omitted).
-            conversation_summary: Context notes for the receiving human agent.
+    def _normalize_department(self, dept: Any) -> str:
+        d = str(dept.value if hasattr(dept, "value") else dept or "").strip().lower()
+        if d in ("reception", "customer_support", "kitchen_manager", "delivery_dispatch"):
+            return HandoffDepartmentEnum.RECEPTION.value
+        if d in ("nursing",):
+            return HandoffDepartmentEnum.NURSING.value
+        if d in ("billing",):
+            return HandoffDepartmentEnum.BILLING.value
+        if d in ("emergency",):
+            return HandoffDepartmentEnum.EMERGENCY.value
+        logger.warning("Unknown department '%s' requested, defaulting to reception", dept)
+        return HandoffDepartmentEnum.RECEPTION.value
 
-        Returns:
-            HumanHandoffOutput with transfer status, wait time, and voice script.
-        """
-        clean_reason = reason.strip()
-        clean_phone = customer_phone.strip() if customer_phone else None
-        clean_name = customer_name.strip() if customer_name else None
-
-        # Auto-infer department or urgency if not provided
-        inferred_dept, inferred_urg = self.infer_department_and_urgency(
-            clean_reason, conversation_summary
-        )
-        final_department = department or inferred_dept
-        final_urgency = urgency or inferred_urg
-
-        if isinstance(final_department, str):
-            try:
-                final_department = HandoffDepartmentEnum(final_department)
-            except ValueError:
-                final_department = HandoffDepartmentEnum.CUSTOMER_SUPPORT
-
-        if isinstance(final_urgency, str):
-            try:
-                final_urgency = HandoffUrgencyEnum(final_urgency)
-            except ValueError:
-                final_urgency = HandoffUrgencyEnum.MEDIUM
-
-        # Select agent and calculate wait
-        assigned_agent = self._pick_agent(final_department)
-        wait_seconds = self._estimate_wait_time(final_urgency)
-        handoff_id = self._generate_handoff_id()
-        dept_name_ar = DEPARTMENT_NAMES_ARABIC.get(
-            final_department, "خدمة العملاء والدعم المباشر"
-        )
-
-        status = "transferred" if final_urgency == HandoffUrgencyEnum.CRITICAL else "queued"
-
-        # Record handoff ticket in queue store
-        record = {
-            "handoff_id": handoff_id,
-            "reason": clean_reason,
-            "customer_phone": clean_phone,
-            "customer_name": clean_name,
-            "urgency": final_urgency,
-            "department": final_department,
-            "department_arabic": dept_name_ar,
-            "status": status,
-            "assigned_agent": assigned_agent,
-            "estimated_wait_seconds": wait_seconds,
-            "conversation_summary": conversation_summary,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        self._queue[handoff_id] = record
-
-        logger.info(
-            f"Escalation ticket created: id={handoff_id}, dept={final_department.value}, "
-            f"urgency={final_urgency.value}, wait={wait_seconds}s, agent='{assigned_agent}'"
-        )
-
-        # Build natural voice-friendly response
-        greeting = f"أهلاً بك يا {clean_name}. " if clean_name else "تحت أمرك تماماً. "
-
-        if final_urgency == HandoffUrgencyEnum.CRITICAL:
-            spoken_message = (
-                f"{greeting}نظراً لأهمية الأمر وحرصنا الكامل على سلامتكم، أقوم الآن فوراً "
-                f"بتحويل مكالمتك بشكل مباشر إلى {dept_name_ar} مع {assigned_agent}. "
-                f"رقم بطاقة المتابعة هو {handoff_id}. يرجى البقاء على الخط، جاري التوصيل الآن."
-            )
-        elif final_urgency == HandoffUrgencyEnum.HIGH:
-            spoken_message = (
-                f"{greeting}أتفهم انزعاجك تماماً ونعتذر عن أي تقصير. أقوم حالياً بتحويلك إلى "
-                f"{dept_name_ar} لمراجعة طلبك وحل المشكلة على الفور مع {assigned_agent}. "
-                f"رقم تذكرتك هو {handoff_id}، ومتوسط الانتظار المتوقع حوالي {wait_seconds} ثانية. "
-                f"يرجى التفضل بالبقاء على الخط."
-            )
-        else:
-            spoken_message = (
-                f"{greeting}بكل سرور، أقوم بتحويل مكالمتك الآن إلى {dept_name_ar}. "
-                f"رقم طلب التحويل هو {handoff_id}، والوقت المتوقع للتوصيل حوالي {wait_seconds} ثانية. "
-                f"يرجى الانتظار لحظات وسيكون معك أحد مسؤولينا."
-            )
-
-        return HumanHandoffOutput(
-            handoff_id=handoff_id,
-            status=status,
-            department=dept_name_ar,
-            urgency=final_urgency,
-            assigned_agent=assigned_agent,
-            estimated_wait_seconds=wait_seconds,
-            message=spoken_message,
-        )
+    def _normalize_urgency(self, urg: Any) -> str:
+        u = str(urg.value if hasattr(urg, "value") else urg or "").strip().lower()
+        if u in ("emergency", "critical"):
+            return HandoffUrgencyEnum.EMERGENCY.value
+        if u in ("urgent", "high"):
+            return HandoffUrgencyEnum.URGENT.value
+        if u in ("medium",):
+            return HandoffUrgencyEnum.MEDIUM.value
+        if u in ("low",):
+            return HandoffUrgencyEnum.LOW.value
+        logger.warning("Unknown urgency '%s' requested, defaulting to medium", urg)
+        return HandoffUrgencyEnum.MEDIUM.value
 
     async def aexecute(
         self,
-        reason: str,
-        customer_phone: Optional[str] = None,
-        customer_name: Optional[str] = None,
-        urgency: Optional[HandoffUrgencyEnum] = None,
-        department: Optional[HandoffDepartmentEnum] = None,
-        conversation_summary: Optional[str] = None,
-    ) -> HumanHandoffOutput:
-        """
-        Asynchronously process human escalation (non-blocking for LiveKit voice turns).
-        """
-        return await asyncio.to_thread(
-            self.execute,
-            reason=reason,
-            customer_phone=customer_phone,
-            customer_name=customer_name,
-            urgency=urgency,
-            department=department,
-            conversation_summary=conversation_summary,
-        )
-
-    def get_handoff_status(self, handoff_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Retrieve existing handoff status and details by ticket ID.
-        """
-        clean_id = handoff_id.strip().upper()
-        return self._queue.get(clean_id)
-
-    def schedule_callback(
-        self,
-        customer_phone: str,
-        customer_name: Optional[str] = None,
-        preferred_time: Optional[str] = None,
-        reason: Optional[str] = None,
+        reason: str | None = None,
+        caller_name: str | None = None,
+        caller_phone: str | None = None,
+        department: str | HandoffDepartmentEnum = HandoffDepartmentEnum.RECEPTION,
+        urgency: str | HandoffUrgencyEnum = HandoffUrgencyEnum.MEDIUM,
+        summary: str | None = None,
+        session_id: str | None = None,
+        # Legacy keyword compatibility
+        customer_name: str | None = None,
+        customer_phone: str | None = None,
+        conversation_summary: str | None = None,
     ) -> ToolResult:
         """
-        Schedule a callback if all lines are busy or if caller prefers a later callback.
+        Asynchronously process a human escalation request (non-blocking for LiveKit turns).
         """
-        ticket_id = self._generate_handoff_id()
-        time_text = f"خلال {preferred_time}" if preferred_time else "خلال 15 دقيقة"
-        name_text = f"يا {customer_name}" if customer_name else "عزيزي العميل"
+        # Resolve parameter aliases
+        final_name = (caller_name or customer_name or "").strip() or None
+        raw_phone = (caller_phone or customer_phone or "").strip() or None
+        final_summary = (summary or conversation_summary or "").strip() or None
 
-        callback_record = {
-            "handoff_id": ticket_id,
-            "status": "callback_scheduled",
-            "customer_phone": customer_phone,
-            "customer_name": customer_name,
-            "preferred_time": preferred_time or "15 minutes",
-            "reason": reason or "طلب إعادة اتصال من العميل",
-            "created_at": datetime.now(timezone.utc).isoformat(),
+        # Clean phone leniently (FR-1.3)
+        final_phone = raw_phone
+        if raw_phone:
+            try:
+                final_phone = clean_egyptian_phone(raw_phone)
+            except ValueError:
+                final_phone = raw_phone
+
+        # Default reason if omitted on direct calls (FR-1.4)
+        clean_reason = (reason or "").strip()
+        if not clean_reason:
+            clean_reason = "طلب التحدث مع موظف الاستقبال"
+
+        # Normalize requested department & urgency
+        clean_dept = self._normalize_department(department)
+        clean_urgency = self._normalize_urgency(urgency)
+
+        # FR-2: Emergency Safety Net
+        combined_text = f"{clean_reason} {final_summary or ''}"
+        is_emergency = detect_emergency(combined_text) or (
+            clean_urgency == HandoffUrgencyEnum.EMERGENCY.value
+        )
+
+        if is_emergency:
+            effective_urgency = HandoffUrgencyEnum.EMERGENCY.value
+            effective_dept = HandoffDepartmentEnum.EMERGENCY.value
+        else:
+            effective_urgency = clean_urgency
+            effective_dept = clean_dept
+
+        # FR-3: Reception hours & Status determination
+        cairo_now = get_cairo_now()
+        cairo_today = get_cairo_today()
+        reception_open = is_reception_open(cairo_now)
+
+        if is_emergency:
+            status = EscalationStatus.TRANSFERRED.value
+            wait_seconds = 0
+        elif reception_open:
+            status = EscalationStatus.QUEUED.value
+            wait_seconds = estimate_wait_seconds(effective_urgency, 0)
+        else:
+            status = EscalationStatus.CALLBACK.value
+            wait_seconds = 0
+
+        needs_phone = bool(status == EscalationStatus.CALLBACK.value and not final_phone)
+
+        # Database persistence task with 400ms timeout budget (FR-7)
+        async def _persist_escalation() -> tuple[str, str, str, str, int, bool, bool]:
+            async with get_async_session(self.session_factory) as session:
+                repo = ClinicRepository(session)
+
+                current_wait = wait_seconds
+                if status == EscalationStatus.QUEUED.value:
+                    ahead = await repo.count_open_escalations(min_urgency=effective_urgency)
+                    current_wait = estimate_wait_seconds(effective_urgency, ahead)
+
+                # FR-5: De-duplication check (within last 10 minutes)
+                existing = None
+                if final_phone:
+                    since_utc = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=10)
+                    existing = await repo.find_recent_open_escalation(final_phone, since_utc)
+
+                if existing:
+                    # Upgrade priority if new request has higher urgency
+                    new_rank = URGENCY_RANKS.get(effective_urgency, 2)
+                    old_rank = URGENCY_RANKS.get(existing.urgency, 2)
+
+                    upgraded_urgency = existing.urgency
+                    upgraded_dept = existing.department
+                    upgraded_status = existing.status
+                    upgraded_wait = existing.estimated_wait_seconds
+
+                    if new_rank > old_rank:
+                        upgraded_urgency = effective_urgency
+                        upgraded_dept = effective_dept
+                        upgraded_status = status
+                        upgraded_wait = current_wait
+                        existing.urgency = effective_urgency
+                        existing.department = effective_dept
+                        existing.status = status
+                        existing.estimated_wait_seconds = current_wait
+
+                    if clean_reason and clean_reason != existing.reason:
+                        old_s = existing.summary or existing.reason
+                        existing.summary = f"{old_s} | [تحديث]: {clean_reason}"[:1000]
+
+                    if final_name and not existing.caller_name:
+                        existing.caller_name = final_name
+                    if session_id and not existing.session_id:
+                        existing.session_id = session_id
+
+                    await repo.save_escalation(existing)
+
+                    return (
+                        existing.ticket_id,
+                        upgraded_status,
+                        upgraded_urgency,
+                        upgraded_dept,
+                        upgraded_wait,
+                        True,  # deduplicated
+                        True,  # persisted
+                    )
+
+                # Create new persistent escalation ticket
+                escalation = await repo.create_escalation(
+                    reason=clean_reason,
+                    caller_name=final_name,
+                    caller_phone=final_phone,
+                    department=effective_dept,
+                    urgency=effective_urgency,
+                    status=status,
+                    summary=final_summary,
+                    session_id=session_id,
+                    estimated_wait_seconds=current_wait,
+                    cairo_date=cairo_today,
+                )
+                return (
+                    escalation.ticket_id,
+                    escalation.status,
+                    escalation.urgency,
+                    escalation.department,
+                    escalation.estimated_wait_seconds,
+                    False,  # deduplicated
+                    True,  # persisted
+                )
+
+        try:
+            (
+                final_ticket_id,
+                final_status,
+                final_urgency_res,
+                final_dept_res,
+                final_wait_res,
+                is_dedup,
+                is_persisted,
+            ) = await asyncio.wait_for(_persist_escalation(), timeout=self.timeout_s)
+        except Exception as exc:  # noqa: BLE001
+            # Fallback path (FR-7.2): Resilience over logging, never crash caller turn
+            logger.error("Escalation DB execution failed or timed out: %s", type(exc).__name__)
+            final_ticket_id = f"ESC-TMP-{uuid.uuid4().hex[:6].upper()}"
+            final_status = status
+            final_urgency_res = effective_urgency
+            final_dept_res = effective_dept
+            final_wait_res = wait_seconds
+            is_dedup = False
+            is_persisted = False
+
+        # Privacy-safe logging (NFR-3)
+        logger.info(
+            "Escalation processed: ticket_id=%s, urgency=%s, dept=%s, status=%s, persisted=%s, dedup=%s",
+            final_ticket_id,
+            final_urgency_res,
+            final_dept_res,
+            final_status,
+            is_persisted,
+            is_dedup,
+        )
+
+        spoken_msg = build_voice_message(
+            status=final_status,
+            urgency=final_urgency_res,
+            department=final_dept_res,
+            ticket_id=final_ticket_id,
+            caller_name=final_name,
+            caller_phone=final_phone,
+            wait_seconds=final_wait_res,
+            emergency_phone=get_settings().emergency_phone,
+        )
+
+        dept_ar = DEPARTMENT_NAMES_ARABIC.get(final_dept_res, "الاستقبال")
+
+        output_payload = {
+            "ticket_id": final_ticket_id,
+            "status": final_status,
+            "urgency": final_urgency_res,
+            "department": final_dept_res,
+            "department_ar": dept_ar,
+            "estimated_wait_seconds": final_wait_res,
+            "message": spoken_msg,
+            "transfer_requested": bool(
+                final_status in (EscalationStatus.TRANSFERRED.value, EscalationStatus.QUEUED.value)
+            ),
+            "emergency_detected": is_emergency,
+            "needs_phone": needs_phone,
+            "deduplicated": is_dedup,
+            "persisted": is_persisted,
         }
-        self._queue[ticket_id] = callback_record
 
         return ToolResult(
             success=True,
-            message=(
-                f"تم جدولة إعادة الاتصال بك بنجاح {name_text} على الرقم {customer_phone} {time_text}. "
-                f"رقم التذكرة الخاص بك هو {ticket_id}. نتمنى لك يوماً سعيداً!"
-            ),
-            data=callback_record,
+            message=spoken_msg,
+            data=output_payload,
         )
+
+    def execute(
+        self,
+        reason: str | None = None,
+        caller_name: str | None = None,
+        caller_phone: str | None = None,
+        department: str | HandoffDepartmentEnum = HandoffDepartmentEnum.RECEPTION,
+        urgency: str | HandoffUrgencyEnum = HandoffUrgencyEnum.MEDIUM,
+        summary: str | None = None,
+        session_id: str | None = None,
+        # Legacy parameter compatibility
+        customer_name: str | None = None,
+        customer_phone: str | None = None,
+        conversation_summary: str | None = None,
+    ) -> ToolResult:
+        """
+        Synchronous execution entrypoint safe for existing running event loops.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        kwargs = {
+            "reason": reason,
+            "caller_name": caller_name,
+            "caller_phone": caller_phone,
+            "department": department,
+            "urgency": urgency,
+            "summary": summary,
+            "session_id": session_id,
+            "customer_name": customer_name,
+            "customer_phone": customer_phone,
+            "conversation_summary": conversation_summary,
+        }
+
+        if loop and loop.is_running():
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                return executor.submit(lambda: asyncio.run(self.aexecute(**kwargs))).result()
+        return asyncio.run(self.aexecute(**kwargs))
 
 
 # Singleton tool instance
-human_handoff_tool = HumanHandoffTool()
+receptionist_handoff_tool = ReceptionistHandoffTool()
 
 
-def escalate_to_human(
-    reason: str,
-    customer_phone: Optional[str] = None,
-    customer_name: Optional[str] = None,
-    urgency: Optional[HandoffUrgencyEnum] = None,
-    department: Optional[HandoffDepartmentEnum] = None,
-    conversation_summary: Optional[str] = None,
-) -> HumanHandoffOutput:
-    """
-    Convenience function to trigger human agent escalation.
-
-    Args:
-        reason: Reason for transfer.
-        customer_phone: Caller phone.
-        customer_name: Caller name.
-        urgency: Optional priority level.
-        department: Optional destination department.
-        conversation_summary: Context notes for receiving human.
-
-    Returns:
-        HumanHandoffOutput with ticket ID, wait time, and voice message.
-    """
-    return human_handoff_tool.execute(
+async def async_transfer_to_receptionist(
+    reason: str | None = None,
+    caller_name: str | None = None,
+    caller_phone: str | None = None,
+    department: str | HandoffDepartmentEnum = HandoffDepartmentEnum.RECEPTION,
+    urgency: str | HandoffUrgencyEnum = HandoffUrgencyEnum.MEDIUM,
+    summary: str | None = None,
+    session_id: str | None = None,
+    **kwargs: Any,
+) -> ToolResult:
+    """Async convenience wrapper for LiveKit Voice Agent and LLM tool calling."""
+    return await receptionist_handoff_tool.aexecute(
         reason=reason,
-        customer_phone=customer_phone,
-        customer_name=customer_name,
-        urgency=urgency,
+        caller_name=caller_name,
+        caller_phone=caller_phone,
         department=department,
-        conversation_summary=conversation_summary,
+        urgency=urgency,
+        summary=summary,
+        session_id=session_id,
+        **kwargs,
     )
 
 
-async def async_escalate_to_human(
-    reason: str,
-    customer_phone: Optional[str] = None,
-    customer_name: Optional[str] = None,
-    urgency: Optional[HandoffUrgencyEnum] = None,
-    department: Optional[HandoffDepartmentEnum] = None,
-    conversation_summary: Optional[str] = None,
-) -> HumanHandoffOutput:
-    """
-    Asynchronous convenience function to trigger human agent escalation.
-    """
-    return await human_handoff_tool.aexecute(
+def transfer_to_receptionist(
+    reason: str | None = None,
+    caller_name: str | None = None,
+    caller_phone: str | None = None,
+    department: str | HandoffDepartmentEnum = HandoffDepartmentEnum.RECEPTION,
+    urgency: str | HandoffUrgencyEnum = HandoffUrgencyEnum.MEDIUM,
+    summary: str | None = None,
+    session_id: str | None = None,
+    **kwargs: Any,
+) -> ToolResult:
+    """Sync convenience wrapper for synchronous tool dispatchers and testing."""
+    return receptionist_handoff_tool.execute(
         reason=reason,
-        customer_phone=customer_phone,
-        customer_name=customer_name,
-        urgency=urgency,
+        caller_name=caller_name,
+        caller_phone=caller_phone,
         department=department,
-        conversation_summary=conversation_summary,
+        urgency=urgency,
+        summary=summary,
+        session_id=session_id,
+        **kwargs,
     )
+
+
+# ==============================================================================
+# Backward-Compatibility Aliases (Deprecated; Phase 5 cleans up)
+# ==============================================================================
+
+HumanHandoffTool = ReceptionistHandoffTool
+human_handoff_tool = receptionist_handoff_tool
+escalate_to_human = transfer_to_receptionist
+async_escalate_to_human = async_transfer_to_receptionist
+
+__all__ = [  # noqa: RUF022
+    "DEPARTMENT_NAMES_ARABIC",
+    "HumanHandoffTool",
+    "ReceptionistHandoffTool",
+    "URGENCY_RANKS",
+    "async_escalate_to_human",
+    "async_transfer_to_receptionist",
+    "build_voice_message",
+    "detect_emergency",
+    "escalate_to_human",
+    "estimate_wait_seconds",
+    "human_handoff_tool",
+    "is_reception_open",
+    "mask_phone_for_speech",
+    "receptionist_handoff_tool",
+    "transfer_to_receptionist",
+]

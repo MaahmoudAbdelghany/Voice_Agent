@@ -133,6 +133,18 @@ class Settings(BaseSettings):
         default="123",
         description="Egyptian emergency ambulance hotline number",
     )
+    reception_open_time: str = Field(
+        default="09:00",
+        description="Reception desk opening time (Cairo time, HH:MM)",
+    )
+    reception_close_time: str = Field(
+        default="22:00",
+        description="Reception desk closing time (Cairo time, HH:MM)",
+    )
+    reception_friday_open_time: str = Field(
+        default="14:00",
+        description="Reception desk Friday opening time (Cairo time, HH:MM)",
+    )
 
     # --- Relational Database Settings (Async SQLAlchemy) ---
     database_url: str = Field(
@@ -159,13 +171,23 @@ class Settings(BaseSettings):
     def handle_legacy_fields(cls, data: Any) -> Any:
         """Map legacy restaurant keys to clinic fields if clinic keys are absent or overridden."""
         if isinstance(data, dict):
-            if "restaurant_name" in data and ("clinic_name" not in data or data.get("clinic_name") == "مجمع عيادات النور التخصصي"):
+            if "restaurant_name" in data and (
+                "clinic_name" not in data or data.get("clinic_name") == "مجمع عيادات النور التخصصي"
+            ):
                 data["clinic_name"] = data["restaurant_name"]
-            if "restaurant_phone" in data and ("clinic_phone" not in data or data.get("clinic_phone") == "+20 2 3345 6789"):
+            if "restaurant_phone" in data and (
+                "clinic_phone" not in data or data.get("clinic_phone") == "+20 2 3345 6789"
+            ):
                 data["clinic_phone"] = data["restaurant_phone"]
-            if "restaurant_address" in data and ("clinic_address" not in data or data.get("clinic_address") == "شارع النصر، المعادي، القاهرة، مصر"):
+            if "restaurant_address" in data and (
+                "clinic_address" not in data
+                or data.get("clinic_address") == "شارع النصر، المعادي، القاهرة، مصر"
+            ):
                 data["clinic_address"] = data["restaurant_address"]
-            if "restaurant_hours" in data and ("clinic_working_hours" not in data or "السبت" in str(data.get("clinic_working_hours", ""))):
+            if "restaurant_hours" in data and (
+                "clinic_working_hours" not in data
+                or "السبت" in str(data.get("clinic_working_hours", ""))
+            ):
                 data["clinic_working_hours"] = data["restaurant_hours"]
         return data
 
@@ -215,9 +237,7 @@ class Settings(BaseSettings):
         """Check if using Qdrant Cloud or local in-memory."""
         if not self.qdrant_url or not self.qdrant_api_key:
             return False
-        return not (
-            "your-cluster-id" in self.qdrant_url or "your_" in self.qdrant_api_key
-        )
+        return not ("your-cluster-id" in self.qdrant_url or "your_" in self.qdrant_api_key)
 
     def is_database_configured(self) -> bool:
         """Check if relational database URL is configured."""

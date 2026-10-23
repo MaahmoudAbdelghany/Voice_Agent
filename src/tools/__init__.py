@@ -27,9 +27,13 @@ from src.tools.doctor_availability import (
 )
 from src.tools.human_handoff import (
     HumanHandoffTool,
+    ReceptionistHandoffTool,
     async_escalate_to_human,
+    async_transfer_to_receptionist,
     escalate_to_human,
     human_handoff_tool,
+    receptionist_handoff_tool,
+    transfer_to_receptionist,
 )
 
 # Tools implementations
@@ -170,17 +174,18 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         sync_callable=book_reservation,
         async_callable=async_book_reservation,
     ),
-    "escalate_to_human": ToolDefinition(
-        name="escalate_to_human",
+    "transfer_to_receptionist": ToolDefinition(
+        name="transfer_to_receptionist",
         description=(
-            "Escalate the call to a live human representative or specialist department "
-            "(Customer Support, Kitchen Manager, Delivery Dispatch, Billing) for complex "
-            "complaints, critical food allergies, or billing issues."
+            "Escalate patient call to live front-desk clinic reception, triage medical emergencies, "
+            "or route to nursing, billing, or scheduling supervisors. Must be called immediately "
+            "when a caller reports life-threatening symptoms (chest pain, breathing trouble, "
+            "bleeding), requests a human agent, or has inquiries outside automated tools."
         ),
-        input_schema=HumanHandoffInput,
-        output_schema=HumanHandoffOutput,
-        sync_callable=escalate_to_human,
-        async_callable=async_escalate_to_human,
+        input_schema=ReceptionistHandoffInput,
+        output_schema=ReceptionistHandoffOutput,
+        sync_callable=transfer_to_receptionist,
+        async_callable=async_transfer_to_receptionist,
     ),
     "check_doctor_availability": ToolDefinition(
         name="check_doctor_availability",
@@ -247,7 +252,9 @@ def execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolResult:
     """
     tool_def = TOOL_REGISTRY.get(tool_name)
     if not tool_def:
-        err_msg = f"Tool '{tool_name}' is not registered. Available tools: {list(TOOL_REGISTRY.keys())}"
+        err_msg = (
+            f"Tool '{tool_name}' is not registered. Available tools: {list(TOOL_REGISTRY.keys())}"
+        )
         logger.error(err_msg)
         return ToolResult(success=False, message="عذراً، هذه الأداة غير متاحة حالياً.", error=err_msg)
 
@@ -292,7 +299,9 @@ async def async_execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolR
     """
     tool_def = TOOL_REGISTRY.get(tool_name)
     if not tool_def:
-        err_msg = f"Tool '{tool_name}' is not registered. Available tools: {list(TOOL_REGISTRY.keys())}"
+        err_msg = (
+            f"Tool '{tool_name}' is not registered. Available tools: {list(TOOL_REGISTRY.keys())}"
+        )
         logger.error(err_msg)
         return ToolResult(success=False, message="عذراً، هذه الأداة غير متاحة حالياً.", error=err_msg)
 
@@ -375,6 +384,8 @@ __all__ = [  # noqa: RUF022
     "reservation_tool",
     "HumanHandoffTool",
     "human_handoff_tool",
+    "ReceptionistHandoffTool",
+    "receptionist_handoff_tool",
     # Functions
     "check_doctor_availability",
     "async_check_doctor_availability",
@@ -392,6 +403,8 @@ __all__ = [  # noqa: RUF022
     "async_get_order_status",
     "book_reservation",
     "async_book_reservation",
+    "transfer_to_receptionist",
+    "async_transfer_to_receptionist",
     "escalate_to_human",
     "async_escalate_to_human",
     # Registry & Dispatchers

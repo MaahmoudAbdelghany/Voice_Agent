@@ -43,13 +43,16 @@ def setup_knowledge_tool():
 
 
 def test_tool_registry_contains_all_tools():
-    """Verify all 4 core domain tools are registered with complete bindings."""
+    """Verify core domain tools are registered with complete bindings."""
     registry = get_registered_tools()
     expected_tools = {
         "search_clinic_knowledge",
         "get_order_status",
         "book_reservation",
-        "escalate_to_human",
+        "transfer_to_receptionist",
+        "check_doctor_availability",
+        "book_appointment",
+        "manage_appointment",
     }
     assert expected_tools.issubset(set(registry.keys()))
 
@@ -114,20 +117,22 @@ def test_execute_reservation_tool_success():
     assert result.data["party_size"] == 4
 
 
-def test_execute_human_handoff_tool_success():
-    """Verify synchronous execution of escalate_to_human via central dispatcher."""
+def test_execute_transfer_to_receptionist_success():
+    """Verify synchronous execution of transfer_to_receptionist via central dispatcher."""
     result = execute_tool(
-        tool_name="escalate_to_human",
+        tool_name="transfer_to_receptionist",
         arguments={
-            "reason": "تأخر المندوب أكثر من ساعة والعميل يطلب إلغاء الطلب",
-            "customer_name": "إيهاب جلال",
-            "customer_phone": "01234567890",
+            "reason": "المريض يرغب في الاستفسار عن كشف منزلي",
+            "caller_name": "إيهاب جلال",
+            "caller_phone": "01234567890",
+            "department": "reception",
+            "urgency": "medium",
         },
     )
     assert isinstance(result, ToolResult)
     assert result.success is True
-    assert "ESC-" in result.data["handoff_id"]
-    assert result.data["status"] in ["queued", "transferred"]
+    assert "ESC-" in result.data["ticket_id"]
+    assert result.data["status"] in ["queued", "transferred", "callback"]
     assert "إيهاب جلال" in result.message
 
 
