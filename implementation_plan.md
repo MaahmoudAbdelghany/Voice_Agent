@@ -63,8 +63,8 @@ The agent can:
 - [x] Step 3.3: Implement appointment booking tool (`src/tools/appointment_booking.py`).
 - [x] Step 3.4: Implement appointment query, reschedule & cancellation tool (`src/tools/manage_appointment.py`).
 - [x] Step 3.5: Adapt clinic knowledge search tool (`src/tools/knowledge_search.py`).
-- [ ] Step 3.6: Adapt receptionist escalation tool (`src/tools/human_handoff.py`).
-- [ ] Step 3.7: Write and run unit tests for all medical tools.
+- [x] Step 3.6: Adapt receptionist escalation tool (`src/tools/human_handoff.py`).
+- [x] Step 3.7: Write and run unit tests for all medical tools.
 
 ### **Phase 4: Real-Time LiveKit Voice Agent Core & Medical Persona**
 - [ ] Step 4.1: Author Egyptian medical receptionist persona & system prompts with guardrails.

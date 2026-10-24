@@ -33,7 +33,7 @@ This roadmap is a **Living Document** under Spec-Driven Development (SDD). Each 
 - [x] **Feature 3.4**: Appointment Query, Cancellation & Rescheduling Tool (`src/tools/manage_appointment.py`).
 - [x] **Feature 3.5**: Clinic Knowledge Search Tool (`src/tools/knowledge_search.py`).
 - [x] **Feature 3.6**: Human Receptionist Escalation Tool with Dashboard Alert (`src/tools/human_handoff.py`).
-- [ ] **Feature 3.7**: Automated Unit & Integration Tests for Medical Tools (`tests/test_clinic_tools.py`).
+- [x] **Feature 3.7**: Automated Unit & Integration Tests for Medical Tools (`tests/test_clinic_tools.py`).
 
 ### Phase 4: Enterprise AI Architecture & Resilience Engine 🛡️
 *Goal: Harden the AI system into an enterprise-grade, fault-tolerant platform based on production AI system design principles: Model Routing, 3-Tier Caching, Trust & Guardrail Layer, Deterministic Safety Gates, Circuit Breakers, and Golden Evals.*

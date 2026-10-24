@@ -71,7 +71,7 @@ and i want you working on the feature based on the cuurent plan.md  feature and 
 
  validation.md for the current feature
 
- explain to me what you done , and why you done this  and wait to give you approval to make review after validation .
+ explain to me what you done , and why you done this  and wait to give you approval to make the next step .
 
 ### 8 after done working on the validation of the feature :
 
