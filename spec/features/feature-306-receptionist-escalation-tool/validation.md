@@ -64,7 +64,7 @@ The feature is complete when: `transfer_to_receptionist` creates persistent tick
 - Type checking: **Not Applicable** — no type checker (mypy/pyright) is configured in `pyproject.toml`.
 
 ### Tier 6: Manual / Visual Verification
-- **Status**: Not Applicable (UI) — this feature adds no dashboard UI (deferred to Feature 6.5 per D9) and produces no audio. The supervisor reviews the spoken messages printed by the Tier 7 CLI checks for tone, politeness, and correctness of the 123 guidance.
+- **Status**: Not Applicable (UI) — this feature adds no dashboard UI (deferred to Feature 7.5 per D9) and produces no audio. The supervisor reviews the spoken messages printed by the Tier 7 CLI checks for tone, politeness, and correctness of the 123 guidance.
 
 ### Tier 7: API / CLI / Application Checks
 - **Live dispatcher calls on the real dev DB** (`data/clinic.db`, after `init_db` creates the table):

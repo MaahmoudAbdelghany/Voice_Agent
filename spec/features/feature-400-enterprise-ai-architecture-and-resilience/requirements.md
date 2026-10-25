@@ -7,6 +7,8 @@
 - **R1.2**: The gateway must enforce a Time-to-First-Token (TTFT) timeout of 3.5 seconds on the primary provider.
 - **R1.3**: The circuit breaker must trip open after 5 consecutive request failures (timeouts, HTTP 429, or HTTP 5xx) within a 60-second window, instantly routing 100% of traffic to the secondary provider for at least 60 seconds without waiting for primary timeouts.
 - **R1.4**: The circuit breaker must enter a `HALF_OPEN` state after the cooldown to test primary health with a single probe request before resuming normal traffic.
+- **R1.5**: Model tiers must be bound deterministically to workflow stages: `llama-3.1-8b-instant` for intent classification and entity extraction; `llama-3.3-70b-versatile` for caller-facing dialogue. No LLM call may be used to select a model.
+- **R1.6**: Every caller-facing generation must enforce `max_tokens=150`.
 
 ### R2: 4-Tier Graceful Degradation Chain
 - **R2.1**: The system must execute a deterministic 4-tier fallback hierarchy:
@@ -35,8 +37,8 @@
 - **R5.3**: The input guardrail must immediately identify explicit requests for medical diagnosis or prescription (e.g., "what medicine should I take for chest pain?") and trigger polite clinical disclaimers with receptionist transfer.
 
 ### R6: Pre-Trace PII Redaction
-- **R6.1**: The system must detect Egyptian phone numbers (`010/011/012/015...`), Egyptian National IDs (14 digits), and sensitive personal identifiers.
-- **R6.2**: Sensitive identifiers must be masked (e.g., `[REDACTED_PHONE]`) before payloads are dispatched to third-party model providers and before saving to persistent trace logs.
+- **R6.1**: The system must detect Egyptian phone numbers (`010/011/012/015...`), Egyptian National IDs (14 digits), and sensitive personal identifiers using Microsoft Presidio with custom Egyptian recognizers.
+- **R6.2**: Sensitive identifiers must be masked (e.g., `[REDACTED_PHONE]`) before payloads are dispatched to third-party model providers and before saving to persistent trace logs (Langfuse).
 
 ### R7: Output Guardrails & Grounding Verification
 - **R7.1**: Output text from the LLM must be verified before streaming to TTS against a strict "Never say" list (no improvised discounts, no unauthorized promises, no prescription of drugs).
@@ -58,17 +60,38 @@
 - **R10.1**: The LLM tool-calling schema for booking and appointment management must omit caller identity fields (`patient_phone`, `patient_id`).
 - **R10.2**: The backend tool execution layer must inject the caller's verified session phone number server-side, preventing parameter spoofing or confused-deputy attacks.
 
-### R11: Distributed Tracing & Cost Accounting
-- **R11.1**: Every conversational turn must generate a unique `trace_id`.
-- **R11.2**: Traces must log: user input (PII-masked), prompt tokens, completion tokens, estimated token cost, latency breakdown (guardrail, cache, router, LLM, tool execution), degradation tier, and tool execution audit records.
+### R11: Hierarchical Trace Logging & Cost Accounting
+- **R11.1**: Every conversational turn must generate a unique `trace_id`, composed of nested spans each carrying `span_id` and `parent_span_id` (OpenTelemetry-compatible).
+- **R11.2**: Spans must cover input guardrails, cache tiers, stage router, LLM calls, tool executions, and output guardrails, and log: PII-masked input/output, prompt tokens, completion tokens, estimated cost, latency (incl. TTFT), and degradation tier. Token and cost totals must roll up to the trace.
+- **R11.3**: Traces must be exported to a self-hosted Langfuse instance; no trace data may be sent to third-party SaaS.
+- **R11.4**: Concurrent async calls must be isolated via `contextvars`; cross-service calls must propagate the W3C `traceparent` header.
+- **R11.5**: Export must be asynchronous (in-memory buffer + background flush). If Langfuse is unavailable, the tracer must degrade to a no-op without affecting the call.
 
-### R12: CI/CD Golden Evaluation Dataset
-- **R12.1**: The system must maintain a version-controlled `golden_dataset.json` containing at least 50 realistic Egyptian clinic conversational turns across:
+### R12: CI/CD Golden Evaluation Dataset & RAGAS Gate
+- **R12.1**: The system must maintain a version-controlled `golden_dataset.json` containing at least 50 realistic Egyptian clinic conversational turns (with reference contexts and answers) across:
   - Routine inquiries (hours, fees, insurance).
   - Appointment bookings and cancellations.
-  - Adversarial prompt injection attempts.
+  - Adversarial prompt injection attempts (direct and indirect via documents).
   - Urgent symptom and medical diagnosis trap queries.
-- **R12.2**: Automated test suites in CI/CD must evaluate the golden dataset and enforce a minimum 95% pass rate on safety and correctness before any release.
+- **R12.2**: Structured fields (selected tool, specialty, escalation flag) must be graded by deterministic exact match with a minimum 95% pass rate.
+- **R12.3**: Free-text answers must be graded with RAGAS using `gpt-4o-mini` as judge, with aggregate thresholds: Faithfulness ≥ 0.90, Context Recall ≥ 0.85, Context Precision ≥ 0.80, Answer Relevancy ≥ 0.85.
+- **R12.4**: A GitHub Actions workflow must run the evaluation on every PR that modifies prompts, model configuration, or RAG components, and block merge on failure.
+
+### R13: OWASP-Aligned Untrusted Content Handling
+- **R13.1**: Caller utterances and retrieved RAG chunks must be wrapped in explicit XML delimiters (e.g. `<caller_utterance>`, `<retrieved_context>`) with system rules instructing the model to treat enclosed content strictly as data.
+- **R13.2**: Knowledge documents must be sanitized at ingestion time to remove hidden or embedded instructions (indirect prompt injection) before indexing.
+- **R13.3**: LLM outputs that drive actions must populate typed Pydantic fields constrained by `Literal`/`Enum` where possible; LLM text must never be passed to `eval`, `subprocess`, or raw SQL.
+- **R13.4**: Secrets and credentials must never be included in prompt context.
+- **R13.5**: A threat model mapping OWASP LLM Top 10 risks to clinic-specific attack scenarios and mitigations must be maintained in `spec/security/threat_model.md`.
+
+### R14: FinOps Token Budgets & Cost Circuit Breaker
+- **R14.1**: Each call must enforce a cumulative token budget (default 8,000 tokens); on exhaustion the agent must politely wrap up or escalate to the receptionist.
+- **R14.2**: The system must accumulate daily estimated spend and emit an alert at 80% of the daily cap (default $10).
+- **R14.3**: On reaching the daily cap, a cost circuit breaker must degrade new LLM requests to Tier 3 (search-only) or Tier 4 (receptionist) without dropping calls.
+- **R14.4**: Tool payloads must be pruned to essential fields before being appended to the conversation state.
+
+### R15: Asynchronous Safety Classification
+- **R15.1**: Llama Guard must run asynchronously on a configurable sample of turns, off the voice hot path, and record verdicts on the corresponding trace.
 
 ---
 
@@ -87,6 +110,9 @@
 ### NFR4: Privacy & Compliance
 - Zero raw personal identification data (phone, national ID) leaked into distributed tracing stores or public LLM training data.
 
+### NFR5: Tracing Overhead
+- Trace instrumentation must add **< 1ms** of overhead per request on the hot path.
+
 ---
 
 ## 3. Constraints & Invariants
@@ -94,3 +120,5 @@
 - **C1 (Code > Prompts)**: Business, security, and financial rules (shift limits, fees, booking validation) must be enforced in deterministic Python code, NEVER solely in natural language system prompts.
 - **C2 (Declarative Configuration)**: System prompts, model IDs, temperature, similarity thresholds, and circuit breaker limits must reside in versioned configuration files (YAML/Pydantic), completely decoupled from imperative Python code.
 - **C3 (Zero Medical Hallucination Invariant)**: In accordance with `spec/tech.md` Invariant 3, under no circumstances shall the system provide medical diagnoses or prescribe medications.
+- **C4 (Configurable LLMOps Thresholds)**: Token budgets, daily cost cap, alert ratio, RAGAS thresholds, Llama Guard sampling rate, and Langfuse connection settings must reside in `src/config.py`.
+- **C5 (Scope Boundary)**: Prometheus/Grafana metrics, online sampled evaluation, SSO/RBAC, tenant isolation, load testing, and SLA are out of scope for this feature (Phase 6).

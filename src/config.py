@@ -59,6 +59,10 @@ class Settings(BaseSettings):
         default="llama-3.3-70b-versatile",
         description="Groq hosted model identifier",
     )
+    llm_stage_model: str = Field(
+        default="llama-3.1-8b-instant",
+        description="Groq model identifier for lightweight stages (classification, extraction)",
+    )
     llm_temperature: float = Field(
         default=0.3,
         ge=0.0,
@@ -70,6 +74,60 @@ class Settings(BaseSettings):
         ge=64,
         le=2048,
         description="Maximum tokens generated per voice turn",
+    )
+
+    # --- LLM Fallback - Google Gemini ---
+    gemini_api_key: str = Field(
+        default="",
+        description="Google Gemini API Key for fallback inference",
+    )
+    gemini_fallback_model: str = Field(
+        default="gemini-2.0-flash",
+        description="Google Gemini fallback model identifier",
+    )
+
+    # --- Model Gateway & Circuit Breaker ---
+    llm_ttft_timeout_s: float = Field(
+        default=3.5,
+        ge=0.01,
+        le=30.0,
+        description="Time-to-first-token timeout on primary provider before failover",
+    )
+    llm_request_timeout_s: float = Field(
+        default=10.0,
+        ge=1.0,
+        le=60.0,
+        description="Total timeout for an individual LLM request attempt",
+    )
+    voice_max_tokens: int = Field(
+        default=150,
+        ge=16,
+        le=1024,
+        description="Hard token cap for caller-facing voice turns",
+    )
+    stage_max_tokens: int = Field(
+        default=256,
+        ge=16,
+        le=1024,
+        description="Token cap for non-dialogue stages (classification, extraction)",
+    )
+    circuit_breaker_failure_threshold: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Consecutive retryable failures before circuit breaker trips OPEN",
+    )
+    circuit_breaker_window_s: float = Field(
+        default=60.0,
+        ge=5.0,
+        le=600.0,
+        description="Rolling window in seconds to count consecutive circuit breaker failures",
+    )
+    circuit_breaker_cooldown_s: float = Field(
+        default=60.0,
+        ge=5.0,
+        le=600.0,
+        description="Cooldown time in seconds while circuit breaker is OPEN before testing HALF_OPEN",
     )
 
     # --- Text-to-Speech (TTS) - ElevenLabs ---
@@ -228,6 +286,10 @@ class Settings(BaseSettings):
     def is_llm_configured(self) -> bool:
         """Check if LLM credentials are provided."""
         return bool(self.groq_api_key and "your_" not in self.groq_api_key)
+
+    def is_gemini_configured(self) -> bool:
+        """Check if Google Gemini fallback credentials are provided."""
+        return bool(self.gemini_api_key and "your_" not in self.gemini_api_key)
 
     def is_tts_configured(self) -> bool:
         """Check if TTS credentials are provided."""

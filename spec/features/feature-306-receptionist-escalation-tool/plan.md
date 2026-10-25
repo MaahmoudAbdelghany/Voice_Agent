@@ -11,7 +11,7 @@ Feature 3.6 delivers the `transfer_to_receptionist` tool: it creates a **persist
 
 ### In Scope
 - **Persistence (D1)**: new `Escalation` ORM model / `escalations` table (created by the existing `init_db` → `Base.metadata.create_all`; additive, no migration tool in repo) + `EscalationStatus` enum.
-- **Repository (D1, D9)**: `ClinicRepository` methods to create a ticket, find a recent open ticket by phone, count/list open tickets (priority-ordered), and update status (`acknowledged` / `resolved`) — the data layer Feature 6.5 will read.
+- **Repository (D1, D9)**: `ClinicRepository` methods to create a ticket, find a recent open ticket by phone, count/list open tickets (priority-ordered), and update status (`acknowledged` / `resolved`) — the data layer Feature 7.5 will read.
 - **Tool rewrite (D5)**: `ReceptionistHandoffTool` in `src/tools/human_handoff.py` using the existing 3.1 schemas `ReceptionistHandoffInput` / `ReceptionistHandoffOutput`, returning the standard `ToolResult` envelope (consistent with 3.2–3.5).
 - **Emergency safety net (D2)**: keyword detector (Egyptian colloquial, MSA, English) over `reason` + `summary`; can only **upgrade** to `urgency=emergency`, `department=emergency`; never downgrades the LLM's choice.
 - **Reception hours (D4)**: new settings `reception_open_time`, `reception_close_time`, `reception_friday_open_time` (Cairo time; defaults 09:00 / 22:00 / Friday 14:00). Outside hours → `status=callback`. Emergencies are handled the same at any hour.
@@ -26,7 +26,7 @@ Feature 3.6 delivers the `transfer_to_receptionist` tool: it creates a **persist
 
 ### Out of Scope
 - Real call transfer via LiveKit SIP / phone bridge (Phase 5).
-- Streamlit escalations page / live alert drawer UI (Feature 6.5).
+- Streamlit escalations page / live alert drawer UI (Feature 7.5).
 - Editing `src/agent/voice_agent.py`, `src/agent/prompts.py` (Phase 5).
 - Full idempotency keys / state machine (Feature 4.5); PII masking in traces (Feature 4.4).
 - Notifications outside the DB (SMS, WhatsApp, email, push).
@@ -44,7 +44,7 @@ Feature 3.6 delivers the `transfer_to_receptionist` tool: it creates a **persist
 | D6 | Repeated calls to the tool | Reuse open ticket for same phone within 10 min; upgrade if higher priority |
 | D7 | Wait time & ticket ID | Deterministic estimate; `ESC-YYYYMMDD-NNNN`; no fake staff names |
 | D8 | DB down / slow | Transfer beats logging: `success=True`, `persisted=False`, `ESC-TMP-…`, 400ms budget |
-| D9 | Dashboard scope | Repository read/update methods only; UI in Feature 6.5 |
+| D9 | Dashboard scope | Repository read/update methods only; UI in Feature 7.5 |
 | D10 | Link ticket to call log | Optional `session_id` column + function parameter (not in LLM schema) |
 
 ---
@@ -84,7 +84,7 @@ flowchart TD
     Tmp --> Out
     Create -.-> Table[("escalations table")]
     Dedup -.-> Table
-    Table -.->|"list_open_escalations (Feature 6.5)"| Dash["Streamlit Dashboard"]
+    Table -.->|"list_open_escalations (Feature 7.5)"| Dash["Streamlit Dashboard"]
 ```
 
 ### Status & message matrix
