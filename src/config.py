@@ -8,8 +8,22 @@ Provides type safety, default values, and credential validation.
 from pathlib import Path
 from typing import Any
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+VALID_CLINIC_CATEGORIES: frozenset[str] = frozenset(
+    {
+        "general",
+        "specialties",
+        "doctors",
+        "pricing",
+        "lab_radiology",
+        "insurance",
+        "booking_queue",
+        "safety_guardrails",
+        "faqs",
+    }
+)
 
 
 class Settings(BaseSettings):
@@ -130,6 +144,74 @@ class Settings(BaseSettings):
         description="Cooldown time in seconds while circuit breaker is OPEN before testing HALF_OPEN",
     )
 
+    # --- 3-Tier Caching Ladder (Feature 4.2) ---
+    cache_enabled: bool = Field(
+        default=True,
+        description="Global master kill switch for 3-tier caching ladder",
+    )
+    cache_exact_enabled: bool = Field(
+        default=True,
+        description="Toggle switch for Tier 1 Exact Hash Cache",
+    )
+    cache_semantic_enabled: bool = Field(
+        default=True,
+        description="Toggle switch for Tier 2 Semantic Cache",
+    )
+    cache_semantic_threshold: float = Field(
+        default=0.97,
+        ge=0.90,
+        le=1.0,
+        description="Strict minimum cosine similarity threshold for Tier 2 semantic cache hit",
+    )
+    cache_semantic_timeout_ms: int = Field(
+        default=50,
+        ge=5,
+        le=500,
+        description="Max timeout in milliseconds for Tier 2 embedding and vector search",
+    )
+    cache_semantic_collection: str = Field(
+        default="semantic_cache",
+        description="Dedicated Qdrant collection name for Tier 2 semantic cache",
+    )
+    cache_max_entries: int = Field(
+        default=2000,
+        ge=10,
+        le=50000,
+        description="Maximum entries stored in Tier 1 in-memory LRU cache",
+    )
+    cache_allowed_categories: list[str] = Field(
+        default_factory=lambda: [
+            "general",
+            "specialties",
+            "pricing",
+            "lab_radiology",
+            "insurance",
+            "faqs",
+        ],
+        description="Allowlist of public categories eligible for caching",
+    )
+    cache_ttl_by_category: dict[str, int] = Field(
+        default_factory=lambda: {
+            "pricing": 21600,  # 6 hours
+            "insurance": 21600,  # 6 hours
+            "general": 86400,  # 24 hours
+            "specialties": 86400,  # 24 hours
+            "lab_radiology": 86400,  # 24 hours
+            "faqs": 86400,  # 24 hours
+        },
+        description="TTL in seconds partitioned per clinic category",
+    )
+    cache_default_ttl_s: int = Field(
+        default=86400,
+        ge=60,
+        le=604800,
+        description="Default TTL in seconds if category is not explicitly mapped",
+    )
+    cache_kb_path: str = Field(
+        default="knowledge_base/clinic_kb.md",
+        description="Path to clinic knowledge base markdown document for kb_version calculation",
+    )
+
     # --- Text-to-Speech (TTS) - ElevenLabs ---
     eleven_api_key: str = Field(
         default="",
@@ -248,6 +330,28 @@ class Settings(BaseSettings):
             ):
                 data["clinic_working_hours"] = data["restaurant_hours"]
         return data
+
+    @field_validator("cache_allowed_categories")
+    @classmethod
+    def validate_cache_allowed_categories(cls, v: list[str]) -> list[str]:
+        """Ensure all allowed categories exist within recognized clinic categories."""
+        invalid = set(v) - set(VALID_CLINIC_CATEGORIES)
+        if invalid:
+            raise ValueError(
+                f"Invalid categories in cache_allowed_categories: {invalid}. Must be in {set(VALID_CLINIC_CATEGORIES)}"
+            )
+        return v
+
+    @field_validator("cache_ttl_by_category")
+    @classmethod
+    def validate_cache_ttl_categories(cls, v: dict[str, int]) -> dict[str, int]:
+        """Ensure all TTL category keys exist within recognized clinic categories."""
+        invalid = set(v.keys()) - set(VALID_CLINIC_CATEGORIES)
+        if invalid:
+            raise ValueError(
+                f"Invalid categories in cache_ttl_by_category: {invalid}. Must be in {set(VALID_CLINIC_CATEGORIES)}"
+            )
+        return v
 
     # --- Backward-Compatibility Aliases ---
     @property

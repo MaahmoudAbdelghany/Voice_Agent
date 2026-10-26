@@ -43,7 +43,7 @@
 
 ### 5. Generate Validation Criteria (`validation.md`) with 3-Tier Testing
 - Create `spec/features/feature-XXX-<feature-name>/validation.md`. based on the rules in the validation skill in validation folder in workspace root `
-- Always use the `view_file` to read the validation skill in validation folder in workspace root
+- Always use the `view_file` to read the validation skill in validation folder in workspace this path root Voice_Agent\.agents\skills\validation\SKILL.md
 
 
 
@@ -76,6 +76,9 @@ and i want you working on the feature based on the cuurent plan.md  feature and 
 ### 8 after done working on the validation of the feature :
 
 commit the changes in git and push into my repo on github and update the roadmap.md file to mark this feature as completed  .
+
+and wait to give you approval to make the next feature .
+
 
 
 make sure to make conversation between us in arabic with good format  from right to left 
