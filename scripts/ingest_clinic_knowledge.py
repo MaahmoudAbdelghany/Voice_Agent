@@ -30,8 +30,10 @@ if str(WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(WORKSPACE_ROOT))
 
 from src.rag.embeddings import embedding_service
+from src.rag.hybrid_retriever import hybrid_retriever
 from src.rag.ingestion import ingestion_pipeline
-from src.rag.retriever import retriever
+
+target_retriever = hybrid_retriever
 
 logging.basicConfig(
     level=logging.INFO,
@@ -88,14 +90,14 @@ def main() -> None:
     print("   Egyptian Polyclinic Qdrant Ingestion & Verification CLI")
     print("=" * 65)
     print(f"📄 Knowledge Base File : {kb_path}")
-    print(f"📦 Target Collection   : {retriever.collection_name}")
+    print(f"📦 Target Collection   : {target_retriever.collection_name}")
     print(f"🔄 Recreate Collection : {args.recreate}")
     print("-" * 65)
 
     # Recreate collection if requested
     if args.recreate:
-        print(f"🗑️ Recreating collection '{retriever.collection_name}'...")
-        retriever.recreate_collection()
+        print(f"🗑️ Recreating collection '{target_retriever.collection_name}'...")
+        target_retriever.recreate_collection()
         print("✅ Collection recreated successfully.")
 
     # Parse markdown into structured chunks
@@ -112,11 +114,11 @@ def main() -> None:
     for cat, count in sorted(category_counts.items()):
         print(f"   • {cat:<18}: {count} chunk(s)")
 
-    # Ingest and embed chunks into Qdrant
+    # Ingest and embed chunks into Qdrant & BM25
     print("-" * 65)
-    print("⚡ Generating FastEmbed embeddings and upserting into Qdrant...")
+    print("⚡ Generating FastEmbed embeddings and upserting into Qdrant & BM25...")
     start_time = time.perf_counter()
-    indexed_count = retriever.upsert_chunks(chunks)
+    indexed_count = target_retriever.upsert_chunks(chunks)
     elapsed = time.perf_counter() - start_time
     print(f"✅ Upserted {indexed_count} points in {elapsed:.2f} seconds.")
 
@@ -127,15 +129,21 @@ def main() -> None:
         print("🧪 Testing Retrieval Verification for query:")
         print(f'   ❓ "{test_query}"')
         print("-" * 65)
-        hits = retriever.search(query=test_query, limit=3)
+        hits = target_retriever.search(query=test_query, limit=3)
         if not hits:
             print("⚠️ No matching points found for test query.")
         else:
             print(f"🎯 Found {len(hits)} matching result(s):")
             for idx, hit in enumerate(hits, start=1):
                 snippet = hit["text"][:140].replace("\n", " ") + "..."
+                sources = ",".join(hit.get("match_sources", ["dense"]))
+                rrf_s = hit.get("rrf_score", 0.0)
+                dense_s = hit.get("dense_score", 0.0)
+                bm25_s = hit.get("bm25_score", 0.0)
                 print(
                     f"   [{idx}] Score: {hit['score']:.4f} | "
+                    f"RRF: {rrf_s:.6f} | Dense: {dense_s:.4f} | BM25: {bm25_s:.4f} | "
+                    f"Sources: [{sources}] | "
                     f"Category: {hit['category']} | "
                     f"Section: {hit['section']}"
                 )

@@ -11,10 +11,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from pathlib import Path
 from typing import Any
 
+from src.config import settings
 from src.rag.embeddings import embedding_service as default_embedding_service
-from src.rag.retriever import QdrantKnowledgeRetriever
 from src.rag.retriever import retriever as default_retriever
 from src.tools.schemas import (
     ClinicKnowledgeSearchOutput,
@@ -105,18 +106,44 @@ class ClinicKnowledgeSearchTool:
 
     def __init__(
         self,
-        retriever_instance: QdrantKnowledgeRetriever | None = None,
+        retriever_instance: Any | None = None,
         embeddings: Any | None = None,
         timeout_s: float = 0.4,
     ):
-        self.retriever = retriever_instance or default_retriever
+        self._retriever = retriever_instance
         self.embeddings = embeddings or default_embedding_service
         self.timeout_s = timeout_s
 
+    @property
+    def retriever(self) -> Any:
+        """Resolve retriever instance lazily on access."""
+        if self._retriever is None:
+            if settings.hybrid_search_enabled:
+                from src.rag.hybrid_retriever import hybrid_retriever
+                self._retriever = hybrid_retriever
+            else:
+                self._retriever = default_retriever
+        return self._retriever
+
+    @retriever.setter
+    def retriever(self, val: Any) -> None:
+        self._retriever = val
+
     def warm_up(self) -> bool:
-        """Pre-load the embedding model into memory for fast tool calls."""
+        """Pre-load the embedding model and warm up retriever."""
         try:
             self.embeddings.embed_query("warm up")
+            if hasattr(self.retriever, "warm_up"):
+                self.retriever.warm_up()
+            # If in-memory retriever has no indexed documents, auto-index from clinic_kb.md
+            if (
+                hasattr(self.retriever, "bm25_index")
+                and not getattr(self.retriever.bm25_index, "documents", None)
+            ):
+                kb_path = Path("knowledge_base/clinic_kb.md")
+                if kb_path.exists():
+                    from src.rag.ingestion import ingestion_pipeline
+                    ingestion_pipeline.ingest_file(kb_path)
             return getattr(self.embeddings, "is_semantic", True)
         except Exception as e:  # noqa: BLE001
             logger.warning(f"Knowledge search warm_up warning: {e}")

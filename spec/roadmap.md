@@ -40,7 +40,7 @@ This roadmap is a **Living Document** under Spec-Driven Development (SDD). Each 
 
 - [x] **Feature 4.1**: Model Gateway, Stage-Based Model Routing & Circuit Breaker (`src/ai_core/gateway.py` — `llama-3.1-8b-instant` for classification/extraction, `llama-3.3-70b-versatile` for dialogue, Google Gemini fallback via LiteLLM, 3.5s TTFT timeout, `max_tokens=150` per voice turn).
 - [x] **Feature 4.2**: 3-Tier Caching Ladder (`src/ai_core/cache.py` with Tier 1 Exact Hash, Tier 2 Metadata-Scoped Semantic Cache >= 0.97, Tier 3 Prompt Prefix Caching).
-- [ ] **Feature 4.3**: Hybrid RAG Upgrade (`src/rag/hybrid_retriever.py` with Dense Vector Qdrant + BM25 via Reciprocal Rank Fusion & structure-aware chunking).
+- [x] **Feature 4.3**: Hybrid RAG Upgrade (`src/rag/hybrid_retriever.py` with Dense Vector Qdrant + BM25 via Reciprocal Rank Fusion & structure-aware chunking).
 - [ ] **Feature 4.4**: OWASP-Aligned Trust Layer & Runtime Guardrails (`src/ai_core/guardrails.py`, `src/rag/sanitizer.py`, `spec/security/threat_model.md` — <20ms regex injection & medical diagnosis filter, XML delimiters for untrusted caller/RAG content, ingestion-time document sanitization, Literal/Enum-constrained outputs, Presidio with Egyptian recognizers pre-trace, async sampled Llama Guard).
 - [ ] **Feature 4.5**: Deterministic State Machine, Idempotency Keys & Write Safety Gates (`src/ai_core/workflow.py`, `src/tools/gates.py` for atomic booking and shift caps).
 - [ ] **Feature 4.6**: Hierarchical LLM Trace Logging (`src/ai_core/tracing.py` — self-hosted Langfuse + OpenTelemetry-compatible nested spans, `contextvars` async isolation, async batch export <1ms overhead, W3C `traceparent` propagation).

@@ -244,6 +244,42 @@ class Settings(BaseSettings):
         description="FastEmbed multilingual model for generating dense text vectors (supports Arabic)",
     )
 
+    # --- Hybrid RAG & Sparse BM25 (Feature 4.3) ---
+    hybrid_search_enabled: bool = Field(
+        default=True,
+        description="Enable hybrid search combining Qdrant dense vector and BM25 sparse keyword search",
+    )
+    hybrid_rrf_k: int = Field(
+        default=60,
+        ge=1,
+        le=1000,
+        description="Reciprocal Rank Fusion smoothing constant k (default: 60)",
+    )
+    hybrid_bm25_k1: float = Field(
+        default=1.5,
+        ge=0.0,
+        le=5.0,
+        description="BM25 term saturation parameter k1 (default: 1.5)",
+    )
+    hybrid_bm25_b: float = Field(
+        default=0.75,
+        ge=0.0,
+        le=1.0,
+        description="BM25 document length normalization parameter b (default: 0.75)",
+    )
+    hybrid_candidate_multiplier: int = Field(
+        default=3,
+        ge=1,
+        le=20,
+        description="Candidate multiplier for top-k retrieval per leg before RRF fusion",
+    )
+    rag_chunk_max_chars: int = Field(
+        default=800,
+        ge=100,
+        le=4000,
+        description="Maximum character limit for non-table narrative chunks before boundary splitting",
+    )
+
     # --- Egyptian Polyclinic Domain Settings ---
     clinic_name: str = Field(
         default="مجمع عيادات النور التخصصي",
