@@ -541,9 +541,8 @@ class ManageAppointmentInput(BaseModel):
         elif self.action == ManageAppointmentAction.CANCEL:
             if not self.booking_code and not self.phone:
                 raise ValueError("'cancel' requires 'booking_code' or 'phone'.")
-        elif (
-            self.action == ManageAppointmentAction.RESCHEDULE
-            and (not self.booking_code or self.new_date is None)
+        elif self.action == ManageAppointmentAction.RESCHEDULE and (
+            not self.booking_code or self.new_date is None
         ):
             raise ValueError("'reschedule' requires 'booking_code' and 'new_date'.")
         return self
@@ -669,6 +668,109 @@ class ReceptionistHandoffOutput(BaseModel):
     message: str = Field(description="Comforting, polite reassurance in Egyptian Arabic.")
 
 
+# ==============================================================================
+# 6. Session-Scoped LLM Schemas (Feature 4.5 — Zero Caller Identity in LLM Args)
+# ==============================================================================
+
+
+class LLMAppointmentBookingInput(BaseModel):
+    """
+    Session-scoped LLM tool input for `book_appointment`.
+    Omit `patient_phone` and `patient_id` completely (`extra='forbid'`);
+    the backend injects the verified caller phone from `CallerSessionContext`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    patient_name: str = Field(..., min_length=2, description="Patient full name.")
+    doctor_id: int | None = Field(default=None, ge=1, description="Doctor numeric ID.")
+    doctor_name: str | None = Field(default=None, description="Doctor name if ID unknown.")
+    date: dt.date | str = Field(..., description=_DATE_DESCRIPTION)
+    visit_type: VisitType = Field(
+        default=VisitType.EXAMINATION,
+        description="'examination' (كشف جديد) or 'consultation' (استشارة / إعادة).",
+    )
+    notes: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Optional caller notes (administrative only, no diagnosis).",
+    )
+
+    @field_validator("patient_name", mode="before")
+    @classmethod
+    def _strip_name(cls, v: Any) -> Any:
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("doctor_name", mode="before")
+    @classmethod
+    def _strip_doctor(cls, v: Any) -> str | None:
+        if v is None:
+            return None
+        text = str(v).strip()
+        return text or None
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def _parse_date(cls, v: Any) -> dt.date:
+        return parse_colloquial_date(v)
+
+    @field_validator("visit_type", mode="before")
+    @classmethod
+    def _visit_type(cls, v: Any) -> VisitType:
+        return parse_visit_type(v)
+
+    @model_validator(mode="after")
+    def _require_doctor(self) -> "LLMAppointmentBookingInput":
+        if self.doctor_id is None and not self.doctor_name:
+            raise ValueError("Provide either 'doctor_id' or 'doctor_name'.")
+        return self
+
+
+class LLMManageAppointmentInput(BaseModel):
+    """
+    Session-scoped LLM tool input for `manage_appointment`.
+    Omit `phone` and `patient_id` completely (`extra='forbid'`);
+    the backend injects the verified caller phone from `CallerSessionContext`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    action: ManageAppointmentAction = Field(
+        ..., description="Operation: 'lookup', 'cancel', or 'reschedule'."
+    )
+    booking_code: str | None = Field(
+        default=None,
+        description="Booking code (optional for lookup/cancel when session phone is active; required for reschedule).",
+    )
+    new_date: dt.date | str | None = Field(
+        default=None, description="Required for 'reschedule'. " + _DATE_DESCRIPTION
+    )
+    reason: str | None = Field(default=None, max_length=300, description="Optional reason.")
+
+    @field_validator("booking_code", mode="before")
+    @classmethod
+    def _code(cls, v: Any) -> str | None:
+        return _normalize_booking_code(v)
+
+    @field_validator("action", mode="before")
+    @classmethod
+    def _action(cls, v: Any) -> Any:
+        return v.strip().lower() if isinstance(v, str) else v
+
+    @field_validator("new_date", mode="before")
+    @classmethod
+    def _parse_date(cls, v: Any) -> dt.date | None:
+        return _optional_date(v)
+
+    @model_validator(mode="after")
+    def _check_reschedule_fields(self) -> "LLMManageAppointmentInput":
+        if self.action == ManageAppointmentAction.RESCHEDULE and (
+            not self.booking_code or self.new_date is None
+        ):
+            raise ValueError("'reschedule' requires 'booking_code' and 'new_date'.")
+        return self
+
+
 __all__ = [
     "AppointmentBookingInput",
     "AppointmentBookingOutput",
@@ -685,6 +787,8 @@ __all__ = [
     "HandoffDepartmentEnum",
     "HandoffUrgencyEnum",
     "KnowledgeChunk",
+    "LLMAppointmentBookingInput",
+    "LLMManageAppointmentInput",
     "ManageAppointmentAction",
     "ManageAppointmentInput",
     "ManageAppointmentOutput",

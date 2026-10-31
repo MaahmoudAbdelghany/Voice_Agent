@@ -314,6 +314,30 @@ class Settings(BaseSettings):
         description="Timeout in seconds for off-hot-path Llama Guard classification calls",
     )
 
+    # --- Deterministic State Machine, Idempotency & Write Safety Gates (Feature 4.5) ---
+    idempotency_ttl_s: int = Field(
+        default=86400,
+        ge=60,
+        le=604800,
+        description="TTL in seconds for booking idempotency keys (default: 24 hours)",
+    )
+    idempotency_max_entries: int = Field(
+        default=5000,
+        ge=10,
+        le=100000,
+        description="Maximum idempotency records held in memory (LRU eviction)",
+    )
+    workflow_max_steps: int = Field(
+        default=6,
+        ge=2,
+        le=20,
+        description="Hard step-budget cap for deterministic appointment workflow state machine",
+    )
+    enforce_session_caller_identity: bool = Field(
+        default=True,
+        description="Inject verified session caller phone server-side and block phone spoofing when CallerSessionContext is active",
+    )
+
     # --- Egyptian Polyclinic Domain Settings ---
     clinic_name: str = Field(
         default="مجمع عيادات النور التخصصي",

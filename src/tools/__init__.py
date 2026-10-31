@@ -25,6 +25,19 @@ from src.tools.doctor_availability import (
     check_doctor_availability,
     doctor_availability_tool,
 )
+from src.tools.gates import (
+    CallerSessionContext,
+    DeterministicWriteGate,
+    GateVerdict,
+    IdempotencyRecord,
+    IdempotencyStore,
+    caller_session_scope,
+    compute_booking_idempotency_key,
+    compute_reschedule_idempotency_key,
+    get_current_caller_session,
+    get_idempotency_store,
+    resolve_effective_caller_phone,
+)
 from src.tools.human_handoff import (
     HumanHandoffTool,
     ReceptionistHandoffTool,
@@ -97,6 +110,8 @@ from src.tools.schemas import (
     ClinicKnowledgeSearchOutput,
     DoctorAvailabilityInput,
     DoctorAvailabilityOutput,
+    LLMAppointmentBookingInput,
+    LLMManageAppointmentInput,
     ManageAppointmentAction,
     ManageAppointmentInput,
     ManageAppointmentOutput,
@@ -239,6 +254,52 @@ def get_tool_definitions() -> list[dict[str, Any]]:
     return [tool.to_openai_dict() for tool in TOOL_REGISTRY.values()]
 
 
+_SESSION_SCOPED_SCHEMAS: dict[str, type[BaseModel]] = {
+    "book_appointment": LLMAppointmentBookingInput,
+    "manage_appointment": LLMManageAppointmentInput,
+}
+
+
+def get_session_scoped_tool_definitions() -> list[dict[str, Any]]:
+    """
+    Get OpenAI / Groq function definitions for live voice sessions where caller identity
+    fields (`patient_phone`, `phone`, `patient_id`) are stripped from `book_appointment`
+    and `manage_appointment` (Feature 4.5 R1.4).
+    """
+    definitions: list[dict[str, Any]] = []
+    for name, tool in TOOL_REGISTRY.items():
+        schema_cls = _SESSION_SCOPED_SCHEMAS.get(name, tool.input_schema)
+        params = schema_cls.model_json_schema()
+        params.pop("title", None)
+        definitions.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": params,
+                },
+            }
+        )
+    return definitions
+
+
+def _prepare_tool_arguments(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """Inject verified session caller phone into tool arguments when CallerSessionContext is active."""
+    args_copy = dict(arguments)
+    session_ctx = get_current_caller_session()
+    if session_ctx is not None:
+        if tool_name == "book_appointment":
+            effective_phone, _ = resolve_effective_caller_phone(args_copy.get("patient_phone"))
+            if effective_phone:
+                args_copy["patient_phone"] = effective_phone
+        elif tool_name == "manage_appointment":
+            effective_phone, _ = resolve_effective_caller_phone(args_copy.get("phone"))
+            if effective_phone:
+                args_copy["phone"] = effective_phone
+    return args_copy
+
+
 def execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolResult:
     """
     Synchronously execute a registered tool by name with given arguments.
@@ -260,7 +321,8 @@ def execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolResult:
 
     try:
         # Validate inputs against schema
-        validated_args = tool_def.input_schema.model_validate(arguments)
+        prepared_args = _prepare_tool_arguments(tool_name, arguments)
+        validated_args = tool_def.input_schema.model_validate(prepared_args)
         args_dict = validated_args.model_dump(exclude_unset=True)
 
         result = tool_def.sync_callable(**args_dict)
@@ -306,7 +368,8 @@ async def async_execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolR
         return ToolResult(success=False, message="عذراً، هذه الأداة غير متاحة حالياً.", error=err_msg)
 
     try:
-        validated_args = tool_def.input_schema.model_validate(arguments)
+        prepared_args = _prepare_tool_arguments(tool_name, arguments)
+        validated_args = tool_def.input_schema.model_validate(prepared_args)
         args_dict = validated_args.model_dump(exclude_unset=True)
 
         if inspect.iscoroutinefunction(tool_def.async_callable):
@@ -412,6 +475,20 @@ __all__ = [  # noqa: RUF022
     "TOOL_REGISTRY",
     "get_registered_tools",
     "get_tool_definitions",
+    "get_session_scoped_tool_definitions",
+    "LLMAppointmentBookingInput",
+    "LLMManageAppointmentInput",
+    "CallerSessionContext",
+    "DeterministicWriteGate",
+    "GateVerdict",
+    "IdempotencyRecord",
+    "IdempotencyStore",
+    "caller_session_scope",
+    "compute_booking_idempotency_key",
+    "compute_reschedule_idempotency_key",
+    "get_current_caller_session",
+    "get_idempotency_store",
+    "resolve_effective_caller_phone",
     "execute_tool",
     "async_execute_tool",
 ]

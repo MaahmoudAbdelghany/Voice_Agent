@@ -77,12 +77,21 @@ from src.ai_core.text_normalizer import (
     compute_kb_version,
     normalize_query,
 )
+from src.ai_core.workflow import (
+    AppointmentWorkflowStateMachine,
+    WorkflowAction,
+    WorkflowExecutionResult,
+    WorkflowState,
+    WorkflowStepTrace,
+    get_appointment_workflow,
+)
 
 __all__ = [
     "LLAMA_GUARD_CATEGORIES",
     "SYSTEM_UNTRUSTED_DATA_RULES",
     "AllowedIntentEnum",
     "AllowedSpecialtyEnum",
+    "AppointmentWorkflowStateMachine",
     "AsyncLlamaGuardClassifier",
     "BreakerState",
     "BypassReason",
@@ -124,11 +133,16 @@ __all__ = [
     "ProviderAttempt",
     "SemanticCacheStore",
     "Stage",
+    "WorkflowAction",
+    "WorkflowExecutionResult",
+    "WorkflowState",
+    "WorkflowStepTrace",
     "build_exact_key",
     "cached_generate",
     "classify_error",
     "compute_kb_version",
     "escape_xml_delimiters",
+    "get_appointment_workflow",
     "get_cache_ladder",
     "get_gateway",
     "get_input_guardrail",

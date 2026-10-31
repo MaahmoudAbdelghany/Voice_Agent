@@ -35,6 +35,12 @@ from src.db.repository import (
 from src.db.schemas import AppointmentStatus, DoctorAvailabilityRead, VisitType
 from src.db.session import get_async_session
 from src.tools.doctor_availability import CAIRO_TZ, get_cairo_today, match_doctors
+from src.tools.gates import (
+    compute_booking_idempotency_key,
+    get_current_caller_session,
+    get_idempotency_store,
+    resolve_effective_caller_phone,
+)
 from src.tools.schemas import (
     AppointmentBookingInput,
     AppointmentBookingOutput,
@@ -274,6 +280,14 @@ class AppointmentBookingTool:
         notes: str | None = None,
     ) -> ToolResult:
         """Asynchronously validate and book an appointment."""
+        # 0. Resolve session-injected caller phone (Feature 4.5 R1)
+        effective_phone, spoof_blocked = resolve_effective_caller_phone(patient_phone)
+        effective_name = patient_name
+        if not effective_name or not str(effective_name).strip():
+            session_ctx = get_current_caller_session()
+            if session_ctx and session_ctx.caller_name:
+                effective_name = session_ctx.caller_name
+
         # 1. Resolve date in Cairo time before schema validation (avoids UTC base)
         cairo_today = get_cairo_today()
         try:
@@ -287,8 +301,8 @@ class AppointmentBookingTool:
         # 2. Validate remaining fields against the Feature 3.1 contract
         try:
             booking = AppointmentBookingInput(
-                patient_name=patient_name,
-                patient_phone=patient_phone,
+                patient_name=effective_name,
+                patient_phone=effective_phone,
                 doctor_id=doctor_id,
                 doctor_name=doctor_name,
                 date=target_date,
@@ -385,6 +399,13 @@ class AppointmentBookingTool:
                                 "queue_number": existing.queue_number,
                                 "appointment_date": existing.appointment_date.isoformat(),
                                 "doctor_name_ar": doc_name,
+                                "idempotency_key": compute_booking_idempotency_key(
+                                    booking.patient_phone,
+                                    doc_id,
+                                    avail.schedule_id or existing.schedule_id,
+                                    target_date,
+                                ),
+                                "spoof_attempt_blocked": spoof_blocked,
                             }
                         },
                     )
@@ -476,6 +497,24 @@ class AppointmentBookingTool:
             payload = output.model_dump()
             payload["visit_type"] = visit_enum.value
             payload["visit_type_downgraded"] = downgraded
+            idem_key = compute_booking_idempotency_key(
+                booking.patient_phone,
+                doc_id,
+                appointment.schedule_id,
+                target_date,
+            )
+            payload["idempotency_key"] = idem_key
+            payload["spoof_attempt_blocked"] = spoof_blocked
+            get_idempotency_store().put(
+                idempotency_key=idem_key,
+                booking_code=appointment.booking_code,
+                doctor_id=doc_id,
+                schedule_id=appointment.schedule_id,
+                appointment_date=target_date.isoformat(),
+                queue_number=appointment.queue_number,
+                response_payload=payload,
+                message_ar=message,
+            )
             return ToolResult(success=True, message=message, data=payload)
 
         except Exception as exc:

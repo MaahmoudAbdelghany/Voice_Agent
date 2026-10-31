@@ -37,6 +37,11 @@ from src.tools.appointment_booking import (
     shift_already_ended,
 )
 from src.tools.doctor_availability import get_cairo_today
+from src.tools.gates import (
+    compute_booking_idempotency_key,
+    get_idempotency_store,
+    resolve_effective_caller_phone,
+)
 from src.tools.schemas import (
     ManageAppointmentAction,
     ManageAppointmentInput,
@@ -378,6 +383,17 @@ class ManageAppointmentTool:
             f"يوم {data_item['day_name_ar']} الموافق {data_item['appointment_date']} "
             f"(كود الحجز {data_item['booking_code']}) بنجاح. لو حبيت تحجز في أي وقت تاني إحنا في الخدمة!"
         )
+        # Invalidate idempotency key for cancelled appointment (Feature 4.5 R3.3)
+        store = get_idempotency_store()
+        store.invalidate_booking_code(target_appt.booking_code)
+        if target_appt.patient and target_appt.patient.phone:
+            old_key = compute_booking_idempotency_key(
+                target_appt.patient.phone,
+                target_appt.doctor_id,
+                target_appt.schedule_id,
+                target_appt.appointment_date,
+            )
+            store.invalidate_key(old_key)
         return _success("cancel", msg, "cancelled", [data_item])
 
     # --------------------------------------------------------------------------
@@ -597,6 +613,18 @@ class ManageAppointmentTool:
         serialized_new = serialize_appointment(new_appt)
         serialized_old = serialize_appointment(old_appt)
 
+        # Invalidate old booking idempotency key (Feature 4.5 R3.3)
+        store = get_idempotency_store()
+        store.invalidate_booking_code(old_code)
+        if old_appt.patient and old_appt.patient.phone:
+            old_key = compute_booking_idempotency_key(
+                old_appt.patient.phone,
+                old_appt.doctor_id,
+                old_appt.schedule_id,
+                old_appt.appointment_date,
+            )
+            store.invalidate_key(old_key)
+
         msg = (
             f"تمام، تم تأجيل حجز حضرتك مع {doc_name} من يوم {old_day_label} {old_date_iso} "
             f"إلى يوم {avail.day_name_ar} الموافق {target_new_date.isoformat()} "
@@ -625,12 +653,15 @@ class ManageAppointmentTool:
         """
         Asynchronous execution entrypoint for appointment management.
         """
+        # Resolve session-injected caller phone (Feature 4.5 R1)
+        effective_phone, spoof_blocked = resolve_effective_caller_phone(phone)
+
         # Validate input schema
         try:
             validated = ManageAppointmentInput(
                 action=action,
                 booking_code=booking_code,
-                phone=phone,
+                phone=effective_phone,
                 new_date=new_date,
                 reason=reason,
             )
@@ -652,14 +683,14 @@ class ManageAppointmentTool:
                 repo = ClinicRepository(session)
 
                 if validated.action == ManageAppointmentAction.LOOKUP:
-                    return await self._handle_lookup(
+                    res = await self._handle_lookup(
                         repo=repo,
                         booking_code=validated.booking_code,
                         phone=validated.phone,
                         cairo_today=cairo_today,
                     )
                 elif validated.action == ManageAppointmentAction.CANCEL:
-                    return await self._handle_cancel(
+                    res = await self._handle_cancel(
                         repo=repo,
                         booking_code=validated.booking_code,
                         phone=validated.phone,
@@ -668,7 +699,7 @@ class ManageAppointmentTool:
                         cairo_now=cairo_now,
                     )
                 elif validated.action == ManageAppointmentAction.RESCHEDULE:
-                    return await self._handle_reschedule(
+                    res = await self._handle_reschedule(
                         repo=repo,
                         booking_code=validated.booking_code,
                         phone=validated.phone,
@@ -678,11 +709,14 @@ class ManageAppointmentTool:
                         cairo_now=cairo_now,
                     )
                 else:
-                    return _failure(
+                    res = _failure(
                         str(validated.action),
                         "إجراء غير مدعوم لإدارة المواعيد.",
                         "unsupported_action",
                     )
+                if res.data is not None:
+                    res.data["spoof_attempt_blocked"] = spoof_blocked
+                return res
 
         except Exception as exc:
             # Privacy: no patient phone or name logged (NFR-4)
