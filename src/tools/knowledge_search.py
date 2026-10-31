@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from src.ai_core.guardrails import wrap_retrieved_context
 from src.config import settings
 from src.rag.embeddings import embedding_service as default_embedding_service
 from src.rag.retriever import retriever as default_retriever
@@ -273,18 +274,23 @@ class ClinicKnowledgeSearchTool:
                 )
                 chunks.append(chunk)
 
-                # FR-3.4: context_text bounding (<= 1200 chars)
+                # FR-3.4: context_text bounding (<= 1200 chars including XML tags)
                 sec_header = hit.get("section") or cat or "معلومات عامة"
                 raw_text = hit.get("text", "").strip()
                 block = f"[{sec_header}]\n{raw_text}"
-                if current_ctx_len + len(block) <= 1200:
+                if current_ctx_len + len(block) <= 1150:
                     context_blocks.append(block)
                     current_ctx_len += len(block) + 2
                 elif not context_blocks:
-                    context_blocks.append(block[:1200])
-                    current_ctx_len = 1200
+                    context_blocks.append(block[:1150])
+                    current_ctx_len = 1150
 
-            context_text = "\n\n".join(context_blocks)
+            raw_context_text = "\n\n".join(context_blocks)
+            context_text = (
+                wrap_retrieved_context(raw_context_text)
+                if settings.guardrails_enabled
+                else raw_context_text
+            )
             top_hit = hits[0]
             top_cat = top_hit.get("category", "general")
             top_text = top_hit.get("text", "")

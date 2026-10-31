@@ -5,11 +5,13 @@ Supports both Qdrant Cloud and local in-memory/disk vector storage.
 Provides hybrid semantic retrieval, category filtering, and formatted context generation for voice LLM turns.
 """
 
-from typing import List, Dict, Any, Optional
 import logging
 import uuid
+from typing import Any
+
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
+
 from src.config import settings
 from src.rag.embeddings import embedding_service
 
@@ -22,7 +24,7 @@ class QdrantKnowledgeRetriever:
     Seamlessly operates with Qdrant Cloud or local in-memory client.
     """
 
-    def __init__(self, collection_name: Optional[str] = None):
+    def __init__(self, collection_name: str | None = None):
         self.collection_name = collection_name or settings.qdrant_collection
         self.client = self._init_client()
         self.embeddings = embedding_service
@@ -76,7 +78,7 @@ class QdrantKnowledgeRetriever:
             logger.warning(f"Error deleting collection '{self.collection_name}': {e}")
         self._ensure_collection()
 
-    def upsert_chunks(self, chunks: List[Dict[str, Any]]) -> int:
+    def upsert_chunks(self, chunks: list[dict[str, Any]]) -> int:
         """
         Embed and upsert knowledge chunks into Qdrant collection.
         
@@ -133,9 +135,9 @@ class QdrantKnowledgeRetriever:
         self,
         query: str,
         limit: int = 4,
-        score_threshold: Optional[float] = None,
-        category: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        score_threshold: float | None = None,
+        category: str | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Execute semantic vector similarity search against the restaurant knowledge base.
         

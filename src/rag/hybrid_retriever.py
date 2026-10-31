@@ -250,6 +250,8 @@ ENGLISH_STOP_WORDS: frozenset[str] = frozenset(
         "cost",
         "price",
         "fee",
+        "test",
+        "tests",
     }
 )
 

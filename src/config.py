@@ -280,6 +280,40 @@ class Settings(BaseSettings):
         description="Maximum character limit for non-table narrative chunks before boundary splitting",
     )
 
+    # --- OWASP Trust Layer, Runtime Guardrails & PII Redaction (Feature 4.4) ---
+    guardrails_enabled: bool = Field(
+        default=True,
+        description="Enable fast CPU input and output guardrails (<20ms)",
+    )
+    pii_redaction_enabled: bool = Field(
+        default=True,
+        description="Enable pre-trace Egyptian PII redaction (phones, 14-digit national IDs)",
+    )
+    rag_sanitize_on_ingest: bool = Field(
+        default=True,
+        description="Sanitize knowledge base documents at ingestion time against indirect prompt injection",
+    )
+    llama_guard_enabled: bool = Field(
+        default=True,
+        description="Enable asynchronous off-hot-path Llama Guard safety classification",
+    )
+    llama_guard_model: str = Field(
+        default="groq/llama-guard-3-8b",
+        description="Model identifier for asynchronous Llama Guard classification",
+    )
+    llama_guard_sample_rate: float = Field(
+        default=0.10,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of conversational turns sampled for async Llama Guard inspection (default: 0.10)",
+    )
+    llama_guard_timeout_s: float = Field(
+        default=3.0,
+        ge=0.5,
+        le=30.0,
+        description="Timeout in seconds for off-hot-path Llama Guard classification calls",
+    )
+
     # --- Egyptian Polyclinic Domain Settings ---
     clinic_name: str = Field(
         default="مجمع عيادات النور التخصصي",

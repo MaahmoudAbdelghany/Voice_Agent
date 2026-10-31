@@ -16,6 +16,7 @@ from typing import Any
 
 from src.config import settings
 from src.rag.retriever import retriever
+from src.rag.sanitizer import DocumentSanitizer, document_sanitizer
 
 logger = logging.getLogger(__name__)
 
@@ -109,8 +110,9 @@ class KnowledgeIngestionPipeline:
     Splits, transforms, and ingests markdown knowledge documents into Qdrant & BM25.
     """
 
-    def __init__(self, target_retriever=None):
+    def __init__(self, target_retriever=None, sanitizer: DocumentSanitizer | None = None):
         self._retriever = target_retriever
+        self.sanitizer = sanitizer or document_sanitizer
 
     @property
     def retriever(self) -> Any:
@@ -585,6 +587,8 @@ class KnowledgeIngestionPipeline:
             raise FileNotFoundError(f"Knowledge base file not found: {file_path}")
 
         content = file_path.read_text(encoding="utf-8")
+        if settings.rag_sanitize_on_ingest and self.sanitizer is not None:
+            content = self.sanitizer.sanitize_text(content)
         max_chars = settings.rag_chunk_max_chars
 
         # Split by level 2 and 3 headers (## and ###)

@@ -387,10 +387,15 @@ class ModelGateway:
             from src.tools.knowledge_search import async_search_clinic_knowledge
 
             tool_res = await asyncio.wait_for(
-                async_search_clinic_knowledge(query=query, limit=1),
+                async_search_clinic_knowledge(query=query, limit=1, score_threshold=0.60),
                 timeout=0.4,
             )
-            if tool_res.success and tool_res.message:
+            if (
+                tool_res.success
+                and tool_res.data
+                and tool_res.data.get("found")
+                and tool_res.message
+            ):
                 return tool_res.message
             return None
         except Exception as e:  # noqa: BLE001

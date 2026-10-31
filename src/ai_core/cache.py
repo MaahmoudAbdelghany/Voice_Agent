@@ -34,6 +34,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
 
 from src.ai_core.gateway import DegradationTier, GatewayResult, ModelGateway, Stage
+from src.ai_core.guardrails import OutputGuardrail
 from src.ai_core.text_normalizer import (
     build_exact_key,
     compute_kb_version,
@@ -277,91 +278,13 @@ class CacheabilityPolicy:
         return True, None
 
 
-class DefaultOutputValidator:
+class DefaultOutputValidator(OutputGuardrail):
     """
     Conservative fail-closed output validator that rejects medical prescriptions,
-    drug dosages, direct medical diagnosis, and unauthorized commercial promises.
+    drug dosages, direct medical diagnosis, unauthorized commercial promises,
+    system/secret leaks, and unsafe code/SQL.
+    Inherits from OutputGuardrail (Feature 4.4) for unified trust-layer enforcement.
     """
-
-    _MED_PRESCRIPTION_WORDS: ClassVar[set[str]] = {
-        "بنادول",
-        "بانادول",
-        "مضاد حيوي",
-        "جرعة",
-        "أقراص",
-        "اقراص",
-        "كبسول",
-        "كبسولات",
-        "روشتة",
-        "روشته",
-        "ملجم",
-        "panadol",
-        "antibiotic",
-        "dosage",
-        "tablets",
-        "capsules",
-        "prescription",
-    }
-
-    _MED_PRESCRIPTION_PATTERNS: ClassVar[list[re.Pattern[str]]] = [
-        re.compile(r"\b\d+\s*(ملجم|mg)\b", re.IGNORECASE),
-        re.compile(r"مرتين\s+في\s+اليوم", re.IGNORECASE),
-        re.compile(r"(قبل|بعد)\s+الأكل", re.IGNORECASE),
-        re.compile(r"خد\s+\w+", re.IGNORECASE),
-    ]
-
-    _DIAGNOSIS_PATTERNS: ClassVar[list[re.Pattern[str]]] = [
-        re.compile(r"عندك\s+التهاب", re.IGNORECASE),
-        re.compile(r"تشخيص\s+حالتك", re.IGNORECASE),
-        re.compile(r"بتعاني\s+من", re.IGNORECASE),
-        re.compile(r"محتمل\s+يكون\s+عندك", re.IGNORECASE),
-        re.compile(r"أنت\s+مصاب", re.IGNORECASE),
-        re.compile(r"you\s+have\s+inflammation", re.IGNORECASE),
-        re.compile(r"diagnosis\s+is", re.IGNORECASE),
-    ]
-
-    _DISCOUNT_PATTERNS: ClassVar[list[re.Pattern[str]]] = [
-        re.compile(r"هعملك\s+خصم", re.IGNORECASE),
-        re.compile(r"خصم\s+خاص\s+لحضرتك", re.IGNORECASE),
-        re.compile(r"مجاناً\s+عشانك", re.IGNORECASE),
-        re.compile(r"أضمن\s+لك", re.IGNORECASE),
-        re.compile(r"special\s+discount\s+for\s+you", re.IGNORECASE),
-        re.compile(r"free\s+for\s+you", re.IGNORECASE),
-    ]
-
-    def is_valid(self, response_text: str) -> bool:
-        """
-        Verify that response text does not contain prohibited medical or promotional content.
-        Fails closed on any exception.
-        """
-        if not response_text:
-            return False
-
-        try:
-            resp_lower = response_text.lower()
-            if any(w in resp_lower for w in self._MED_PRESCRIPTION_WORDS):
-                return False
-
-            tokens = set(re.findall(r"\b\w+\b", resp_lower))
-            if any(w in tokens for w in self._MED_PRESCRIPTION_WORDS):
-                return False
-
-            for pat in self._MED_PRESCRIPTION_PATTERNS:
-                if pat.search(response_text):
-                    return False
-
-            for pat in self._DIAGNOSIS_PATTERNS:
-                if pat.search(response_text):
-                    return False
-
-            for pat in self._DISCOUNT_PATTERNS:
-                if pat.search(response_text):
-                    return False
-
-            return True
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"DefaultOutputValidator encountered error (fail-closed): {e}")
-            return False
 
 
 # ==============================================================================
