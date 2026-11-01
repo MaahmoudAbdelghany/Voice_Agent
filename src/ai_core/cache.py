@@ -674,7 +674,48 @@ class CacheLadder:
     async def lookup(self, query: str, scope: CacheScope | None = None) -> CacheResult:
         """
         Evaluate Tier 1 then Tier 2 cache. Guaranteed fail-open (never raises).
+        Automatically records a child span when an active trace context exists.
         """
+        from src.ai_core.tracing import SpanKind, SpanStatus, get_current_trace, span_scope
+
+        if get_current_trace() is None:
+            return await self._lookup_impl(query, scope)
+
+        eff_scope = scope or CacheScope()
+        with span_scope(
+            "cache_ladder.lookup",
+            kind=SpanKind.CACHE,
+            input_payload={
+                "query": query,
+                "category": eff_scope.category,
+                "language": eff_scope.language,
+            },
+        ) as sp:
+            res = await self._lookup_impl(query, scope)
+            sp.set_attributes(
+                {
+                    "hit": res.hit,
+                    "tier": res.tier.value,
+                    "similarity": res.similarity,
+                    "bypass_reason": res.bypass_reason.value if res.bypass_reason else None,
+                    "kb_version": res.kb_version,
+                }
+            )
+            sp.set_output(
+                {
+                    "hit": res.hit,
+                    "tier": res.tier.value,
+                    "text": res.text,
+                }
+            )
+            if res.tier == CacheTier.BYPASS:
+                sp.set_status(
+                    SpanStatus.BYPASSED,
+                    error_class=res.bypass_reason.value if res.bypass_reason else None,
+                )
+            return res
+
+    async def _lookup_impl(self, query: str, scope: CacheScope | None = None) -> CacheResult:
         start_t = time.perf_counter()
         effective_scope = scope or CacheScope()
 
@@ -849,7 +890,59 @@ class CacheLadder:
         """
         Store public answer in Tier 1 and Tier 2 caches after passing safety gates.
         Fail-closed: Returns False and writes nothing if validation fails.
+        Automatically records a child span when an active trace context exists.
         """
+        from src.ai_core.tracing import SpanKind, SpanStatus, get_current_trace, span_scope
+
+        if get_current_trace() is None:
+            return await self._store_impl(
+                query,
+                scope,
+                response_text,
+                degradation_tier=degradation_tier,
+                tool_calls=tool_calls,
+                truncated=truncated,
+            )
+
+        with span_scope(
+            "cache_ladder.store",
+            kind=SpanKind.CACHE,
+            input_payload={
+                "query": query,
+                "category": scope.category,
+                "response_text": response_text,
+            },
+        ) as sp:
+            stored = await self._store_impl(
+                query,
+                scope,
+                response_text,
+                degradation_tier=degradation_tier,
+                tool_calls=tool_calls,
+                truncated=truncated,
+            )
+            sp.set_attributes(
+                {
+                    "stored": stored,
+                    "category": scope.category,
+                    "degradation_tier": str(degradation_tier),
+                }
+            )
+            sp.set_output({"stored": stored})
+            if not stored:
+                sp.set_status(SpanStatus.BYPASSED, error_class="store_rejected")
+            return stored
+
+    async def _store_impl(
+        self,
+        query: str,
+        scope: CacheScope,
+        response_text: str | None,
+        *,
+        degradation_tier: DegradationTier | str = DegradationTier.TIER_1_PRIMARY,
+        tool_calls: list[Any] | None = None,
+        truncated: bool = False,
+    ) -> bool:
         if not self.settings.cache_enabled:
             return False
 

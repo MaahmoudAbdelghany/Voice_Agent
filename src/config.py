@@ -338,6 +338,74 @@ class Settings(BaseSettings):
         description="Inject verified session caller phone server-side and block phone spoofing when CallerSessionContext is active",
     )
 
+    # --- Hierarchical LLM Trace Logging & Self-Hosted Langfuse (Feature 4.6) ---
+    tracing_enabled: bool = Field(
+        default=True,
+        description="Enable hierarchical OpenTelemetry-compatible span tracing across turns",
+    )
+    langfuse_enabled: bool = Field(
+        default=False,
+        description="Enable asynchronous batch export to self-hosted Langfuse server",
+    )
+    langfuse_host: str = Field(
+        default="http://localhost:3000",
+        description="Base URL of self-hosted Langfuse server (patient data sovereignty invariant)",
+    )
+    langfuse_public_key: str = Field(
+        default="",
+        description="Langfuse project public API key (pk-lf-...)",
+    )
+    langfuse_secret_key: str = Field(
+        default="",
+        description="Langfuse project secret API key (sk-lf-...)",
+    )
+    tracing_batch_size: int = Field(
+        default=20,
+        ge=1,
+        le=500,
+        description="Maximum number of trace events exported in a single Langfuse HTTP batch",
+    )
+    tracing_flush_interval_s: float = Field(
+        default=2.0,
+        ge=0.1,
+        le=60.0,
+        description="Background flush interval in seconds for pending trace batches",
+    )
+    tracing_http_timeout_s: float = Field(
+        default=2.0,
+        ge=0.2,
+        le=30.0,
+        description="HTTP timeout in seconds when posting batches to self-hosted Langfuse",
+    )
+    tracing_max_queue_size: int = Field(
+        default=1000,
+        ge=10,
+        le=50000,
+        description="Maximum pending raw traces buffered in memory before dropping oldest",
+    )
+    tracing_ring_buffer_size: int = Field(
+        default=200,
+        ge=10,
+        le=10000,
+        description="Maximum PII-redacted TraceRecords retained in in-memory ring buffer",
+    )
+    llm_cost_per_1m_tokens: dict[str, dict[str, float]] = Field(
+        default_factory=lambda: {
+            "groq/llama-3.3-70b-versatile": {"prompt": 0.59, "completion": 0.79},
+            "llama-3.3-70b-versatile": {"prompt": 0.59, "completion": 0.79},
+            "groq/llama-3.1-8b-instant": {"prompt": 0.05, "completion": 0.08},
+            "llama-3.1-8b-instant": {"prompt": 0.05, "completion": 0.08},
+            "groq/llama-guard-3-8b": {"prompt": 0.20, "completion": 0.20},
+            "llama-guard-3-8b": {"prompt": 0.20, "completion": 0.20},
+            "gemini/gemini-2.0-flash": {"prompt": 0.10, "completion": 0.40},
+            "gemini-2.0-flash": {"prompt": 0.10, "completion": 0.40},
+            "openai/gpt-4o-mini": {"prompt": 0.15, "completion": 0.60},
+            "gpt-4o-mini": {"prompt": 0.15, "completion": 0.60},
+            "default": {"prompt": 0.50, "completion": 0.80},
+        },
+        description="USD pricing per 1,000,000 prompt/completion tokens by model identifier",
+    )
+
     # --- Egyptian Polyclinic Domain Settings ---
     clinic_name: str = Field(
         default="مجمع عيادات النور التخصصي",
@@ -502,6 +570,17 @@ class Settings(BaseSettings):
     def is_database_configured(self) -> bool:
         """Check if relational database URL is configured."""
         return bool(self.database_url)
+
+    def is_langfuse_configured(self) -> bool:
+        """Check if self-hosted Langfuse export is enabled and credentials are provided."""
+        return bool(
+            self.langfuse_enabled
+            and self.langfuse_host
+            and self.langfuse_public_key
+            and self.langfuse_secret_key
+            and "your_" not in self.langfuse_public_key
+            and "your_" not in self.langfuse_secret_key
+        )
 
     def get_sqlite_db_path(self) -> str | None:
         """Extract SQLite file path from URL and guarantee parent directory exists."""

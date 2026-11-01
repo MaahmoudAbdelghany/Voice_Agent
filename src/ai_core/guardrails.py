@@ -291,7 +291,44 @@ class InputGuardrail:
     def evaluate(self, text: str) -> InputGuardrailResult:
         """
         Evaluate caller utterance in < 20ms CPU using 4-way context-aware triage.
+        Automatically records a child span when an active trace context exists.
         """
+        from src.ai_core.tracing import SpanKind, SpanStatus, get_current_trace, span_scope
+
+        if get_current_trace() is None:
+            return self._evaluate_impl(text)
+
+        with span_scope(
+            "input_guardrail.evaluate",
+            kind=SpanKind.GUARDRAIL_INPUT,
+            input_payload={"text": text},
+        ) as sp:
+            res = self._evaluate_impl(text)
+            sp.set_attributes(
+                {
+                    "allowed": res.allowed,
+                    "action": res.action.value,
+                    "category": res.category.value,
+                    "escalate": res.escalate,
+                    "matched_rule": res.matched_rule,
+                }
+            )
+            sp.set_output(
+                {
+                    "allowed": res.allowed,
+                    "action": res.action.value,
+                    "response_text": res.response_text,
+                }
+            )
+            if not res.allowed:
+                sp.set_status(
+                    SpanStatus.BLOCKED,
+                    error_class=res.category.value,
+                    error_message=res.matched_rule,
+                )
+            return res
+
+    def _evaluate_impl(self, text: str) -> InputGuardrailResult:
         start_t = time.perf_counter()
 
         if not text or not text.strip():
@@ -553,8 +590,47 @@ class OutputGuardrail:
     ) -> OutputGuardrailResult:
         """
         Validate LLM output text against safety, leak, and numeric grounding rules (< 5ms).
-        Fails closed on any exception.
+        Fails closed on any exception. Automatically records a child span when an active trace exists.
         """
+        from src.ai_core.tracing import SpanKind, SpanStatus, get_current_trace, span_scope
+
+        if get_current_trace() is None:
+            return self._validate_impl(response_text, retrieved_context)
+
+        with span_scope(
+            "output_guardrail.validate",
+            kind=SpanKind.GUARDRAIL_OUTPUT,
+            input_payload={
+                "response_text": response_text,
+                "has_retrieved_context": bool(retrieved_context and retrieved_context.strip()),
+            },
+        ) as sp:
+            res = self._validate_impl(response_text, retrieved_context)
+            sp.set_attributes(
+                {
+                    "allowed": res.allowed,
+                    "violation_category": res.violation_category,
+                }
+            )
+            sp.set_output(
+                {
+                    "allowed": res.allowed,
+                    "violation_category": res.violation_category,
+                    "safe_fallback_text": res.safe_fallback_text,
+                }
+            )
+            if not res.allowed:
+                sp.set_status(
+                    SpanStatus.BLOCKED,
+                    error_class=res.violation_category or "output_blocked",
+                )
+            return res
+
+    def _validate_impl(
+        self,
+        response_text: str,
+        retrieved_context: str | None = None,
+    ) -> OutputGuardrailResult:
         start_t = time.perf_counter()
         default_fallback = (
             "عذراً، لا يمكنني تأكيد هذه المعلومة حالياً. "
@@ -1259,6 +1335,8 @@ class AsyncLlamaGuardClassifier:
                 trace_id=trace_id,
             )
             self.recent_verdicts.append(verdict)
+            if trace_id:
+                self._attach_verdict_to_tracer(trace_id, verdict)
             if on_verdict is not None:
                 await self._invoke_callback(on_verdict, verdict)
             return verdict
@@ -1310,9 +1388,20 @@ class AsyncLlamaGuardClassifier:
             )
 
         self.recent_verdicts.append(verdict)
+        if trace_id:
+            self._attach_verdict_to_tracer(trace_id, verdict)
         if on_verdict is not None:
             await self._invoke_callback(on_verdict, verdict)
         return verdict
+
+    def _attach_verdict_to_tracer(self, trace_id: str, verdict: LlamaGuardVerdict) -> None:
+        """Attach verdict to HierarchicalTracer if present."""
+        try:
+            from src.ai_core.tracing import get_tracer
+
+            get_tracer().attach_llama_guard_verdict(trace_id, verdict)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Could not attach LlamaGuardVerdict to tracer: %s", exc)
 
     async def _invoke_callback(self, callback: VerdictCallback, verdict: LlamaGuardVerdict) -> None:
         try:

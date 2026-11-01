@@ -206,7 +206,97 @@ class AppointmentWorkflowStateMachine:
     ) -> WorkflowExecutionResult:
         """
         Execute an appointment workflow deterministically across finite states.
+        Automatically records a child span when an active trace context exists.
         """
+        from src.ai_core.tracing import SpanKind, SpanStatus, get_current_trace, span_scope
+
+        if get_current_trace() is None:
+            return await self._execute_impl(
+                action,
+                patient_name=patient_name,
+                patient_phone=patient_phone,
+                phone=phone,
+                doctor_id=doctor_id,
+                doctor_name=doctor_name,
+                date=date,
+                new_date=new_date,
+                visit_type=visit_type,
+                booking_code=booking_code,
+                reason=reason,
+                notes=notes,
+            )
+
+        action_label = action.value if isinstance(action, WorkflowAction) else str(action)
+        with span_scope(
+            f"workflow.{action_label}",
+            kind=SpanKind.WORKFLOW,
+            input_payload={
+                "action": action_label,
+                "patient_name": patient_name,
+                "patient_phone": patient_phone or phone,
+                "doctor_id": doctor_id,
+                "doctor_name": doctor_name,
+                "date": str(date) if date is not None else None,
+                "new_date": str(new_date) if new_date is not None else None,
+                "booking_code": booking_code,
+            },
+        ) as sp:
+            res = await self._execute_impl(
+                action,
+                patient_name=patient_name,
+                patient_phone=patient_phone,
+                phone=phone,
+                doctor_id=doctor_id,
+                doctor_name=doctor_name,
+                date=date,
+                new_date=new_date,
+                visit_type=visit_type,
+                booking_code=booking_code,
+                reason=reason,
+                notes=notes,
+            )
+            sp.set_attributes(
+                {
+                    "action": res.action.value,
+                    "terminal_state": res.terminal_state.value,
+                    "steps_taken": res.steps_taken,
+                    "idempotent_replay": res.idempotent_replay,
+                    "spoof_attempt_blocked": res.spoof_attempt_blocked,
+                    "escalate": res.escalate,
+                }
+            )
+            sp.set_output(
+                {
+                    "success": res.success,
+                    "terminal_state": res.terminal_state.value,
+                    "message": res.tool_result.message,
+                    "error": res.tool_result.error,
+                }
+            )
+            if not res.success:
+                sp.set_status(
+                    SpanStatus.ERROR,
+                    error_class=res.error_class or "workflow_failed",
+                    error_message=res.tool_result.message,
+                )
+            return res
+
+    async def _execute_impl(
+        self,
+        action: WorkflowAction | str,
+        *,
+        patient_name: str | None = None,
+        patient_phone: str | None = None,
+        phone: str | None = None,
+        doctor_id: int | None = None,
+        doctor_name: str | None = None,
+        date: dt.date | dt.datetime | str | None = None,
+        new_date: dt.date | dt.datetime | str | None = None,
+        visit_type: VisitType | str | None = VisitType.EXAMINATION,
+        booking_code: str | None = None,
+        reason: str | None = None,
+        notes: str | None = None,
+    ) -> WorkflowExecutionResult:
         overall_start = time.perf_counter()
         traces: list[WorkflowStepTrace] = []
         current_state = WorkflowState.INIT

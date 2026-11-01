@@ -737,6 +737,7 @@ class HybridKnowledgeRetriever:
     ) -> list[dict[str, Any]]:
         """
         Execute hybrid search combining Dense Qdrant search and Sparse BM25 search via RRF.
+        Automatically records a child span when an active trace context exists.
 
         Args:
             query: User utterance or search query.
@@ -747,6 +748,55 @@ class HybridKnowledgeRetriever:
         Returns:
             List of merged matching records with calibrated scores and provenance.
         """
+        from src.ai_core.tracing import SpanKind, get_current_trace, span_scope
+
+        if get_current_trace() is None:
+            return self._search_impl(
+                query=query,
+                limit=limit,
+                score_threshold=score_threshold,
+                category=category,
+            )
+
+        with span_scope(
+            "hybrid_rag.search",
+            kind=SpanKind.RAG,
+            input_payload={
+                "query": query,
+                "limit": limit,
+                "score_threshold": score_threshold,
+                "category": category,
+            },
+        ) as sp:
+            results = self._search_impl(
+                query=query,
+                limit=limit,
+                score_threshold=score_threshold,
+                category=category,
+            )
+            sp.set_attributes(
+                {
+                    "category": category,
+                    "top_k": limit,
+                    "results_count": len(results),
+                    "top_score": results[0].get("score") if results else None,
+                }
+            )
+            sp.set_output(
+                {
+                    "results_count": len(results),
+                    "chunk_ids": [r.get("id") for r in results],
+                }
+            )
+            return results
+
+    def _search_impl(
+        self,
+        query: str,
+        limit: int = 4,
+        score_threshold: float | None = None,
+        category: str | None = None,
+    ) -> list[dict[str, Any]]:
         clean_q = normalize_query(query) if isinstance(query, str) else ""
         if not clean_q:
             return []

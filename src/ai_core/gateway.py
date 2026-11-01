@@ -429,7 +429,85 @@ class ModelGateway:
         Stream output tokens for a request, failing over transparently if needed.
         Yields: (text_chunk, final_result_or_none)
         When streaming completes, the final item yielded has text_chunk=None and the full GatewayResult.
+        Automatically records a child span when an active trace context exists.
         """
+        from src.ai_core.tracing import SpanKind, SpanStatus, get_current_trace, span_scope
+
+        if get_current_trace() is None:
+            async for item in self._astream_impl(
+                stage=stage,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                tools=tools,
+            ):
+                yield item
+            return
+
+        span_kind = (
+            SpanKind.ROUTER if stage in (Stage.CLASSIFICATION, Stage.EXTRACTION) else SpanKind.LLM
+        )
+        span_name = f"gateway.{stage.value}"
+        with span_scope(
+            span_name,
+            kind=span_kind,
+            input_payload={"stage": stage.value, "messages": messages},
+        ) as sp:
+            async for chunk, final_res in self._astream_impl(
+                stage=stage,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                tools=tools,
+            ):
+                if final_res is not None:
+                    sp.set_usage(
+                        provider=final_res.provider,
+                        model=final_res.model,
+                        prompt_tokens=final_res.prompt_tokens,
+                        completion_tokens=final_res.completion_tokens,
+                        total_tokens=final_res.total_tokens,
+                        ttft_ms=final_res.ttft_ms,
+                        degradation_tier=final_res.degradation_tier.value,
+                        settings=self.settings,
+                    )
+                    sp.set_attributes(
+                        {
+                            "stage": final_res.stage.value,
+                            "escalate": final_res.escalate,
+                            "truncated": final_res.truncated,
+                            "finish_reason": final_res.finish_reason,
+                            "attempts_count": len(final_res.attempts),
+                            "attempts": [a.model_dump() for a in final_res.attempts],
+                        }
+                    )
+                    sp.set_output(
+                        {
+                            "text": final_res.text,
+                            "tool_calls": final_res.tool_calls,
+                            "degradation_tier": final_res.degradation_tier.value,
+                        }
+                    )
+                    if not final_res.success:
+                        sp.set_status(
+                            SpanStatus.ERROR,
+                            error_class=final_res.error_class or "gateway_failed",
+                        )
+                    elif final_res.degradation_tier != DegradationTier.TIER_1_PRIMARY:
+                        sp.set_status(
+                            SpanStatus.DEGRADED,
+                            error_class=final_res.error_class,
+                        )
+                yield chunk, final_res
+
+    async def _astream_impl(
+        self,
+        stage: Stage,
+        messages: list[dict[str, Any]],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        tools: list[dict[str, Any]] | None = None,
+    ) -> AsyncGenerator[tuple[str | None, GatewayResult | None], None]:
         start_overall = time.monotonic()
         temp = temperature if temperature is not None else self.settings.llm_temperature
         clamped_tokens = self.resolve_max_tokens(stage, max_tokens)
