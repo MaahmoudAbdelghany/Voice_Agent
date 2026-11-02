@@ -1,4 +1,4 @@
-We are going to add a new big feature i want add the feature in roadmap as a phase  , the feature is: [FEATURE NAME]
+We are going to add a new big feature i want add the feature in roadmap as a phase  , the feature is: [i want you apply instructions and information into pdfs to build a power ai sytem for my project ]
 
 
 
@@ -50,6 +50,6 @@ We are going to add a new big feature i want add the feature in roadmap as a pha
 
 ### 6. Wait for Human Review (Mandatory Gate) 🛑
 - **Halt all coding activity immediately.**
-- Present the generated specification files (`plan.md`, `requirements.md`) to the human supervisor.
+- Present the generated specification files (`plan.md`, `requirements.md`,`validation.md`) to the human supervisor.
 - Highlight key decisions, trade-offs, and open questions.
 - **Strict Prohibition**: Never write application code or make edits before receiving explicit approval (e.g., *"go ahead"*, *"approved"*, *"اعتمد"*).

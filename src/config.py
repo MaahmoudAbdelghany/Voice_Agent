@@ -406,6 +406,60 @@ class Settings(BaseSettings):
         description="USD pricing per 1,000,000 prompt/completion tokens by model identifier",
     )
 
+    # --- FinOps Token Budgets & Cost Circuit Breaker (Feature 4.7) ---
+    finops_enabled: bool = Field(
+        default=True,
+        description="Enable FinOps per-call token budgets and daily spend circuit breaker",
+    )
+    finops_call_token_budget: int = Field(
+        default=8000,
+        ge=100,
+        le=200000,
+        description="Hard cumulative token budget per patient call session (default: 8,000)",
+    )
+    finops_min_turn_tokens: int = Field(
+        default=16,
+        ge=1,
+        le=256,
+        description="Minimum remaining call tokens required to start a new LLM generation turn",
+    )
+    finops_daily_spend_cap_usd: float = Field(
+        default=10.0,
+        ge=0.01,
+        le=10000.0,
+        description="Daily cloud LLM spend cap in USD before cost circuit breaker trips (default: $10.00)",
+    )
+    finops_daily_alert_ratio: float = Field(
+        default=0.80,
+        ge=0.10,
+        le=1.0,
+        description="Fraction of daily spend cap that triggers an early FinOps alert (default: 0.80 = $8.00)",
+    )
+    finops_max_tracked_sessions: int = Field(
+        default=2000,
+        ge=10,
+        le=100000,
+        description="Maximum active/recent call session ledgers retained in memory (LRU eviction)",
+    )
+    finops_max_tool_list_items: int = Field(
+        default=5,
+        ge=1,
+        le=50,
+        description="Maximum list items retained inside pruned tool data payloads",
+    )
+    finops_max_tool_field_chars: int = Field(
+        default=300,
+        ge=32,
+        le=4000,
+        description="Maximum character length for any individual string field in a pruned tool payload",
+    )
+    finops_max_tool_payload_chars: int = Field(
+        default=1200,
+        ge=128,
+        le=16000,
+        description="Maximum total JSON character length for a serialized pruned tool message",
+    )
+
     # --- Egyptian Polyclinic Domain Settings ---
     clinic_name: str = Field(
         default="مجمع عيادات النور التخصصي",

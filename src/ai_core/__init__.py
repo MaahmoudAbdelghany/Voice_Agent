@@ -7,6 +7,10 @@ Provides Enterprise Architecture & Resilience Layer:
 - Circuit Breakers
 - 4-Tier Graceful Degradation
 - 3-Tier Caching Ladder (Exact Hash, Semantic, Prompt Prefix)
+- OWASP Trust Layer, Runtime Guardrails & Egyptian PII Redaction
+- Deterministic Appointment Workflow State Machine & Write Safety Gates
+- Hierarchical LLM Trace Logging & Self-Hosted Langfuse Exporter
+- FinOps Token Budgets, Daily Cost Circuit Breaker & Tool Payload Pruner
 """
 
 from src.ai_core.cache import (
@@ -28,6 +32,22 @@ from src.ai_core.cache import (
     get_cache_ladder,
 )
 from src.ai_core.circuit_breaker import BreakerState, CircuitBreaker
+from src.ai_core.finops import (
+    TOOL_DATA_ALLOWLISTS,
+    AlertLevel,
+    CallBudgetSnapshot,
+    DailySpendSnapshot,
+    FinOpsAlert,
+    FinOpsController,
+    FinOpsDecision,
+    FinOpsGateStatus,
+    finops_session_scope,
+    format_pruned_tool_message,
+    get_current_finops_session_id,
+    get_finops_controller,
+    prune_tool_payload,
+    resolve_finops_session_id,
+)
 from src.ai_core.gateway import (
     DegradationTier,
     GatewayResult,
@@ -116,6 +136,8 @@ from src.ai_core.workflow import (
 __all__ = [
     "LLAMA_GUARD_CATEGORIES",
     "SYSTEM_UNTRUSTED_DATA_RULES",
+    "TOOL_DATA_ALLOWLISTS",
+    "AlertLevel",
     "AllowedIntentEnum",
     "AllowedSpecialtyEnum",
     "AppointmentWorkflowStateMachine",
@@ -131,8 +153,10 @@ __all__ = [
     "CacheTier",
     "CacheabilityPolicy",
     "CachedTurnResult",
+    "CallBudgetSnapshot",
     "CircuitBreaker",
     "CreditCardRecognizer",
+    "DailySpendSnapshot",
     "DefaultOutputValidator",
     "DegradationTier",
     "EgyptianNationalIDRecognizer",
@@ -141,6 +165,10 @@ __all__ = [
     "EmailRecognizer",
     "EntityExtractionSchema",
     "ErrorCategory",
+    "FinOpsAlert",
+    "FinOpsController",
+    "FinOpsDecision",
+    "FinOpsGateStatus",
     "GatewayResult",
     "GuardrailCategory",
     "HierarchicalTracer",
@@ -181,15 +209,19 @@ __all__ = [
     "compute_kb_version",
     "escape_xml_delimiters",
     "estimate_llm_cost_usd",
+    "finops_session_scope",
+    "format_pruned_tool_message",
     "format_traceparent",
     "generate_span_id",
     "generate_trace_id",
     "get_appointment_workflow",
     "get_cache_ladder",
+    "get_current_finops_session_id",
     "get_current_span",
     "get_current_span_id",
     "get_current_trace",
     "get_current_trace_id",
+    "get_finops_controller",
     "get_gateway",
     "get_input_guardrail",
     "get_llama_guard_classifier",
@@ -200,6 +232,8 @@ __all__ = [
     "normalize_query",
     "parse_llama_guard_output",
     "parse_traceparent",
+    "prune_tool_payload",
+    "resolve_finops_session_id",
     "span_scope",
     "trace_scope",
     "traced_span",

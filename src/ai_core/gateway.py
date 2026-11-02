@@ -1,12 +1,13 @@
 """
-Enterprise Model Gateway with Stage-Based Routing, Circuit Breaker, and 4-Tier Degradation.
+Enterprise Model Gateway with Stage-Based Routing, Circuit Breaker, FinOps Gate, and 4-Tier Degradation.
 
 Centralized entry point for all LLM reasoning in the Voice AI Agent platform.
 Enforces:
 1. Stage-based deterministic model selection (Groq Llama 3.1 8B vs 3.3 70B).
 2. Per-provider Circuit Breaker with instant failover to Google Gemini.
 3. Strict Time-to-First-Token (TTFT 3.5s) timeout and voice max_tokens clamping (150).
-4. 4-tier graceful degradation (Primary -> Backup -> Search-Only -> Receptionist).
+4. FinOps per-call token budget (8,000 tokens) and $10/day Cost Circuit Breaker (Feature 4.7).
+5. 4-tier graceful degradation (Primary -> Backup -> Search-Only -> Receptionist).
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ import time
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from enum import Enum
 from typing import (
+    TYPE_CHECKING,
     Any,
     Protocol,
     runtime_checkable,
@@ -41,6 +43,9 @@ from pydantic import BaseModel, Field
 from src.ai_core.circuit_breaker import CircuitBreaker
 from src.config import Settings, get_settings
 from src.tools.human_handoff import detect_emergency
+
+if TYPE_CHECKING:
+    from src.ai_core.finops import FinOpsController
 
 logger = logging.getLogger(__name__)
 
@@ -302,7 +307,7 @@ class LiteLLMProvider:
 class ModelGateway:
     """
     Central AI Model Gateway implementing stage routing, circuit breaker failover,
-    and 4-tier degradation.
+    FinOps budget enforcement, and 4-tier degradation.
     """
 
     def __init__(
@@ -313,7 +318,10 @@ class ModelGateway:
         primary_breaker: CircuitBreaker | None = None,
         fallback_breaker: CircuitBreaker | None = None,
         search_fallback: Callable[[str], Awaitable[str | None]] | None = None,
+        finops_controller: FinOpsController | None = None,
     ) -> None:
+        from src.ai_core.finops import FinOpsController
+
         self.settings = settings or get_settings()
 
         # Primary provider: Groq
@@ -341,6 +349,9 @@ class ModelGateway:
         )
 
         self._search_fallback = search_fallback
+        self.finops: FinOpsController = finops_controller or FinOpsController(
+            settings=self.settings
+        )
 
     def resolve_model(self, provider_name: str, stage: Stage) -> str:
         """Resolve model identifier for provider and workflow stage."""
@@ -424,6 +435,7 @@ class ModelGateway:
         temperature: float | None = None,
         max_tokens: int | None = None,
         tools: list[dict[str, Any]] | None = None,
+        session_id: str | None = None,
     ) -> AsyncGenerator[tuple[str | None, GatewayResult | None], None]:
         """
         Stream output tokens for a request, failing over transparently if needed.
@@ -440,6 +452,7 @@ class ModelGateway:
                 temperature=temperature,
                 max_tokens=max_tokens,
                 tools=tools,
+                session_id=session_id,
             ):
                 yield item
             return
@@ -459,6 +472,7 @@ class ModelGateway:
                 temperature=temperature,
                 max_tokens=max_tokens,
                 tools=tools,
+                session_id=session_id,
             ):
                 if final_res is not None:
                     sp.set_usage(
@@ -471,6 +485,8 @@ class ModelGateway:
                         degradation_tier=final_res.degradation_tier.value,
                         settings=self.settings,
                     )
+                    call_snap = self.finops.get_session_snapshot(session_id=session_id)
+                    daily_snap = self.finops.get_daily_snapshot()
                     sp.set_attributes(
                         {
                             "stage": final_res.stage.value,
@@ -479,6 +495,17 @@ class ModelGateway:
                             "finish_reason": final_res.finish_reason,
                             "attempts_count": len(final_res.attempts),
                             "attempts": [a.model_dump() for a in final_res.attempts],
+                            "finops_status": (
+                                "DAILY_CAP_EXCEEDED"
+                                if final_res.error_class == "daily_cost_cap_exceeded"
+                                else (
+                                    "CALL_BUDGET_EXCEEDED"
+                                    if final_res.error_class == "call_token_budget_exceeded"
+                                    else "ALLOWED"
+                                )
+                            ),
+                            "call_tokens_used": call_snap.total_tokens if call_snap else 0,
+                            "daily_spend_usd": daily_snap.spend_usd,
                         }
                     )
                     sp.set_output(
@@ -507,10 +534,12 @@ class ModelGateway:
         temperature: float | None = None,
         max_tokens: int | None = None,
         tools: list[dict[str, Any]] | None = None,
+        session_id: str | None = None,
     ) -> AsyncGenerator[tuple[str | None, GatewayResult | None], None]:
+        from src.ai_core.finops import FinOpsGateStatus
+
         start_overall = time.monotonic()
         temp = temperature if temperature is not None else self.settings.llm_temperature
-        clamped_tokens = self.resolve_max_tokens(stage, max_tokens)
 
         # Validate input
         if not messages:
@@ -523,6 +552,164 @@ class ModelGateway:
             )
             yield None, res
             return
+
+        # Pre-flight FinOps budget & daily cost circuit breaker evaluation (Feature 4.7)
+        finops_decision = self.finops.check_budget(
+            stage=stage,
+            requested_max_tokens=max_tokens,
+            session_id=session_id,
+        )
+
+        # Case A: Per-call 8,000-token budget exhausted (R1.4 / R14.1)
+        if finops_decision.status == FinOpsGateStatus.CALL_BUDGET_EXCEEDED:
+            overall_lat = (time.monotonic() - start_overall) * 1000.0
+            if stage != Stage.DIALOGUE:
+                yield (
+                    None,
+                    GatewayResult(
+                        success=False,
+                        text=None,
+                        tool_calls=[],
+                        stage=stage,
+                        degradation_tier=DegradationTier.TIER_4_HUMAN_ESCALATION,
+                        escalate=False,
+                        latency_ms=overall_lat,
+                        error_class="call_token_budget_exceeded",
+                        attempts=[],
+                    ),
+                )
+                return
+
+            user_query = self._extract_last_user_query(messages)
+            if user_query and detect_emergency(user_query):
+                em_msg = (
+                    f"حالتك تستدعي رعاية طبية عاجلة. يرجى الاتصال بالإسعاف على رقم {self.settings.emergency_phone} فوراً، "
+                    "وجاري تحويلك لموظف الاستقبال لمساعدتك."
+                )
+                yield em_msg, None
+                yield (
+                    None,
+                    GatewayResult(
+                        success=True,
+                        text=em_msg,
+                        tool_calls=[],
+                        stage=stage,
+                        degradation_tier=DegradationTier.TIER_4_HUMAN_ESCALATION,
+                        escalate=True,
+                        latency_ms=overall_lat,
+                        error_class="emergency_detected",
+                        attempts=[],
+                    ),
+                )
+                return
+
+            wrap_msg = (
+                "عشان أقدر أخدم حضرتك بأفضل شكل في باقي استفساراتك، "
+                "جاري تحويلك لموظف الاستقبال لمساعدتك حالاً."
+            )
+            yield wrap_msg, None
+            yield (
+                None,
+                GatewayResult(
+                    success=True,
+                    text=wrap_msg,
+                    tool_calls=[],
+                    stage=stage,
+                    degradation_tier=DegradationTier.TIER_4_HUMAN_ESCALATION,
+                    escalate=True,
+                    latency_ms=overall_lat,
+                    error_class="call_token_budget_exceeded",
+                    attempts=[],
+                ),
+            )
+            return
+
+        # Case B: Daily $10.00 cost circuit breaker tripped (R3.2 / R14.3)
+        if finops_decision.status == FinOpsGateStatus.DAILY_CAP_EXCEEDED:
+            overall_lat = (time.monotonic() - start_overall) * 1000.0
+            if stage != Stage.DIALOGUE:
+                yield (
+                    None,
+                    GatewayResult(
+                        success=False,
+                        text=None,
+                        tool_calls=[],
+                        stage=stage,
+                        degradation_tier=DegradationTier.TIER_4_HUMAN_ESCALATION,
+                        escalate=False,
+                        latency_ms=overall_lat,
+                        error_class="daily_cost_cap_exceeded",
+                        attempts=[],
+                    ),
+                )
+                return
+
+            user_query = self._extract_last_user_query(messages)
+            if user_query and detect_emergency(user_query):
+                em_msg = (
+                    f"حالتك تستدعي رعاية طبية عاجلة. يرجى الاتصال بالإسعاف على رقم {self.settings.emergency_phone} فوراً، "
+                    "وجاري تحويلك لموظف الاستقبال لمساعدتك."
+                )
+                yield em_msg, None
+                yield (
+                    None,
+                    GatewayResult(
+                        success=True,
+                        text=em_msg,
+                        tool_calls=[],
+                        stage=stage,
+                        degradation_tier=DegradationTier.TIER_4_HUMAN_ESCALATION,
+                        escalate=True,
+                        latency_ms=overall_lat,
+                        error_class="emergency_detected",
+                        attempts=[],
+                    ),
+                )
+                return
+
+            snippet = await self._execute_search_fallback(user_query) if user_query else None
+            overall_lat = (time.monotonic() - start_overall) * 1000.0
+            if snippet:
+                t3_msg = f"عفواً، بنواجه ضغط على النظام حالياً، لكن حسب معلومات العيادة: {snippet}"
+                if len(t3_msg) > 300:
+                    t3_msg = t3_msg[:297] + "..."
+                yield t3_msg, None
+                yield (
+                    None,
+                    GatewayResult(
+                        success=True,
+                        text=t3_msg,
+                        tool_calls=[],
+                        stage=stage,
+                        degradation_tier=DegradationTier.TIER_3_SEARCH_ONLY,
+                        escalate=False,
+                        latency_ms=overall_lat,
+                        error_class="daily_cost_cap_exceeded",
+                        attempts=[],
+                    ),
+                )
+                return
+
+            t4_msg = "عفواً، بنواجه ضغط على النظام حالياً، جاري تحويلك لموظف الاستقبال لمساعدتك حالاً."
+            yield t4_msg, None
+            yield (
+                None,
+                GatewayResult(
+                    success=True,
+                    text=t4_msg,
+                    tool_calls=[],
+                    stage=stage,
+                    degradation_tier=DegradationTier.TIER_4_HUMAN_ESCALATION,
+                    escalate=True,
+                    latency_ms=overall_lat,
+                    error_class="daily_cost_cap_exceeded",
+                    attempts=[],
+                ),
+            )
+            return
+
+        # Case C: ALLOWED (with optional final-turn remaining-token clamping)
+        clamped_tokens = finops_decision.effective_max_tokens
 
         attempts: list[ProviderAttempt] = []
         providers = [
@@ -644,6 +831,14 @@ class ModelGateway:
 
                 # D8 Semantics: Mid-stream failure (after first token was yielded) does NOT fail over
                 if chunks_yielded > 0:
+                    if prompt_tokens > 0 or completion_tokens > 0 or total_tokens > 0:
+                        self.finops.record_usage(
+                            model=model,
+                            prompt_tokens=prompt_tokens,
+                            completion_tokens=completion_tokens,
+                            total_tokens=total_tokens or None,
+                            session_id=finops_decision.session_id,
+                        )
                     overall_lat = (time.monotonic() - start_overall) * 1000.0
                     final_text = "".join(accumulated_text)
                     stitched_tools = [tool_calls_map[k] for k in sorted(tool_calls_map.keys())]
@@ -676,6 +871,13 @@ class ModelGateway:
             if not stream_failed:
                 # Provider succeeded!
                 await breaker.record_success()
+                self.finops.record_usage(
+                    model=model,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens or None,
+                    session_id=finops_decision.session_id,
+                )
                 attempt_latency = (time.monotonic() - start_attempt) * 1000.0
                 attempts.append(
                     ProviderAttempt(
@@ -808,6 +1010,7 @@ class ModelGateway:
         temperature: float | None = None,
         max_tokens: int | None = None,
         tools: list[dict[str, Any]] | None = None,
+        session_id: str | None = None,
     ) -> GatewayResult:
         """
         Non-streaming generation returning the complete GatewayResult.
@@ -819,6 +1022,7 @@ class ModelGateway:
             temperature=temperature,
             max_tokens=max_tokens,
             tools=tools,
+            session_id=session_id,
         ):
             if res is not None:
                 final_result = res
@@ -838,5 +1042,7 @@ def get_gateway() -> ModelGateway:
     """Return singleton instance of ModelGateway."""
     global _gateway_instance
     if _gateway_instance is None:
-        _gateway_instance = ModelGateway()
+        from src.ai_core.finops import get_finops_controller
+
+        _gateway_instance = ModelGateway(finops_controller=get_finops_controller())
     return _gateway_instance
