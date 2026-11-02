@@ -90,9 +90,11 @@ _EMERGENCY_PATTERNS = [
     re.compile(r"مش واعي|مش واعيه|مش واعية"),
     # Seizures / Convulsions
     re.compile(r"تشنج|صرع|seizure|convulsion|بيترعش جامد"),
-    # Stroke / Paralysis
+    # Stroke / Paralysis / FAST signs
     re.compile(r"شلل|جلطة مخية|جلطه مخيه|stroke|paralysis"),
-    re.compile(r"اعوجاج.*فم"),
+    re.compile(r"اعوجاج.*(?:فم|بق)|بقه\s+اتعوج|فمه\s+اتعوج|كلامه\s+تقل|ثقل\s+في\s+الكلام"),
+    # Critical Infant Fever (< 3 months)
+    re.compile(r"(?:رضيع|طفل\s+صغير).*(?:حرارته|سخن).*(?:خامل|مش\s+بيرضع)|حرارة\s+(?:الرضع|رضيع)|حراره\s+(?:الرضع|رضيع)"),
     # Poisoning / Overdose
     re.compile(r"تسمم|جرعة زائدة|جرعه زائده|جرعة زايدة|poison|poisoning|overdose"),
     re.compile(r"شرب.*(?:كلور|دوا|دواء|منظف)"),

@@ -460,6 +460,56 @@ class Settings(BaseSettings):
         description="Maximum total JSON character length for a serialized pruned tool message",
     )
 
+    # --- Golden Evaluation & RAGAS CI Gate (Feature 4.8) ---
+    eval_judge_model: str = Field(
+        default="openai/gpt-4o-mini",
+        description="Model identifier for RAGAS evaluation judge (e.g. openai/gpt-4o-mini)",
+    )
+    eval_use_live_judge: bool = Field(
+        default=False,
+        description="Toggle switch for live LLM judge via litellm (requires OPENAI_API_KEY) vs deterministic judge",
+    )
+    eval_faithfulness_threshold: float = Field(
+        default=0.90,
+        ge=0.0,
+        le=1.0,
+        description="Minimum aggregate RAGAS faithfulness threshold (default: 0.90)",
+    )
+    eval_context_recall_threshold: float = Field(
+        default=0.85,
+        ge=0.0,
+        le=1.0,
+        description="Minimum aggregate RAGAS context recall threshold (default: 0.85)",
+    )
+    eval_context_precision_threshold: float = Field(
+        default=0.80,
+        ge=0.0,
+        le=1.0,
+        description="Minimum aggregate RAGAS context precision threshold (default: 0.80)",
+    )
+    eval_answer_relevancy_threshold: float = Field(
+        default=0.85,
+        ge=0.0,
+        le=1.0,
+        description="Minimum aggregate RAGAS answer relevancy threshold (default: 0.85)",
+    )
+    eval_structured_exact_match_threshold: float = Field(
+        default=0.95,
+        ge=0.0,
+        le=1.0,
+        description="Minimum aggregate structured exact-match pass rate across tool, specialty, and escalate (default: 0.95)",
+    )
+    eval_golden_dataset_path: str = Field(
+        default="tests/evals/golden_dataset.json",
+        description="Path to version-controlled golden evaluation dataset JSON",
+    )
+    eval_judge_timeout_s: float = Field(
+        default=10.0,
+        ge=1.0,
+        le=60.0,
+        description="Timeout in seconds for live LLM judge API calls",
+    )
+
     # --- Egyptian Polyclinic Domain Settings ---
     clinic_name: str = Field(
         default="مجمع عيادات النور التخصصي",

@@ -1,0 +1,66 @@
+name: Golden Evaluation & RAGAS CI Gate
+
+on:
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'src/ai_core/**'
+      - 'src/rag/**'
+      - 'src/agent/**'
+      - 'src/tools/**'
+      - 'src/config.py'
+      - 'knowledge_base/**'
+      - 'tests/evals/**'
+      - '.github/workflows/evals.yml'
+  push:
+    branches: [main, master]
+    paths:
+      - 'src/ai_core/**'
+      - 'src/rag/**'
+      - 'src/agent/**'
+      - 'src/tools/**'
+      - 'src/config.py'
+      - 'knowledge_base/**'
+      - 'tests/evals/**'
+      - '.github/workflows/evals.yml'
+  workflow_dispatch:
+
+jobs:
+  golden-evals:
+    name: Golden Evals & RAGAS Gate (gpt-4o-mini / Deterministic)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install project dependencies
+        run: |
+          uv sync --all-extras --dev
+
+      - name: Lint and style check
+        run: |
+          uv run ruff check src/ai_core tests/evals
+
+      - name: Run Golden Evaluation & RAGAS Test Suite
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PYTHONIOENCODING: utf-8
+        run: |
+          uv run pytest tests/evals/test_golden_evals.py -v
+
+      - name: Generate Markdown Scorecard for Step Summary
+        if: always()
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          uv run python -c "import asyncio, os; from src.ai_core.evals import GoldenEvaluationRunner, format_eval_report_markdown; summary = asyncio.run(GoldenEvaluationRunner().run_suite()); md = format_eval_report_markdown(summary); os.environ.get('GITHUB_STEP_SUMMARY') and open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8').write(md + '\n'); print(md)"
+

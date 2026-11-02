@@ -45,7 +45,7 @@ This roadmap is a **Living Document** under Spec-Driven Development (SDD). Each 
 - [x] **Feature 4.5**: Deterministic State Machine, Idempotency Keys & Write Safety Gates (`src/ai_core/workflow.py`, `src/tools/gates.py` for atomic booking and shift caps).
 - [x] **Feature 4.6**: Hierarchical LLM Trace Logging (`src/ai_core/tracing.py` — self-hosted Langfuse + OpenTelemetry-compatible nested spans, `contextvars` async isolation, async batch export <1ms overhead, W3C `traceparent` propagation).
 - [x] **Feature 4.7**: FinOps Token Budgets & Cost Circuit Breaker (`src/ai_core/finops.py` — 8,000 tokens/call budget, $10/day cap with 80% alert, degrade to Tier 3 search-only / receptionist on breach).
-- [ ] **Feature 4.8**: Golden Evaluation Suite & RAGAS CI Gate (`tests/evals/`, `.github/workflows/evals.yml` — Faithfulness >= 0.90, Context Recall >= 0.85, Context Precision >= 0.80, Answer Relevancy >= 0.85 + exact-match on structured fields, `gpt-4o-mini` judge, triggered on prompt/model PRs).
+- [x] **Feature 4.8**: Golden Evaluation Suite & RAGAS CI Gate (`tests/evals/`, `.github/workflows/evals.yml` — Faithfulness >= 0.90, Context Recall >= 0.85, Context Precision >= 0.80, Answer Relevancy >= 0.85 + exact-match on structured fields, `gpt-4o-mini` judge, triggered on prompt/model PRs).
 - [ ] **Feature 4.9**: Architecture Decision Records (ADRs) & Diagram-as-Code (`spec/adr/`, `spec/architecture.md`).
 
 ### Phase 5: Real-Time LiveKit Voice Agent Core & Medical Persona 🎙️

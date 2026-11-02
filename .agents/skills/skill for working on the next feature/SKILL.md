@@ -45,7 +45,7 @@
 - Create `spec/features/feature-XXX-<feature-name>/validation.md`. based on the rules in the validation skill in validation folder in workspace root `
 - Always use the `view_file` to read the validation skill in validation folder in workspace this path root Voice_Agent\.agents\skills\validation\SKILL.md
 
-and finaly give me summary for plan.md and requirements.md and validation.md in md file answr me into arabic with good format from right to left .
+and finaly summarize the main points for plan.md and requirements.md and validation.md in md file answr me into arabic with good format from right to left .
 
 
 make sure to make conversation between us in arabic with good format  from right to left 
