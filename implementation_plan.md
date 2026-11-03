@@ -78,7 +78,7 @@ The agent can:
 - [x] Step 4.9: Architecture Decision Records (ADRs) & Diagram-as-Code (`spec/adr/`, `spec/architecture.md`, `tests/test_architecture_docs.py`).
 
 ### **Phase 5: Real-Time LiveKit Voice Agent Core & Medical Persona**
-- [ ] Step 5.1: Author Egyptian medical receptionist persona & system prompts with guardrails.
+- [x] Step 5.1: Author Egyptian medical receptionist persona & system prompts with guardrails (`src/agent/prompts.py`, `src/agent/messages.py`).
 - [ ] Step 5.2: Update call session manager & metrics tracking.
 - [ ] Step 5.3: Wire LiveKit voice worker with registered clinic tools.
 - [ ] Step 5.4: Update CLI call simulation runner for clinic scenarios.
