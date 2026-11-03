@@ -1,0 +1,49 @@
+name: Architecture Documentation & ADR Drift Gate
+
+on:
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'spec/**'
+      - 'src/**'
+      - 'tests/test_architecture_docs.py'
+      - '.github/workflows/docs.yml'
+  push:
+    branches: [main, master]
+    paths:
+      - 'spec/**'
+      - 'src/**'
+      - 'tests/test_architecture_docs.py'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+jobs:
+  docs-drift-gate:
+    name: ADRs & Diagram-as-Code Sync Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install project dependencies
+        run: |
+          uv sync --all-extras --dev
+
+      - name: Lint architecture docs test
+        run: |
+          uv run ruff check tests/test_architecture_docs.py
+
+      - name: Run Architecture Docs & ADR Drift Test
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          uv run pytest tests/test_architecture_docs.py -v

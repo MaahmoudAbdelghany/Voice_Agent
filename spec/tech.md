@@ -94,3 +94,11 @@
 - **SLA (contractual)**: P95 voice turn latency **<= 1.2s**, monthly uptime **99.5%**, up to **50 concurrent calls**.
 - Autoscaling is driven by active calls per task (custom metric), not CPU utilization.
 - Load testing (Locust + `lk load-test`) is a mandatory gate before UAT / go-live.
+
+---
+
+## 3. Architecture Documentation & Decision Records (ADRs)
+
+- **System Architecture & C4 Diagrams (`Diagram-as-Code`)**: [`spec/architecture.md`](./architecture.md)
+- **Architecture Decision Records Index (ADRs 001–009)**: [`spec/adr/README.md`](./adr/README.md)
+- **OWASP LLM Top 10 Threat Model**: [`spec/security/threat_model.md`](./security/threat_model.md)

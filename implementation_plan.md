@@ -66,24 +66,44 @@ The agent can:
 - [x] Step 3.6: Adapt receptionist escalation tool (`src/tools/human_handoff.py`).
 - [x] Step 3.7: Write and run unit tests for all medical tools.
 
-### **Phase 4: Real-Time LiveKit Voice Agent Core & Medical Persona**
-- [ ] Step 4.1: Author Egyptian medical receptionist persona & system prompts with guardrails.
-- [ ] Step 4.2: Update call session manager & metrics tracking.
-- [ ] Step 4.3: Wire LiveKit voice worker with registered clinic tools.
-- [ ] Step 4.4: Update CLI call simulation runner for clinic scenarios.
-- [ ] Step 4.5: Write and run agent pipeline and guardrail tests.
+### **Phase 4: Enterprise AI Architecture & Resilience Engine**
+- [x] Step 4.1: Model Gateway, Stage-Based Routing & Circuit Breaker (`src/ai_core/gateway.py`, `src/ai_core/circuit_breaker.py`).
+- [x] Step 4.2: 3-Tier Caching Ladder (`src/ai_core/cache.py`, `src/ai_core/text_normalizer.py`).
+- [x] Step 4.3: Hybrid RAG Upgrade (`src/rag/hybrid_retriever.py`, `src/rag/ingestion.py`).
+- [x] Step 4.4: OWASP-Aligned Trust Layer & Runtime Guardrails (`src/ai_core/guardrails.py`, `src/rag/sanitizer.py`, `spec/security/threat_model.md`).
+- [x] Step 4.5: Deterministic State Machine & Write Safety Gates (`src/ai_core/workflow.py`, `src/tools/gates.py`).
+- [x] Step 4.6: Hierarchical LLM Trace Logging (`src/ai_core/tracing.py`).
+- [x] Step 4.7: FinOps Token Budgets & Cost Circuit Breaker (`src/ai_core/finops.py`).
+- [x] Step 4.8: Golden Evaluation Suite & RAGAS CI Gate (`src/ai_core/evals.py`, `tests/evals/`, `.github/workflows/evals.yml`).
+- [x] Step 4.9: Architecture Decision Records (ADRs) & Diagram-as-Code (`spec/adr/`, `spec/architecture.md`, `tests/test_architecture_docs.py`).
 
-### **Phase 5: Clinic Admin & Analytics Dashboard**
-- [ ] Step 5.1: Update main dashboard portal, RTL theme & clinic branding.
-- [ ] Step 5.2: Update call logs, audio playback & transcript viewer.
-- [ ] Step 5.3: Build appointments & queue management view.
-- [ ] Step 5.4: Adapt latency & call analytics.
-- [ ] Step 5.5: Build receptionist escalations alert drawer.
+### **Phase 5: Real-Time LiveKit Voice Agent Core & Medical Persona**
+- [ ] Step 5.1: Author Egyptian medical receptionist persona & system prompts with guardrails.
+- [ ] Step 5.2: Update call session manager & metrics tracking.
+- [ ] Step 5.3: Wire LiveKit voice worker with registered clinic tools.
+- [ ] Step 5.4: Update CLI call simulation runner for clinic scenarios.
+- [ ] Step 5.5: Write and run agent pipeline and guardrail tests.
 
-### **Phase 6: Production Containerization & Cloud Deployment**
-- [ ] Step 6.1: Multi-stage Dockerfile and docker-compose.yml.
-- [ ] Step 6.2: AWS ECS Fargate task definition & deployment automation scripts.
-- [ ] Step 6.3: End-to-end simulated call verification.
+### **Phase 6: LLMOps Production Operations, Identity & Reliability**
+- [ ] Step 6.1: Prometheus Metrics Exporter (`src/ops/metrics.py`).
+- [ ] Step 6.2: Grafana Dashboards & Alertmanager Rules (`infra/observability/`).
+- [ ] Step 6.3: Online Sampled Evaluation (`src/ops/online_eval.py`).
+- [ ] Step 6.4: SSO (OAuth2/OIDC JWT) & RBAC (`src/auth/`).
+- [ ] Step 6.5: Multi-Branch Tenant Isolation & Role-Scoped Tools.
+- [ ] Step 6.6: Load & Stress Testing (`tests/load/`).
+- [ ] Step 6.7: SLI/SLO/SLA Contract & Autoscaling Policy (`spec/sla.md`).
+
+### **Phase 7: Clinic Admin & Analytics Dashboard**
+- [ ] Step 7.1: Update main dashboard portal, RTL theme & clinic branding.
+- [ ] Step 7.2: Update call logs, audio playback & transcript viewer.
+- [ ] Step 7.3: Build appointments & queue management view.
+- [ ] Step 7.4: Adapt latency & call analytics.
+- [ ] Step 7.5: Build receptionist escalations alert drawer.
+
+### **Phase 8: Production Containerization & Cloud Deployment**
+- [ ] Step 8.1: Multi-stage Dockerfile and docker-compose.yml.
+- [ ] Step 8.2: AWS ECS Fargate task definition & deployment automation scripts.
+- [ ] Step 8.3: End-to-end simulated call verification.
 
 ---
 

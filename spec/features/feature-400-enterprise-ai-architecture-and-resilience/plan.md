@@ -31,7 +31,7 @@ Transform the Egyptian Polyclinic Voice AI Assistant from a standard prototype i
 - **Model Gateway & Stage-Based Routing (`src/ai_core/gateway.py`)**:
   - Primary dialogue model: Groq (`llama-3.3-70b-versatile`) for sub-300ms TTFT.
   - Lightweight stage model: Groq (`llama-3.1-8b-instant`) deterministically bound to intent classification and entity extraction nodes (no LLM call to choose an LLM).
-  - Secondary fallback provider: OpenAI (`gpt-4o-mini`) / Claude with LiteLLM abstraction.
+  - Secondary fallback provider: Google Gemini (`gemini-2.0-flash`) via LiteLLM abstraction (see [`spec/adr/003-multi-tier-model-gateway.md`](../../adr/003-multi-tier-model-gateway.md) for why OpenAI was rejected in favor of Gemini).
   - `max_tokens=150` per voice turn (output tokens are the highest-leverage cost control).
   - Circuit Breaker pattern: 3.5s TTFT timeout; trips open after 5 consecutive 429/5xx errors, rerouting traffic instantly to secondary fallback.
 - **3-Tier Caching Ladder (`src/ai_core/cache.py`)**:
