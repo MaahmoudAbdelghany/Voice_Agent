@@ -562,6 +562,34 @@ class Settings(BaseSettings):
         description="Echo SQL queries to logger for debugging",
     )
 
+    # --- Medical Call Session State & Metric Tracking (Feature 5.2) ---
+    session_history_window: int = Field(
+        default=12,
+        ge=2,
+        le=100,
+        description="Sliding window size (number of non-system messages) sent to LLM per turn",
+    )
+    session_slo_turn_ms: float = Field(
+        default=800.0,
+        ge=100.0,
+        le=10000.0,
+        description="End-to-end voice turn latency SLO threshold in milliseconds (default: 800ms)",
+    )
+    session_tool_timeout_ms: float = Field(
+        default=400.0,
+        ge=50.0,
+        le=10000.0,
+        description="Tool execution latency timeout threshold in milliseconds (default: 400ms)",
+    )
+    session_evict_on_end: bool = Field(
+        default=True,
+        description="Evict ended call sessions from in-memory registry after atomic disk persistence",
+    )
+    session_storage_dir: str = Field(
+        default="data/calls",
+        description="Directory path for persisted PII-redacted call session JSON artifacts",
+    )
+
     # --- App & Observability ---
     dashboard_port: int = Field(
         default=8501,

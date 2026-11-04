@@ -45,13 +45,17 @@
 - Create `spec/features/feature-XXX-<feature-name>/validation.md`. based on the rules in the validation skill in validation folder in workspace root `
 - Always use the `view_file` to read the validation skill in validation folder in workspace this path root Voice_Agent\.agents\skills\validation\SKILL.md
 
-and finaly summarize the main points for plan.md and requirements.md and validation.md in md file answr me into arabic with good format from right to left .
+### 6.
+I want you to extract the most important topics from this feature, and I want you to explain for each topic in a simple way and examples to clarify. Then, I want you to give me takeaways for each topic. give me summary for all topics And finally, I want you to answer me in Arabic with good format from right to left.
+and finaly summarize the main points for plan.md and requirements.md and validation.and put all them in md file .
+
+
 
 
 make sure to make conversation between us in arabic with good format  from right to left 
 
 
-### 6. Wait for Human Review (Mandatory Gate) 🛑
+### 7. Wait for Human Review (Mandatory Gate) 🛑
 - **Halt all coding activity immediately.**
 - Present the generated specification files (`plan.md`, `requirements.md`, `validation.md`) to the human supervisor.
 - Highlight key decisions, trade-offs, and open questions.
@@ -68,7 +72,7 @@ and i want you working on the feature based on the cuurent plan.md  feature and 
 
 
 
-###  7 after done working on the feature :
+###  9 after done working on the feature :
 
 - Always read using `view_file`
 
@@ -76,7 +80,7 @@ and i want you working on the feature based on the cuurent plan.md  feature and 
 
  explain to me what you done , and why you done this  and wait to give you approval to make the next step .
 
-### 8 after done working on the validation of the feature :
+### 10 after done working on the validation of the feature :
 
 commit the changes in git and push into my repo on github and update the roadmap.md file to mark this feature as completed  .
 

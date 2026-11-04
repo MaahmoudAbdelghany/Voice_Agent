@@ -52,7 +52,7 @@ This roadmap is a **Living Document** under Spec-Driven Development (SDD). Each 
 *Goal: Build the real-time WebRTC audio pipeline tuned for polite Egyptian Arabic, medical safety guardrails, and rapid tool calling.*
 
 - [x] **Feature 5.1**: Egyptian Clinic Assistant Persona, System Prompts & Medical Guardrails (`src/agent/prompts.py`, `src/agent/messages.py`).
-- [ ] **Feature 5.2**: Medical Call Session State & Metric Tracking (`src/agent/session_manager.py`).
+- [x] **Feature 5.2**: Medical Call Session State & Metric Tracking (`src/agent/session_manager.py`).
 - [ ] **Feature 5.3**: LiveKit Voice Pipeline Worker registering all clinic tools (`src/agent/voice_agent.py`).
 - [ ] **Feature 5.4**: CLI Simulated Call Runner for clinic booking scenarios (`scripts/test_call.py`).
 - [ ] **Feature 5.5**: Automated Voice Orchestration & Guardrail Test Suite (`tests/test_agent.py`).

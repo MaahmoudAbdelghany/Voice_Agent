@@ -79,7 +79,7 @@ The agent can:
 
 ### **Phase 5: Real-Time LiveKit Voice Agent Core & Medical Persona**
 - [x] Step 5.1: Author Egyptian medical receptionist persona & system prompts with guardrails (`src/agent/prompts.py`, `src/agent/messages.py`).
-- [ ] Step 5.2: Update call session manager & metrics tracking.
+- [x] Step 5.2: Update call session manager & metrics tracking.
 - [ ] Step 5.3: Wire LiveKit voice worker with registered clinic tools.
 - [ ] Step 5.4: Update CLI call simulation runner for clinic scenarios.
 - [ ] Step 5.5: Write and run agent pipeline and guardrail tests.
