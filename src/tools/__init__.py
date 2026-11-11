@@ -55,48 +55,16 @@ from src.tools.knowledge_search import (
     KnowledgeSearchTool,
     async_search_clinic_knowledge,
     async_search_knowledge,
-    async_search_restaurant_knowledge,
     clinic_knowledge_search_tool,
     knowledge_search_tool,
     search_clinic_knowledge,
     search_knowledge,
-    search_restaurant_knowledge,
-)
-
-# Legacy restaurant schemas (deprecated; removed once Features 3.2-3.6 land)
-from src.tools.legacy_schemas import (
-    HandoffDepartmentEnum,
-    HandoffUrgencyEnum,
-    HumanHandoffInput,
-    HumanHandoffOutput,
-    KnowledgeChunk,
-    KnowledgeSearchInput,
-    KnowledgeSearchOutput,
-    OrderItem,
-    OrderStatusEnum,
-    OrderStatusInput,
-    OrderStatusOutput,
-    ReservationInput,
-    ReservationOutput,
-    ReservationStatusEnum,
 )
 from src.tools.manage_appointment import (
     ManageAppointmentTool,
     async_manage_appointment,
     manage_appointment,
     manage_appointment_tool,
-)
-from src.tools.order_status import (
-    OrderStatusTool,
-    async_get_order_status,
-    get_order_status,
-    order_status_tool,
-)
-from src.tools.reservation import (
-    ReservationTool,
-    async_book_reservation,
-    book_reservation,
-    reservation_tool,
 )
 
 # Clinic domain schemas (Feature 3.1)
@@ -110,6 +78,9 @@ from src.tools.schemas import (
     ClinicKnowledgeSearchOutput,
     DoctorAvailabilityInput,
     DoctorAvailabilityOutput,
+    HandoffDepartmentEnum,
+    HandoffUrgencyEnum,
+    KnowledgeChunk,
     LLMAppointmentBookingInput,
     LLMManageAppointmentInput,
     ManageAppointmentAction,
@@ -166,28 +137,6 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         output_schema=ClinicKnowledgeSearchOutput,
         sync_callable=search_clinic_knowledge,
         async_callable=async_search_clinic_knowledge,
-    ),
-    "get_order_status": ToolDefinition(
-        name="get_order_status",
-        description=(
-            "Look up real-time customer order status, delivery driver contact, "
-            "and estimated delivery time by order ID (e.g. ORD-1001) or phone number."
-        ),
-        input_schema=OrderStatusInput,
-        output_schema=OrderStatusOutput,
-        sync_callable=get_order_status,
-        async_callable=async_get_order_status,
-    ),
-    "book_reservation": ToolDefinition(
-        name="book_reservation",
-        description=(
-            "Check table availability and book table reservations at restaurant "
-            "branches for a specific date, time slot, and party size (1-30 guests)."
-        ),
-        input_schema=ReservationInput,
-        output_schema=ReservationOutput,
-        sync_callable=book_reservation,
-        async_callable=async_book_reservation,
     ),
     "transfer_to_receptionist": ToolDefinition(
         name="transfer_to_receptionist",
@@ -413,21 +362,9 @@ __all__ = [  # noqa: RUF022
     "ManageAppointmentOutput",
     "ClinicKnowledgeSearchInput",
     "ClinicKnowledgeSearchOutput",
+    "KnowledgeChunk",
     "ReceptionistHandoffInput",
     "ReceptionistHandoffOutput",
-    # Legacy Schemas (deprecated)
-    "KnowledgeSearchInput",
-    "KnowledgeSearchOutput",
-    "KnowledgeChunk",
-    "OrderStatusInput",
-    "OrderStatusOutput",
-    "OrderItem",
-    "OrderStatusEnum",
-    "ReservationInput",
-    "ReservationOutput",
-    "ReservationStatusEnum",
-    "HumanHandoffInput",
-    "HumanHandoffOutput",
     "HandoffUrgencyEnum",
     "HandoffDepartmentEnum",
     # Tools Classes & Singletons
@@ -441,10 +378,6 @@ __all__ = [  # noqa: RUF022
     "clinic_knowledge_search_tool",
     "KnowledgeSearchTool",
     "knowledge_search_tool",
-    "OrderStatusTool",
-    "order_status_tool",
-    "ReservationTool",
-    "reservation_tool",
     "HumanHandoffTool",
     "human_handoff_tool",
     "ReceptionistHandoffTool",
@@ -460,12 +393,6 @@ __all__ = [  # noqa: RUF022
     "async_search_clinic_knowledge",
     "search_knowledge",
     "async_search_knowledge",
-    "search_restaurant_knowledge",
-    "async_search_restaurant_knowledge",
-    "get_order_status",
-    "async_get_order_status",
-    "book_reservation",
-    "async_book_reservation",
     "transfer_to_receptionist",
     "async_transfer_to_receptionist",
     "escalate_to_human",

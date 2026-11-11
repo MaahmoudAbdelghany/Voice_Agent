@@ -418,14 +418,12 @@ async def async_search_clinic_knowledge(
 
 
 # ==============================================================================
-# Backward-compatibility aliases (deprecated; replaced in Phase 5)
+# Clinic Knowledge Search Aliases
 # ==============================================================================
 KnowledgeSearchTool = ClinicKnowledgeSearchTool
 knowledge_search_tool = clinic_knowledge_search_tool
 search_knowledge = search_clinic_knowledge
 async_search_knowledge = async_search_clinic_knowledge
-search_restaurant_knowledge = search_clinic_knowledge
-async_search_restaurant_knowledge = async_search_clinic_knowledge
 
 __all__ = [
     "ALLOWED_CATEGORIES",
@@ -433,13 +431,11 @@ __all__ = [
     "KnowledgeSearchTool",
     "async_search_clinic_knowledge",
     "async_search_knowledge",
-    "async_search_restaurant_knowledge",
     "clean_markdown_for_speech",
     "clinic_knowledge_search_tool",
     "is_emergency_content",
     "knowledge_search_tool",
     "search_clinic_knowledge",
     "search_knowledge",
-    "search_restaurant_knowledge",
     "trim_to_sentence_boundary",
 ]

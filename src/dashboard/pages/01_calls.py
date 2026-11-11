@@ -6,18 +6,15 @@ multi-criteria search and filtering, audio playback with synthetic fallback,
 and turn-by-turn chat transcripts with per-turn latency telemetry and tool execution traces.
 """
 
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+
 import streamlit as st
 
 from src.agent.session_manager import CallSession, CallStatus, MessageRole
-from src.config import settings
 from src.dashboard.calls_data import (
     filter_call_sessions,
     load_all_call_sessions,
     resolve_call_audio,
-    seed_demo_calls,
 )
 from src.dashboard.i18n import t
 
@@ -73,7 +70,7 @@ if is_arabic:
 # ==============================================================================
 with st.sidebar:
     st.markdown(f"### ⚙️ {t('sidebar_settings_title', lang)}")
-    
+
     # Language Switcher
     lang_options = {"en": "English 🇺🇸", "ar": "العربية 🇸🇦"}
     current_index = 0 if lang == "en" else 1
@@ -90,7 +87,7 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown(f"### 🔍 {t('filter_status_label', lang)}")
-    
+
     # Status Filter
     status_display_map = {
         "all": t("filter_status_all", lang),
@@ -125,17 +122,11 @@ with st.sidebar:
         placeholder=t("filter_search_placeholder", lang),
     )
 
-    st.markdown("---")
-    # Quick action: Seed Demo Calls
-    if st.button(f"🌱 {t('btn_reseed_demo', lang)}", use_container_width=True):
-        seed_demo_calls()
-        st.success(t("btn_reseed_success", lang))
-        st.rerun()
-
 # ==============================================================================
 # 4. Data Loading & Filtering Pipeline
 # ==============================================================================
-all_sessions = load_all_call_sessions(auto_seed=True)
+storage_override = st.session_state.get("calls_storage_dir")
+all_sessions = load_all_call_sessions(storage_dir=storage_override)
 filtered_sessions = filter_call_sessions(
     sessions=all_sessions,
     status=selected_status,
@@ -233,8 +224,6 @@ else:
     # Build tabular view
     table_rows = []
     for s in filtered_sessions:
-        # Determine status pill
-        status_val = s.status.value.upper()
         if s.context.escalated or s.status == CallStatus.ESCALATED:
             status_display = "🚨 ESCALATED"
         elif s.status == CallStatus.ENDED:
@@ -243,7 +232,13 @@ else:
             status_display = "📡 ACTIVE"
 
         start_str = s.start_time.strftime("%Y-%m-%d %H:%M:%S")
-        cust_display = s.context.customer_name or s.context.customer_phone or "Anonymous"
+        cust_display = (
+            s.context.patient_name
+            or s.context.customer_name
+            or s.context.patient_phone
+            or s.context.customer_phone
+            or "Anonymous"
+        )
         lang_display = "🇸🇦 AR" if (s.context.language or "").lower() == "ar" else "🇺🇸 EN"
         dur_display = f"{int(s.metrics.duration_seconds)}s"
         avg_l = f"{round(s.metrics.average_latency_ms)}ms" if s.metrics.average_latency_ms > 0 else "N/A"
@@ -272,13 +267,17 @@ else:
     # 7. Deep-Dive Call Inspector
     # ==========================================================================
     st.markdown(f"### 🔎 {t('detail_header_title', lang)}")
-    
+
     # Session Selector
     session_options = {
-        s.session_id: f"{s.session_id} • {s.context.customer_name or s.context.customer_phone or 'Unknown'} • [{s.status.value.upper()}]"
+        s.session_id: (
+            f"{s.session_id} • "
+            f"{s.context.patient_name or s.context.customer_name or s.context.patient_phone or s.context.customer_phone or 'Unknown'} • "
+            f"[{s.status.value.upper()}]"
+        )
         for s in filtered_sessions
     }
-    
+
     selected_session_id = st.selectbox(
         label=t("detail_select_prompt", lang),
         options=list(session_options.keys()),
@@ -286,15 +285,24 @@ else:
         key="selected_call_session",
     )
 
-    selected_session: Optional[CallSession] = next(
+    selected_session: CallSession | None = next(
         (s for s in filtered_sessions if s.session_id == selected_session_id), None
     )
 
     if selected_session:
         # Escalation Alert Banner
         if selected_session.context.escalated or selected_session.status == CallStatus.ESCALATED:
-            esc_reason = selected_session.context.escalation_reason or "Customer requested direct supervisor assistance"
-            esc_dept = selected_session.context.escalation_department or "Customer Care"
+            esc_obj = selected_session.context.escalation
+            esc_reason = (
+                (esc_obj.reason if esc_obj and esc_obj.reason else None)
+                or selected_session.context.escalation_reason
+                or "Caller requested clinic receptionist assistance"
+            )
+            esc_dept = (
+                (esc_obj.department if esc_obj and esc_obj.department else None)
+                or selected_session.context.escalation_department
+                or "reception"
+            )
             st.markdown(
                 f"""
                 <div class="escalation-banner">
@@ -316,41 +324,50 @@ else:
 
         with meta_col1:
             st.markdown(f"#### 👤 {t('detail_customer_card_title', lang)}")
-            cust_name = selected_session.context.customer_name or "N/A"
-            cust_phone = selected_session.context.customer_phone or "N/A"
-            order_ref = selected_session.context.order_id or "N/A"
+            patient_name = selected_session.context.patient_name or selected_session.context.customer_name or "N/A"
+            patient_phone = selected_session.context.patient_phone or selected_session.context.customer_phone or "N/A"
+            specialty_val = selected_session.context.requested_specialty or "N/A"
+            doctor_val = selected_session.context.requested_doctor_name or "N/A"
             sentiment_val = selected_session.context.sentiment.capitalize()
-            
+
             pills_html = f"""
             <div>
-                <span class="slot-pill">👤 <strong>{t('detail_customer_name', lang)}:</strong> {cust_name}</span>
-                <span class="slot-pill">📱 <strong>{t('detail_customer_phone', lang)}:</strong> {cust_phone}</span>
-                <span class="slot-pill">📦 <strong>{t('detail_order_id', lang)}:</strong> {order_ref}</span>
+                <span class="slot-pill">👤 <strong>{t('detail_customer_name', lang)}:</strong> {patient_name}</span>
+                <span class="slot-pill">📱 <strong>{t('detail_customer_phone', lang)}:</strong> {patient_phone}</span>
+                <span class="slot-pill">🏥 <strong>{t('detail_specialty', lang)}:</strong> {specialty_val}</span>
+                <span class="slot-pill">🩺 <strong>{t('detail_doctor', lang)}:</strong> {doctor_val}</span>
                 <span class="slot-pill">🎭 <strong>{t('detail_sentiment', lang)}:</strong> {sentiment_val}</span>
             </div>
             """
             st.markdown(pills_html, unsafe_allow_html=True)
 
-            if selected_session.context.allergies or selected_session.context.dietary_preferences:
-                allergies_str = ", ".join(selected_session.context.allergies + selected_session.context.dietary_preferences)
+            if selected_session.context.emergency_flag:
                 st.markdown(
-                    f"""<div style="margin-top: 6px;"><span class="slot-pill" style="border-color: #FBBF24; color: #FDE68A;">
-                    🥗 <strong>{t('detail_allergies', lang)}:</strong> {allergies_str}</span></div>""",
+                    f"""<div style="margin-top: 6px;"><span class="slot-pill" style="border-color: #EF4444; color: #FCA5A5;">
+                    🚑 <strong>{t('detail_emergency_flag', lang)}</strong></span></div>""",
                     unsafe_allow_html=True,
                 )
 
-            if selected_session.context.reservation_draft:
-                res_draft = selected_session.context.reservation_draft
-                res_str = f"Date: {res_draft.get('date', 'N/A')} {res_draft.get('time', '')} | Guests: {res_draft.get('party_size') or res_draft.get('guests', 'N/A')} | Table: {res_draft.get('table', 'Confirmed')}"
+            if selected_session.context.bookings:
+                booking_items = [
+                    f"{b.booking_code} ({b.action})"
+                    + (f" • {b.appointment_date}" if b.appointment_date else "")
+                    + (f" • #{b.queue_number}" if b.queue_number else "")
+                    for b in selected_session.context.bookings
+                ]
+                bookings_str = " | ".join(booking_items)
                 st.markdown(
                     f"""<div style="margin-top: 6px;"><span class="slot-pill" style="border-color: #60A5FA; color: #93C5FD;">
-                    📅 <strong>{t('detail_reservation', lang)}:</strong> {res_str}</span></div>""",
+                    📅 <strong>{t('detail_bookings', lang)}:</strong> {bookings_str}</span></div>""",
                     unsafe_allow_html=True,
                 )
 
         with meta_col2:
             st.markdown(f"#### 🔊 {t('audio_player_title', lang)}")
-            audio_source, is_demo = resolve_call_audio(selected_session.session_id)
+            audio_source, is_demo = resolve_call_audio(
+                selected_session.session_id,
+                storage_dir=storage_override,
+            )
             
             audio_badge_class = "demo-audio-tag" if is_demo else "real-audio-tag"
             audio_badge_text = t("audio_player_demo_badge", lang) if is_demo else t("audio_player_real_badge", lang)

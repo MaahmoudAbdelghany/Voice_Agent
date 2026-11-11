@@ -5,18 +5,19 @@ Inspects configurations and connectivity for LiveKit, Qdrant, Groq, ElevenLabs, 
 Designed to be non-blocking, fast, and defensive against network failures.
 """
 
-from typing import Dict, Any
+from typing import Any
+
 from src.config import settings
 
 
-def check_services_health() -> Dict[str, Dict[str, Any]]:
+def check_services_health() -> dict[str, dict[str, Any]]:
     """
     Check the configuration and reachability of all connected external subsystems.
     
     Returns:
         Dict mapping service keys to their diagnostic metadata and status.
     """
-    health: Dict[str, Dict[str, Any]] = {}
+    health: dict[str, dict[str, Any]] = {}
 
     # 1. LiveKit Cloud Voice Infrastructure
     try:
@@ -38,7 +39,7 @@ def check_services_health() -> Dict[str, Dict[str, Any]]:
                 "badge_class": "badge-warning",
                 "details": "Missing LIVEKIT_URL or LIVEKIT_API_KEY",
             }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         health["livekit"] = {
             "name_key": "service_livekit",
             "sub_key": "service_livekit_sub",
@@ -68,7 +69,7 @@ def check_services_health() -> Dict[str, Dict[str, Any]]:
                 "badge_class": "badge-warning",
                 "details": f"In-Memory Vector DB ({settings.qdrant_collection})",
             }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         health["qdrant"] = {
             "name_key": "service_qdrant",
             "sub_key": "service_qdrant_sub",
@@ -98,7 +99,7 @@ def check_services_health() -> Dict[str, Dict[str, Any]]:
                 "badge_class": "badge-warning",
                 "details": "GROQ_API_KEY is not set",
             }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         health["groq"] = {
             "name_key": "service_groq",
             "sub_key": "service_groq_sub",
@@ -128,7 +129,7 @@ def check_services_health() -> Dict[str, Dict[str, Any]]:
                 "badge_class": "badge-warning",
                 "details": "ELEVEN_API_KEY is not set",
             }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         health["elevenlabs"] = {
             "name_key": "service_elevenlabs",
             "sub_key": "service_elevenlabs_sub",
@@ -158,7 +159,7 @@ def check_services_health() -> Dict[str, Dict[str, Any]]:
                 "badge_class": "badge-warning",
                 "details": "DEEPGRAM_API_KEY is not set",
             }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         health["deepgram"] = {
             "name_key": "service_deepgram",
             "sub_key": "service_deepgram_sub",

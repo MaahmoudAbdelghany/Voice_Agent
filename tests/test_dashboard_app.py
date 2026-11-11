@@ -7,15 +7,14 @@ Covers:
 - Tier 3: Edge Cases & Error Resilience (Mocked exceptions, missing credentials, missing assets)
 """
 
-import os
 from pathlib import Path
 from unittest.mock import patch
-import pytest
+
 from streamlit.testing.v1 import AppTest
 
-from src.dashboard.i18n import TRANSLATIONS, t
-from src.dashboard.health import check_services_health
 from src.config import Settings, settings
+from src.dashboard.health import check_services_health
+from src.dashboard.i18n import TRANSLATIONS, t
 
 APP_FILE = str(Path(__file__).parent.parent / "src" / "dashboard" / "app.py")
 
@@ -31,10 +30,10 @@ class TestDashboardTier1Unit:
         """Verify that English and Arabic dictionaries have complete matching key sets."""
         en_keys = set(TRANSLATIONS["en"].keys())
         ar_keys = set(TRANSLATIONS["ar"].keys())
-        
+
         missing_in_ar = en_keys - ar_keys
         missing_in_en = ar_keys - en_keys
-        
+
         assert not missing_in_ar, f"Arabic translation is missing keys: {missing_in_ar}"
         assert not missing_in_en, f"English translation is missing keys: {missing_in_en}"
 
@@ -51,9 +50,9 @@ class TestDashboardTier1Unit:
         """Verify check_services_health returns all 5 required services with expected fields."""
         health = check_services_health()
         expected_services = {"livekit", "qdrant", "groq", "elevenlabs", "deepgram"}
-        
+
         assert set(health.keys()) == expected_services
-        for svc_id, svc_data in health.items():
+        for svc_data in health.values():
             assert "name_key" in svc_data
             assert "sub_key" in svc_data
             assert "status" in svc_data
@@ -66,7 +65,7 @@ class TestDashboardTier1Unit:
         """Verify that style.css exists and defines critical aesthetic classes."""
         css_file = Path("src/dashboard/assets/style.css")
         assert css_file.exists(), "src/dashboard/assets/style.css does not exist"
-        
+
         content = css_file.read_text(encoding="utf-8")
         assert ".header-container" in content
         assert ".kpi-card" in content
@@ -83,11 +82,13 @@ class TestDashboardTier2Integration:
     """Integration tests running the full Streamlit app via the AppTest simulator."""
 
     def test_dashboard_app_renders_cleanly(self):
-        """Verify the Streamlit dashboard renders completely with zero unhandled exceptions."""
+        """Verify the Streamlit dashboard renders clinic_name with zero unhandled exceptions."""
         at = AppTest.from_file(APP_FILE)
         at.run()
-        
+
         assert not at.exception, f"App raised unhandled exceptions: {at.exception}"
+        sidebar_md = " ".join(m.value for m in at.sidebar.markdown)
+        assert settings.clinic_name in sidebar_md
 
     def test_dashboard_kpi_metrics_rendered(self):
         """Verify that KPI cards and values appear in the rendered app output."""

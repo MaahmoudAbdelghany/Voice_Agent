@@ -1,19 +1,18 @@
 """
-Internationalization (i18n) Module for Voice Agent Dashboard.
+Internationalization (i18n) Module for Clinic Voice Agent Dashboard.
 
 Supports English (en) and Arabic (ar) with clean fallback and structured dictionary keys.
 """
 
-from typing import Dict, Any
 
-TRANSLATIONS: Dict[str, Dict[str, str]] = {
+TRANSLATIONS: dict[str, dict[str, str]] = {
     "en": {
         # App Header
         "app_title": "Voice AI Agent Operations",
-        "app_subtitle": "Restaurant Customer Service & Real-Time Voice Intelligence",
+        "app_subtitle": "Egyptian Polyclinic Medical Reception & Real-Time Voice Intelligence",
         "agent_status_ready": "Agent Pipeline Active",
         "agent_status_offline": "Agent Pipeline Paused",
-        
+
         # KPI Cards
         "kpi_turn_latency": "Turn Latency (Avg)",
         "kpi_turn_latency_sub": "SLA Budget: < 800ms",
@@ -23,51 +22,55 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "kpi_total_calls_sub": "100% Automated Logging",
         "kpi_handoff_rate": "Human Escalation",
         "kpi_handoff_rate_sub": "Target: < 5%",
-        
+
         # Service Health Section
         "health_section_title": "Cloud Infrastructure & Subsystem Health",
         "health_section_desc": "Real-time connectivity and credential verification for connected AI providers.",
         "service_livekit": "LiveKit Cloud",
         "service_livekit_sub": "WebRTC Media Server & Room Worker",
         "service_qdrant": "Qdrant Vector DB",
-        "service_qdrant_sub": "RAG Domain Knowledge Index",
+        "service_qdrant_sub": "Clinic Medical Knowledge & Hybrid RAG Index",
         "service_groq": "Groq Cloud (Llama 3.3)",
         "service_groq_sub": "Ultra-Low Latency LLM Reasoning",
         "service_elevenlabs": "ElevenLabs TTS",
         "service_elevenlabs_sub": "Streaming Neural Voice Synthesis",
         "service_deepgram": "Deepgram STT",
         "service_deepgram_sub": "Nova-3 Streaming Multilingual ASR",
-        
+
         # Status Badges
         "status_operational": "Operational",
         "status_degraded": "Degraded / Local",
         "status_unconfigured": "Not Configured",
         "status_offline": "Offline",
-        
+
         # Quick Navigation
         "nav_section_title": "Operations & Analytics Modules",
-        "nav_section_desc": "Access detailed call recordings, latency telemetry, RAG knowledge base, and agent configuration.",
+        "nav_section_desc": "Access detailed call recordings, latency telemetry, clinic RAG knowledge base, and agent configuration.",
         "nav_calls_title": "Call Logs & Audio",
         "nav_calls_desc": "Review live transcripts, caller intent tags, tool execution traces, and listen to synthesized call audio.",
         "nav_analytics_title": "Latency & Metrics",
-        "nav_analytics_desc": "Interactive Plotly analytics for STT, LLM, and TTS latency breakdowns, peak call hours, and volume trends.",
-        "nav_knowledge_title": "Knowledge Base & Menu",
-        "nav_knowledge_desc": "Manage restaurant menus, dietary ingredients, branch policies, and trigger on-demand vector ingestion.",
+        "nav_analytics_desc": "Interactive Plotly analytics for STT, LLM, and TTS latency breakdowns, peak clinic hours, and volume trends.",
+        "nav_knowledge_title": "Clinic Knowledge Base",
+        "nav_knowledge_desc": "Manage clinic specialties, doctor schedules, lab prep rules, consultation fees, and insurance policies.",
         "nav_settings_title": "Prompts & Settings",
         "nav_settings_desc": "Live prompt engineering playground, temperature adjustments, voice ID selection, and system environment config.",
-        
+
         # Sidebar & Controls
         "sidebar_settings_title": "Dashboard Preferences",
         "language_selector_label": "Interface Language / لغة العرض",
+        "sidebar_language_label": "Interface Language / لغة العرض",
         "sidebar_info_title": "System Information",
         "sidebar_agent_persona": "Persona",
-        "sidebar_restaurant_name": "Restaurant",
+        "sidebar_clinic_name": "Clinic",
         "sidebar_version": "Dashboard Version",
         "sidebar_refresh_btn": "Refresh Live Health",
-        
-        # Call Logs & Transcripts (Feature 5.2)
+        "filter_section_title": "Filter Criteria",
+        "filter_language_label": "Call Language",
+        "refresh_button": "Refresh Analytics",
+
+        # Call Logs & Transcripts
         "calls_page_title": "Voice Call Logs & Audio Recordings",
-        "calls_page_subtitle": "Inspect real-time conversation transcripts, audio playback, tool executions, and latency metrics.",
+        "calls_page_subtitle": "Inspect real-time patient conversation transcripts, audio playback, clinic tool executions, and latency metrics.",
         "filter_status_label": "Call Status",
         "filter_status_all": "All Statuses",
         "filter_status_active": "Active Calls",
@@ -77,13 +80,11 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "filter_lang_all": "All Languages",
         "filter_lang_ar": "Arabic",
         "filter_lang_en": "English",
-        "filter_search_label": "Search (ID, Phone, Name, Order)",
-        "filter_search_placeholder": "Type order ID, phone, or caller name...",
-        "btn_reseed_demo": "Seed Sample Calls",
-        "btn_reseed_success": "Demo calls generated successfully!",
+        "filter_search_label": "Search (ID, Phone, Patient, Booking)",
+        "filter_search_placeholder": "Type booking code, phone, doctor, or patient name...",
         "col_session_id": "Session ID",
         "col_timestamp": "Time",
-        "col_customer": "Customer",
+        "col_customer": "Patient",
         "col_status": "Status",
         "col_language": "Language",
         "col_duration": "Duration",
@@ -92,22 +93,23 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "col_tools": "Tools",
         "detail_select_prompt": "Select Call to Inspect",
         "detail_header_title": "Call Deep-Dive Inspection",
-        "detail_escalated_banner": "⚠️ Escalated Call: Transferred to Human Supervisor",
-        "detail_customer_card_title": "Customer & Context Profile",
-        "detail_customer_name": "Customer Name",
+        "detail_escalated_banner": "⚠️ Escalated Call: Transferred to Clinic Receptionist",
+        "detail_customer_card_title": "Patient & Clinical Call Context",
+        "detail_customer_name": "Patient Name",
         "detail_customer_phone": "Phone Number",
-        "detail_order_id": "Order Reference",
+        "detail_specialty": "Specialty",
+        "detail_doctor": "Doctor",
+        "detail_bookings": "Appointments",
+        "detail_emergency_flag": "Medical Emergency Alert",
         "detail_sentiment": "Sentiment",
-        "detail_allergies": "Allergies & Dietary",
-        "detail_reservation": "Reservation Draft",
         "detail_escalation_reason": "Escalation Reason",
         "detail_escalation_dept": "Department",
         "audio_player_title": "Call Audio Recording",
-        "audio_player_demo_badge": "Demo Audio Preview (Simulated Tone)",
+        "audio_player_demo_badge": "Fallback Audio Preview (Simulated Tone)",
         "audio_player_real_badge": "Recorded Call Audio",
         "transcript_section_title": "Turn-by-Turn Conversation Transcript",
         "role_caller": "Caller",
-        "role_assistant": "AI Voice Agent",
+        "role_assistant": "AI Receptionist",
         "role_tool": "Tool Execution",
         "interrupted_badge": "⚡ Interrupted",
         "turn_latency": "Turn Latency",
@@ -115,16 +117,15 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "tool_result_title": "Execution Output",
         "empty_transcript_msg": "No conversation turns recorded for this session.",
         "no_calls_found_msg": "No calls matching the current filters.",
-        
-        # Analytics & Latency Telemetry (Feature 5.3)
+
+        # Analytics & Latency Telemetry
         "analytics_page_title": "Voice Latency & Operational Analytics",
-        "analytics_page_subtitle": "Real-time SLA monitoring, turn breakdown (STT/LLM/TTS), and call traffic patterns",
+        "analytics_page_subtitle": "Real-time SLA monitoring, turn breakdown (STT/LLM/TTS), and clinic call traffic patterns",
         "filter_time_range_label": "Time Range",
         "time_range_24h": "Last 24 Hours",
         "time_range_7d": "Last 7 Days",
         "time_range_30d": "Last 30 Days",
         "time_range_all": "All Time",
-        "filter_status_label": "Call Outcome",
         "status_opt_all": "All Outcomes",
         "status_opt_completed": "Completed Only",
         "status_opt_escalated": "Escalated Only",
@@ -147,33 +148,32 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "chart_sla_target_label": "SLA Target Budget",
         "chart_sla_compliant_label": "Compliant (<800ms)",
         "chart_sla_breached_label": "Breached (≥800ms)",
-        "sec_volume_trends_title": "Traffic Volume & Rush-Hour Concurrency",
-        "sec_volume_trends_desc": "Historical call volume patterns across calendar days and 24-hour service distribution.",
+        "sec_volume_trends_title": "Traffic Volume & Peak Shift Concurrency",
+        "sec_volume_trends_desc": "Historical clinic call volume patterns across calendar days and 24-hour shift distribution.",
         "chart_daily_volume_title": "Daily Call Volume by Status",
-        "chart_hourly_volume_title": "Hourly Traffic Distribution (Rush-Hour Peaks)",
-        "chart_hourly_peak_label": "Peak Rush Hour (Lunch / Dinner)",
+        "chart_hourly_volume_title": "Hourly Traffic Distribution (Peak Clinic Shifts)",
+        "chart_hourly_peak_label": "Peak Clinic Hours (Midday / Evening Shifts)",
         "chart_hourly_normal_label": "Normal Hours",
-        "sec_conversational_insights_title": "Conversational & Domain AI Intelligence",
-        "sec_conversational_insights_desc": "Customer sentiment distribution, domain tool utilization, and language share.",
-        "chart_sentiment_title": "Customer Sentiment Breakdown",
+        "sec_conversational_insights_title": "Conversational & Clinical Tool Intelligence",
+        "sec_conversational_insights_desc": "Caller sentiment distribution, clinic tool utilization, and language share.",
+        "chart_sentiment_title": "Caller Sentiment Breakdown",
         "chart_sentiment_pos": "Positive",
         "chart_sentiment_neu": "Neutral",
         "chart_sentiment_neg": "Negative",
-        "chart_tools_title": "AI Tool Invocations Frequency",
+        "chart_tools_title": "Clinic AI Tool Invocations Frequency",
         "chart_language_title": "Language Distribution",
         "analytics_no_data_warn": "No call sessions found matching the selected filter criteria.",
-        "analytics_auto_seeded_notice": "ℹ️ 7-Day sample call sessions were automatically seeded to provide realistic analytics curves.",
-        
+
         # Footer
-        "footer_text": "Production Voice AI Agent Platform • Built with LiveKit, Deepgram, Groq, ElevenLabs & Qdrant",
+        "footer_text": "Production Clinic Voice AI Platform • Built with LiveKit, Deepgram, Groq, ElevenLabs & Qdrant",
     },
     "ar": {
         # App Header
         "app_title": "مركز عمليات المساعد الصوتي الذكي",
-        "app_subtitle": "خدمة عملاء المطاعم والتوصيل بالذكاء الاصطناعي الصوتي الفوري",
+        "app_subtitle": "الاستقبال الطبي الذكي للعيادات والمراكز الطبية بالذكاء الاصطناعي الصوتي الفوري",
         "agent_status_ready": "خط المعالجة الصوتي نشط وجاهز",
         "agent_status_offline": "خط المعالجة الصوتي متوقف مؤقتاً",
-        
+
         # KPI Cards
         "kpi_turn_latency": "متوسط زمن الاستجابة",
         "kpi_turn_latency_sub": "المستهدف القياسي: أقل من 800ms",
@@ -181,69 +181,71 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "kpi_active_calls_sub": "جلسات WebRTC المباشرة",
         "kpi_total_calls": "إجمالي مكالمات اليوم",
         "kpi_total_calls_sub": "تسجيل وأرشفة آلية 100%",
-        "kpi_handoff_rate": "نسبة التحويل لمشرف بشري",
+        "kpi_handoff_rate": "نسبة التحويل للاستقبال البشري",
         "kpi_handoff_rate_sub": "المستهدف: أقل من 5%",
-        
+
         # Service Health Section
         "health_section_title": "حالة البنية التحتية والأنظمة الفرعية",
         "health_section_desc": "فحص لحظي مباشر للاتصال ومفاتيح الربط لمزودي خدمات الذكاء الاصطناعي.",
         "service_livekit": "خادم LiveKit السحابي",
         "service_livekit_sub": "خادم بث الصوت WebRTC وإدارة الجلسات",
         "service_qdrant": "قاعدة بيانات Qdrant الشعاعية",
-        "service_qdrant_sub": "فهرس استرجاع المعرفة وقوائم الطعام",
+        "service_qdrant_sub": "فهرس المعرفة الطبية للعيادة والاسترجاع الهجين",
         "service_groq": "خادم Groq السحابي (Llama 3.3)",
         "service_groq_sub": "استدلال فائق السرعة للنموذج اللغوي",
         "service_elevenlabs": "توليد الصوت ElevenLabs TTS",
         "service_elevenlabs_sub": "تحويل النص إلى كلام صوتي طبيعي متدفق",
         "service_deepgram": "التعرف الصوتي Deepgram STT",
         "service_deepgram_sub": "نموذج Nova-3 للتعرف اللحظي متعدد اللغات",
-        
+
         # Status Badges
         "status_operational": "يعمل بكفاءة",
         "status_degraded": "محدود / محلي",
         "status_unconfigured": "غير مهيأ",
         "status_offline": "غير متصل",
-        
+
         # Quick Navigation
         "nav_section_title": "أقسام العمليات والتحليلات",
-        "nav_section_desc": "الوصول السريع لسجلات المكالمات، تحليلات زمن الاستجابة، قاعدة المعرفة، وإعدادات الوكيل.",
+        "nav_section_desc": "الوصول السريع لسجلات المكالمات، تحليلات زمن الاستجابة، قاعدة المعرفة الطبية، وإعدادات الوكيل.",
         "nav_calls_title": "سجلات المكالمات والتسجيلات",
-        "nav_calls_desc": "استعراض النصوص الحية، نوايا المتصلين، مسار استدعاء الأدوات، والاستماع للتسجيل الصوتي.",
+        "nav_calls_desc": "استعراض النصوص الحية، نوايا المرضى، مسار استدعاء الأدوات، والاستماع للتسجيل الصوتي.",
         "nav_analytics_title": "تحليلات الأداء والأزمنة",
-        "nav_analytics_desc": "مخططات بيانية تفاعلية لتوزيع أزمنة STT و LLM و TTS، ساعات الذروة، وحجم المكالمات.",
-        "nav_knowledge_title": "قاعدة المعرفة وقائمة الطعام",
-        "nav_knowledge_desc": "إدارة قوائم الطعام، المكونات، مسببات الحساسية، وسياسات الفروع، وتحديث الفهرس الشعاعي.",
+        "nav_analytics_desc": "مخططات بيانية تفاعلية لتوزيع أزمنة STT و LLM و TTS، فترات الذروة بالعيادة، وحجم المكالمات.",
+        "nav_knowledge_title": "قاعدة المعرفة الطبية",
+        "nav_knowledge_desc": "إدارة تخصصات العيادة، مواعيد الأطباء، تعليمات التحاليل والأشعة، أسعار الكشف، وسياسات التأمين الصحي.",
         "nav_settings_title": "مختبر التعليمات والإعدادات",
         "nav_settings_desc": "تعديل وتجربة التوجيهات الفورية (Prompts)، ضبط درجات الحرارة، واختيار هوية الصوت.",
-        
+
         # Sidebar & Controls
         "sidebar_settings_title": "تفضيلات لوحة التحكم",
         "language_selector_label": "لغة العرض / Interface Language",
+        "sidebar_language_label": "لغة العرض / Interface Language",
         "sidebar_info_title": "معلومات النظام",
         "sidebar_agent_persona": "هوية المساعد",
-        "sidebar_restaurant_name": "اسم المطعم",
+        "sidebar_clinic_name": "اسم العيادة",
         "sidebar_version": "إصدار اللوحة",
         "sidebar_refresh_btn": "تحديث فحص الحالة الآن",
-        
-        # Call Logs & Transcripts (Feature 5.2)
+        "filter_section_title": "معايير الفلترة",
+        "filter_language_label": "لغة المكالمة",
+        "refresh_button": "تحديث التحليلات",
+
+        # Call Logs & Transcripts
         "calls_page_title": "سجلات المكالمات والتسجيلات الصوتية",
-        "calls_page_subtitle": "متابعة وتدقيق نصوص المحادثات الحية، الاستماع للتسجيلات، تتبع استدعاء الأدوات وأزمنة الاستجابة.",
+        "calls_page_subtitle": "متابعة وتدقيق محادثات المرضى، الاستماع للتسجيلات، تتبع أدوات العيادة وأزمنة الاستجابة.",
         "filter_status_label": "حالة المكالمة",
         "filter_status_all": "جميع الحالات",
         "filter_status_active": "مكالمات جارية",
         "filter_status_ended": "مكتملة بنجاح",
-        "filter_status_escalated": "محولة لمشرف",
+        "filter_status_escalated": "محولة للاستقبال",
         "filter_lang_label": "لغة المكالمة",
         "filter_lang_all": "جميع اللغات",
         "filter_lang_ar": "العربية",
         "filter_lang_en": "الإنجليزية",
-        "filter_search_label": "بحث (المعرف، الهاتف، الاسم، الطلب)",
-        "filter_search_placeholder": "اكتب رقم الطلب، الهاتف، أو اسم المتصل...",
-        "btn_reseed_demo": "توليد مكالمات تجريبية",
-        "btn_reseed_success": "تم توليد المكالمات التجريبية بنجاح!",
+        "filter_search_label": "بحث (المعرف، الهاتف، المريض، كود الحجز)",
+        "filter_search_placeholder": "اكتب كود الحجز، الهاتف، الطبيب، أو اسم المريض...",
         "col_session_id": "معرّف الجلسة",
         "col_timestamp": "التوقيت",
-        "col_customer": "العميل",
+        "col_customer": "المريض",
         "col_status": "الحالة",
         "col_language": "اللغة",
         "col_duration": "المدة",
@@ -252,22 +254,23 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "col_tools": "الأدوات",
         "detail_select_prompt": "اختر المكالمة المراد تدقيقها",
         "detail_header_title": "تفاصيل وتدقيق المكالمة",
-        "detail_escalated_banner": "⚠️ مكالمة مصعدة: تم تحويلها لمشرف بشري",
-        "detail_customer_card_title": "ملف العميل وسياق المكالمة",
-        "detail_customer_name": "اسم المتصل",
+        "detail_escalated_banner": "⚠️ مكالمة مصعدة: تم تحويلها لموظف الاستقبال البشري",
+        "detail_customer_card_title": "ملف المريض وسياق المكالمة",
+        "detail_customer_name": "اسم المريض",
         "detail_customer_phone": "رقم الهاتف",
-        "detail_order_id": "رقم الطلب",
+        "detail_specialty": "التخصص",
+        "detail_doctor": "الطبيب",
+        "detail_bookings": "المواعيد والحجوزات",
+        "detail_emergency_flag": "تنبيه طوارئ طبية",
         "detail_sentiment": "انطباع المتصل",
-        "detail_allergies": "الحساسية والتفضيلات",
-        "detail_reservation": "بيانات الحجز",
         "detail_escalation_reason": "سبب التصعيد",
         "detail_escalation_dept": "القسم المحول إليه",
         "audio_player_title": "التسجيل الصوتي للمكالمة",
-        "audio_player_demo_badge": "عينة صوتية تجريبية (نغمة محاكاة)",
+        "audio_player_demo_badge": "عينة صوتية احتياطية (نغمة محاكاة)",
         "audio_player_real_badge": "تسجيل صوتي فعلي للمكالمة",
         "transcript_section_title": "نص المحادثة خطوة بخطوة",
         "role_caller": "المتصل",
-        "role_assistant": "الوكيل الصوتي الذكي",
+        "role_assistant": "مساعد الاستقبال الذكي",
         "role_tool": "استدعاء أداة",
         "interrupted_badge": "⚡ تمت المقاطعة",
         "turn_latency": "زمن الدور",
@@ -275,16 +278,15 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "tool_result_title": "المخرجات والنتيجة",
         "empty_transcript_msg": "لا توجد أدوار مسجلة لهذه الجلسة.",
         "no_calls_found_msg": "لا توجد مكالمات مطابقة لمعايير الفلترة الحالية.",
-        
-        # Analytics & Latency Telemetry (Feature 5.3)
+
+        # Analytics & Latency Telemetry
         "analytics_page_title": "تحليلات أزمنة الاستجابة وكثافة المكالمات",
-        "analytics_page_subtitle": "المراقبة الفورية لمستوى الخدمة (SLA)، تفكيك أزمنة الاستجابة (STT/LLM/TTS)، وحركة الاتصالات",
+        "analytics_page_subtitle": "المراقبة الفورية لمستوى الخدمة (SLA)، تفكيك أزمنة الاستجابة (STT/LLM/TTS)، وحركة اتصالات العيادة",
         "filter_time_range_label": "النطاق الزمني",
         "time_range_24h": "آخر 24 ساعة",
         "time_range_7d": "آخر 7 أيام",
         "time_range_30d": "آخر 30 يوماً",
         "time_range_all": "كافة الأوقات",
-        "filter_status_label": "حالة المكالمة",
         "status_opt_all": "كافة الحالات",
         "status_opt_completed": "المكتملة فقط",
         "status_opt_escalated": "المصعدة فقط",
@@ -292,7 +294,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "analytics_kpi_total_calls": "إجمالي المكالمات المحللة",
         "analytics_kpi_avg_latency": "متوسط الاستجابة الكلية",
         "analytics_kpi_sla_rate": "نسبة الالتزام بالـ SLA (<800ms)",
-        "analytics_kpi_escalation": "معدل التحويل لمشرف",
+        "analytics_kpi_escalation": "معدل التحويل للاستقبال",
         "analytics_kpi_duration": "متوسط مدة المكالمة",
         "analytics_kpi_p95": "زمن الشريحة 95% (p95)",
         "sec_sla_breakdown_title": "قياسات أزمنة الاستجابة وفق الدستور التقني",
@@ -307,25 +309,24 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "chart_sla_target_label": "الحد الأقصى للـ SLA",
         "chart_sla_compliant_label": "ضمن المعيار (<800ms)",
         "chart_sla_breached_label": "تجاوز المعيار (≥800ms)",
-        "sec_volume_trends_title": "حجم الاتصالات وأوقات الذروة",
+        "sec_volume_trends_title": "حجم الاتصالات وفترات الذروة بالعيادة",
         "sec_volume_trends_desc": "أنماط حركة المكالمات عبر الأيام وتوزيعها على مدار الـ 24 ساعة لتحديد أوقات الضغط.",
         "chart_daily_volume_title": "حجم المكالمات اليومي حسب النتيجة",
-        "chart_hourly_volume_title": "توزيع المكالمات بالساعة (أوقات الذروة)",
-        "chart_hourly_peak_label": "ساعات الذروة (الغداء / العشاء)",
+        "chart_hourly_volume_title": "توزيع المكالمات بالساعة (فترات الذروة بالعيادة)",
+        "chart_hourly_peak_label": "ساعات الذروة في العيادة (الظهيرة / المساء)",
         "chart_hourly_normal_label": "الساعات المعتادة",
-        "sec_conversational_insights_title": "ذكاء المحادثات والعمليات التشغيلية",
-        "sec_conversational_insights_desc": "انطباعات العملاء، استدعاءات الأدوات الذكية، ونسب اللغات المستخدمة.",
-        "chart_sentiment_title": "توزيع انطباعات العملاء",
+        "sec_conversational_insights_title": "ذكاء المحادثات وأدوات العيادة",
+        "sec_conversational_insights_desc": "انطباعات المتصلين، استدعاءات أدوات العيادة، ونسب اللغات المستخدمة.",
+        "chart_sentiment_title": "توزيع انطباعات المتصلين",
         "chart_sentiment_pos": "إيجابي",
         "chart_sentiment_neu": "محايد",
         "chart_sentiment_neg": "سلبي",
-        "chart_tools_title": "تكرار استخدام أدوات الذكاء الاصطناعي",
+        "chart_tools_title": "تكرار استخدام أدوات العيادة الذكية",
         "chart_language_title": "توزيع اللغات (عربي / إنجليزي)",
         "analytics_no_data_warn": "لا توجد مكالمات مسجلة تطابق معايير الفلترة المحددة.",
-        "analytics_auto_seeded_notice": "ℹ️ تم توليد عينات تجريبية موزعة على 7 أيام لتوفير رسوم بيانية واقعية.",
-        
+
         # Footer
-        "footer_text": "منصة الوكيل الصوتي للإنتاج • مبنية بتقنيات LiveKit و Deepgram و Groq و ElevenLabs و Qdrant",
+        "footer_text": "منصة الوكيل الصوتي الطبي للإنتاج • مبنية بتقنيات LiveKit و Deepgram و Groq و ElevenLabs و Qdrant",
     },
 }
 
@@ -333,11 +334,11 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 def t(key: str, lang: str = "en") -> str:
     """
     Retrieve localized string for a given key.
-    
+
     Args:
         key: Translation key identifier.
         lang: Target language ('en' or 'ar'). Defaults to 'en'.
-        
+
     Returns:
         Translated string, or key if translation is missing.
     """

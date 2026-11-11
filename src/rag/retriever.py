@@ -18,6 +18,9 @@ from src.rag.embeddings import embedding_service
 logger = logging.getLogger(__name__)
 
 
+_local_memory_client: QdrantClient | None = None
+
+
 class QdrantKnowledgeRetriever:
     """
     Manages vector indexing and retrieval from Qdrant vector database.
@@ -32,6 +35,7 @@ class QdrantKnowledgeRetriever:
 
     def _init_client(self) -> QdrantClient:
         """Initializes Qdrant client based on configuration."""
+        global _local_memory_client
         if settings.is_qdrant_cloud():
             logger.info(f"Connecting to Qdrant Cloud at {settings.qdrant_url}")
             return QdrantClient(
@@ -39,8 +43,10 @@ class QdrantKnowledgeRetriever:
                 api_key=settings.qdrant_api_key,
             )
         else:
-            logger.info("Using local in-memory Qdrant instance for vector search")
-            return QdrantClient(":memory:")
+            if _local_memory_client is None:
+                logger.info("Using local in-memory Qdrant instance for vector search")
+                _local_memory_client = QdrantClient(":memory:")
+            return _local_memory_client
 
     def _ensure_collection(self) -> None:
         """Ensure collection exists in Qdrant with appropriate vector configuration."""
@@ -62,9 +68,9 @@ class QdrantKnowledgeRetriever:
                         field_name="category",
                         field_schema=qmodels.PayloadSchemaType.KEYWORD,
                     )
-                except Exception as idx_err:
+                except Exception as idx_err:  # noqa: BLE001
                     logger.debug(f"Payload index creation info for '{self.collection_name}': {idx_err}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error checking/creating collection '{self.collection_name}': {e}")
 
     def recreate_collection(self) -> None:
@@ -74,7 +80,7 @@ class QdrantKnowledgeRetriever:
             if any(col.name == self.collection_name for col in collections):
                 logger.info(f"Deleting existing collection '{self.collection_name}'...")
                 self.client.delete_collection(collection_name=self.collection_name)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Error deleting collection '{self.collection_name}': {e}")
         self._ensure_collection()
 
@@ -139,7 +145,7 @@ class QdrantKnowledgeRetriever:
         category: str | None = None,
     ) -> list[dict[str, Any]]:
         """
-        Execute semantic vector similarity search against the restaurant knowledge base.
+        Execute semantic vector similarity search against the clinic knowledge base.
         
         Args:
             query: User utterance or question.
@@ -183,7 +189,7 @@ class QdrantKnowledgeRetriever:
                     limit=limit,
                     score_threshold=score_threshold,
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error performing Qdrant search: {e}")
             return []
 

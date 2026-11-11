@@ -2,7 +2,7 @@
 Medical Call Session State, Turn Memory, and Metric Tracking for Egyptian Polyclinic Voice AI Agent.
 
 Provides:
-- Clinic-first call context (`ClinicCallContext`, `BookingRef`, `EscalationInfo`) with legacy restaurant field compatibility.
+- Clinic-first call context (`ClinicCallContext`, `BookingRef`, `EscalationInfo`).
 - Enforced call lifecycle state machine (`CallLifecycle`) separated from momentary activity (`CallActivity`).
 - Per-turn stage latency tracking (`TurnLatency`) with nearest-rank P50/P95/max percentiles, SLO breach counters (>800ms), and tool timeout counters (>400ms).
 - FinOps ledger snapshot integration (`FinOpsController`) and hierarchical Langfuse `trace_id` linkage.
@@ -149,10 +149,9 @@ class ClinicCallContext(BaseModel):
     """
     Clinic-first call context and extracted slots gathered across turns (R1.1–R1.3).
 
-    Maintains backward-compatible aliases (`customer_name`, `customer_phone`,
-    `order_id`, `reservation_draft`, `dietary_preferences`, `allergies`,
-    `escalated`, `escalation_reason`, `escalation_department`) so legacy JSON
-    files and dashboard pages continue to function seamlessly until Phase 7.
+    Maintains generic caller/escalation aliases (`customer_name`, `customer_phone`,
+    `escalated`, `escalation_reason`, `escalation_department`) synchronized with
+    canonical clinic fields (`patient_name`, `patient_phone`, `escalation`).
     """
 
     # Primary clinic fields (R1.1)
@@ -171,13 +170,9 @@ class ClinicCallContext(BaseModel):
     sentiment: str = "neutral"
     custom_notes: dict[str, Any] = Field(default_factory=dict)
 
-    # Deprecated legacy restaurant fields kept as Optional for backward compatibility (R1.3, C6)
+    # Generic caller & escalation compatibility aliases
     customer_name: str | None = None
     customer_phone: str | None = None
-    order_id: str | None = None
-    reservation_draft: dict[str, Any] = Field(default_factory=dict)
-    dietary_preferences: list[str] = Field(default_factory=list)
-    allergies: list[str] = Field(default_factory=list)
     escalated: bool = False
     escalation_reason: str | None = None
     escalation_department: str | None = None
@@ -1005,24 +1000,6 @@ class CallSession(BaseModel):
 
             self.transition_to(CallLifecycle.ESCALATED)
 
-        # 6. Legacy Restaurant Tools (kept for backward compatibility with old tests/scripts)
-        elif tool_name in ("get_order_status", "check_order_status"):
-            if "order_id" in arguments:
-                self.context.order_id = str(arguments["order_id"])
-            elif "order_id" in payload:
-                self.context.order_id = str(payload["order_id"])
-
-        elif tool_name == "book_reservation":
-            if payload.get("success") or payload.get("reservation_id"):
-                self.context.reservation_draft = {**arguments, **payload}
-                if arguments.get("customer_name"):
-                    self.context.customer_name = str(arguments["customer_name"])
-                # Only populate legacy customer_phone if no verified scope is active
-                if not _resolve_verified_caller_phone():
-                    raw_p = arguments.get("phone_number") or arguments.get("phone")
-                    if raw_p:
-                        self.context.customer_phone = str(raw_p)
-
     def mark_emergency(self, reason: str | None = None) -> None:
         """
         Mark this call session as a medical emergency (R2.5).
@@ -1048,7 +1025,7 @@ class CallSession(BaseModel):
             self.messages[-1].interrupted = True
 
     def update_context(self, **kwargs: Any) -> None:
-        """Update extracted slots and entities."""
+        """Update extracted clinic slots and entities (ignores unknown/removed fields)."""
         for key, value in kwargs.items():
             # Never allow untrusted update_context to overwrite a verified caller phone
             if key in ("patient_phone", "customer_phone"):
@@ -1056,10 +1033,10 @@ class CallSession(BaseModel):
                 if verified:
                     self.context.patient_phone = verified
                     continue
-            if hasattr(self.context, key):
+            if key in ClinicCallContext.model_fields:
                 setattr(self.context, key, value)
             else:
-                self.context.custom_notes[key] = value
+                logger.debug("Ignoring unknown ClinicCallContext field in update_context: %s", key)
 
     # ------------------------------------------------------------------
     # Conversation Memory: Deterministic Context Summary & Sliding Window (R5.1–R5.3)
@@ -1248,7 +1225,6 @@ class CallSession(BaseModel):
             "requested_specialty": self.context.requested_specialty,
             "requested_doctor_name": self.context.requested_doctor_name,
             "booking_codes": self.context.booking_codes,
-            "order_id": self.context.order_id,
             "escalated": self.context.escalated,
             "escalation_department": self.context.escalation_department,
             "emergency_flag": self.context.emergency_flag,

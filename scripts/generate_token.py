@@ -7,10 +7,9 @@ Usage:
 """
 
 import argparse
-import sys
-import os
-from pathlib import Path
 import datetime
+import sys
+from pathlib import Path
 
 # Add project root to sys.path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -21,8 +20,8 @@ if str(PROJECT_ROOT) not in sys.path:
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-from src.agent import voice_agent  # imports clock skew patch
 from livekit import api
+
 from src.config import settings
 
 

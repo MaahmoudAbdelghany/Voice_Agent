@@ -179,7 +179,7 @@ class CacheabilityPolicy:
     _PERSONAL_PHRASES_EN: ClassVar[list[str]] = [
         "my appointment",
         "my booking",
-        "my reservation",
+        "my queue number",
         "my number",
         "my name",
         "my visit",

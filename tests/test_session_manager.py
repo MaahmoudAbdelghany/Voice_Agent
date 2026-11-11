@@ -19,6 +19,7 @@ from src.agent.session_manager import (
     CallLifecycle,
     CallSession,
     CallStatus,
+    ClinicCallContext,
     EscalationInfo,
     MessageRole,
     SessionManager,
@@ -505,15 +506,32 @@ def test_i4_end_and_persist_writes_file_evicts_memory_and_reloads(tmp_path):
 # ==============================================================================
 
 
+def test_u13_clinic_call_context_has_no_legacy_restaurant_fields():
+    """T1.5: ClinicCallContext and CallSession.to_summary_dict() exclude legacy restaurant fields."""
+    ctx = ClinicCallContext()
+    for removed_field in (
+        "order_id",
+        "reservation_draft",
+        "dietary_preferences",
+        "allergies",
+    ):
+        assert removed_field not in ClinicCallContext.model_fields
+        assert not hasattr(ctx, removed_field)
+
+    session = CallSession()
+    summary = session.to_summary_dict()
+    assert "order_id" not in summary
+
+
 def test_e1_existing_data_calls_json_files_load_and_legacy_status_maps(tmp_path):
-    """E1 (R3.4, R6.6): all existing files in data/calls/*.json load cleanly; legacy 'speaking' -> ACTIVE + speaking."""
+    """E1 (R3.4, R6.6): persisted files in data/calls/*.json load cleanly; legacy 'speaking' -> ACTIVE + speaking."""
     real_calls_dir = Path("data/calls")
-    if real_calls_dir.exists():
+    if real_calls_dir.exists() and list(real_calls_dir.glob("*.json")):
         mgr = SessionManager(storage_dir=real_calls_dir)
         loaded = mgr.load_all_persisted_sessions()
         assert len(loaded) >= 1
 
-    # Also explicitly test legacy status='speaking' mapping
+    # Explicitly test legacy status='speaking' mapping and safe ignoring of unknown legacy keys
     legacy_file = tmp_path / "legacy-speaking.json"
     legacy_file.write_text(
         json.dumps(
@@ -523,7 +541,7 @@ def test_e1_existing_data_calls_json_files_load_and_legacy_status_maps(tmp_path)
                 "participant_identity": "caller-legacy",
                 "status": "speaking",
                 "context": {
-                    "customer_name": "عميل قديم",
+                    "customer_name": "مريض مسجل",
                     "customer_phone": "+201112223333",
                     "order_id": "ORD-123",
                 },
@@ -538,8 +556,40 @@ def test_e1_existing_data_calls_json_files_load_and_legacy_status_maps(tmp_path)
     assert legacy_sess.lifecycle == CallLifecycle.ACTIVE
     assert legacy_sess.status == CallStatus.ACTIVE
     assert legacy_sess.activity == CallActivity.SPEAKING
-    assert legacy_sess.context.patient_name == "عميل قديم"
-    assert legacy_sess.context.order_id == "ORD-123"
+    assert legacy_sess.context.patient_name == "مريض مسجل"
+    assert not hasattr(legacy_sess.context, "order_id")
+
+
+def test_e8_legacy_restaurant_fields_ignored_without_mutating_session():
+    """T3.2: Passing legacy field names (order_id, reservation_draft) is ignored without mutating session state."""
+    ctx = ClinicCallContext(
+        patient_name="سلمى عادل",
+        order_id="ORD-999",
+        reservation_draft={"party_size": 4},
+    )
+    assert ctx.patient_name == "سلمى عادل"
+    assert not hasattr(ctx, "order_id")
+    assert not hasattr(ctx, "reservation_draft")
+    assert ctx.custom_notes == {}
+
+    session = CallSession()
+    before_dump = session.context.model_dump()
+    session.update_context(
+        order_id="ORD-999",
+        reservation_draft={"party_size": 4},
+        dietary_preferences=["vegan"],
+        allergies=["nuts"],
+    )
+    assert session.context.model_dump() == before_dump
+    assert session.context.custom_notes == {}
+
+    # Recording an unregistered legacy tool name also leaves clinic context untouched
+    session.record_tool_call(
+        tool_name="get_order_status",
+        arguments={"order_id": "ORD-999"},
+        result={"success": False, "error": "unregistered"},
+    )
+    assert session.context.model_dump() == before_dump
 
 
 def test_e2_malformed_tool_result_never_raises():

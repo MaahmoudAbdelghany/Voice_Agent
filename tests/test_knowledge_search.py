@@ -20,14 +20,12 @@ from src.tools.knowledge_search import (
     KnowledgeSearchTool,
     async_search_clinic_knowledge,
     async_search_knowledge,
-    async_search_restaurant_knowledge,
     clean_markdown_for_speech,
     clinic_knowledge_search_tool,
     is_emergency_content,
     knowledge_search_tool,
     search_clinic_knowledge,
     search_knowledge,
-    search_restaurant_knowledge,
     trim_to_sentence_boundary,
 )
 from src.tools.schemas import ToolResult
@@ -275,14 +273,16 @@ def test_warm_up():
     assert tool.warm_up() is True
 
 
-def test_deprecated_aliases_importable():
-    """Verify legacy restaurant aliases point to clinic implementation."""
+def test_clinic_aliases_and_restaurant_aliases_removed():
+    """T1.4: Verify generic clinic aliases exist while legacy restaurant aliases are absent."""
+    import src.tools.knowledge_search as ks_mod
+
     assert KnowledgeSearchTool is ClinicKnowledgeSearchTool
     assert knowledge_search_tool is clinic_knowledge_search_tool
     assert search_knowledge is search_clinic_knowledge
     assert async_search_knowledge is async_search_clinic_knowledge
-    assert search_restaurant_knowledge is search_clinic_knowledge
-    assert async_search_restaurant_knowledge is async_search_clinic_knowledge
+    assert not hasattr(ks_mod, "search_restaurant_knowledge")
+    assert not hasattr(ks_mod, "async_search_restaurant_knowledge")
 
 
 # ==============================================================================

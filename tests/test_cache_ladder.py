@@ -200,8 +200,9 @@ def test_deny_personal_words_ar_en():
         assert ok is False, f"Expected personal query bypass for '{word}'"
         assert reason == BypassReason.PERSONAL_QUERY
 
-    # English personal phrases
-    for phrase in ["my appointment", "my booking", "my number", "my name"]:
+    # English personal phrases (clinic-only, no legacy restaurant phrasing)
+    assert "my reservation" not in CacheabilityPolicy._PERSONAL_PHRASES_EN
+    for phrase in ["my appointment", "my booking", "my queue number", "my number", "my name"]:
         ok, reason = policy.allows_query(f"Can you tell me {phrase} details?")
         assert ok is False, f"Expected personal query bypass for '{phrase}'"
         assert reason == BypassReason.PERSONAL_QUERY

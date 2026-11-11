@@ -4,7 +4,7 @@
 - **Folder**: `spec/features/feature-513-legacy-restaurant-purge/`
 - **Phase branch**: `phase/5-livekit-voice-core`
 - **Size**: Medium (4 execution groups across tools/agent, config/session/RAG, dashboard, and tests/docs — no new architectural components)
-- **Status**: Approved (Phase Gate 1)
+- **Status**: Committed
 
 ---
 
@@ -92,19 +92,26 @@ flowchart TD
 | `tests/test_architecture_docs.py` | Modify | Update architecture doc checks if legacy file references are removed |
 | `README.md` | Modify | Replace remaining restaurant mentions with clinic equivalents |
 | `spec/architecture.md` | Modify | Remove references to legacy restaurant modules |
+| `scripts/generate_token.py` | Modify | Remove dead `src.agent.voice_agent` import after deleting legacy worker |
+| `src/dashboard/health.py` | Modify | Modernize dict type annotations and health-check exception boundary lint markers |
+| `src/dashboard/pages/02_analytics.py` | Modify | Remove `seed_analytics_call_sessions` auto-seeder so empty storage renders clean empty state |
+| `tests/test_session_manager.py` | Modify | Add `T1.5` and `T3.2` checks verifying absence and rejection of legacy restaurant context fields |
+| `tests/test_cache_ladder.py` | Modify | Update personal query phrase check (`"my queue number"`, no `"my reservation"`) for `T1.7` |
+| `tests/test_dashboard_app.py` | Modify | Verify `settings.clinic_name` renders in sidebar and clean unused imports |
+| `tests/test_prompts.py` | Modify | Guard `test_i3_voice_pipeline_instructions_use_clinic_prompt` with `pytest.importorskip("src.agent.voice_agent")` until Feature 5.4 recreates `voice_agent.py` (preserving all negative restaurant assertions) |
 
 ## 7. Execution Groups
-- **Group 1 — Purge Legacy Tools, Scripts & Agent Stubs**: Delete `order_status.py`, `reservation.py`, `legacy_schemas.py`, `scripts/ingest_knowledge.py`, `src/agent/voice_agent.py`, `scripts/test_call.py`, `tests/test_order_status.py`, `tests/test_reservation.py`, `tests/test_agent.py`. Update `src/tools/__init__.py`, `src/tools/knowledge_search.py`, and `src/tools/schemas.py`. Update `tests/test_tools.py` and `tests/test_knowledge_search.py`.
-- **Group 2 — Clean Config, Session Manager, RAG & Cache**: Remove `restaurant_*` fields/validator from `src/config.py`; remove deprecated restaurant fields/branches from `src/agent/session_manager.py`; clean `src/rag/ingestion.py`, `src/rag/retriever.py`, and `src/ai_core/cache.py`. Update `tests/test_database_engine.py`, `tests/test_session_manager.py` (if affected), and `tests/test_rag.py`.
-- **Group 3 — Clean Dashboard & Remove Demo Seeds**: Remove demo seed generator from `src/dashboard/calls_data.py`; update `src/dashboard/analytics_data.py`, `src/dashboard/i18n.py`, `src/dashboard/app.py`, and `src/dashboard/pages/01_calls.py`; update `tests/test_calls_page.py` and `tests/test_analytics_page.py` to test empty state and clinic session fixtures.
-- **Group 4 — Docs Cleanup & Codebase Purity Guard**: Clean `README.md` and `spec/architecture.md`; update `tests/test_architecture_docs.py`; add automated codebase purity tests verifying zero legacy restaurant modules/identifiers remain in `src/` and `scripts/`; run full test suite and ruff.
+- **Group 1 — Purge Legacy Tools, Scripts & Agent Stubs**: Delete `order_status.py`, `reservation.py`, `legacy_schemas.py`, `scripts/ingest_knowledge.py`, `src/agent/voice_agent.py`, `scripts/test_call.py`, `tests/test_order_status.py`, `tests/test_reservation.py`, `tests/test_agent.py`. Update `src/tools/__init__.py`, `src/tools/knowledge_search.py`, `src/tools/schemas.py`, and `scripts/generate_token.py`. Update `tests/test_tools.py` and `tests/test_knowledge_search.py`.
+- **Group 2 — Clean Config, Session Manager, RAG & Cache**: Remove `restaurant_*` fields/validator from `src/config.py`; remove deprecated restaurant fields/branches from `src/agent/session_manager.py`; clean `src/rag/ingestion.py`, `src/rag/retriever.py`, and `src/ai_core/cache.py`. Update `tests/test_database_engine.py`, `tests/test_session_manager.py`, `tests/test_cache_ladder.py`, and `tests/test_rag.py`.
+- **Group 3 — Clean Dashboard & Remove Demo Seeds**: Remove demo seed generators from `src/dashboard/calls_data.py` and `src/dashboard/analytics_data.py`; update `src/dashboard/i18n.py`, `src/dashboard/app.py`, `src/dashboard/health.py`, `src/dashboard/pages/01_calls.py`, and `src/dashboard/pages/02_analytics.py`; update `tests/test_calls_page.py`, `tests/test_analytics_page.py`, and `tests/test_dashboard_app.py` to test empty state and clinic session fixtures.
+- **Group 4 — Docs Cleanup & Codebase Purity Guard**: Clean `README.md` and `spec/architecture.md`; update `tests/test_architecture_docs.py` and `tests/test_prompts.py` (`importorskip` bridge until Feature 5.4); add automated codebase purity tests verifying zero legacy restaurant modules/identifiers remain in `src/` and `scripts/`; run full test suite and ruff.
 
 ## 8. Risks & Trade-offs
 | Risk / Trade-off | Impact | Mitigation |
 |:---|:---|:---|
 | Existing tests in `test_session_manager.py` or `test_database_engine.py` assert legacy backward-compatibility aliases | Test failure after removing `restaurant_*` or `order_id` | Inspect and update those specific compatibility tests in Group 2 so they assert strict rejection/absence of legacy fields. |
 | Dashboard pages crash when `load_call_sessions` returns `[]` | Empty-state bug in UI or `test_calls_page.py` / `test_analytics_page.py` | Ensure `calls_data.py` and `analytics_data.py` handle empty session lists gracefully with zero-division guards and dedicated unit tests. |
-| Deleting `src/agent/voice_agent.py` in 5.3 temporarily removes the worker module until 5.4 | Any test importing `src.agent.voice_agent` would fail during 5.3 | `tests/test_agent.py` is the only test importing `voice_agent.py` and is also deleted in 5.3 (and recreated in 5.6 after 5.4 recreates `voice_agent.py`). |
+| Deleting `src/agent/voice_agent.py` in 5.3 temporarily removes the worker module until 5.4 | Any test importing `src.agent.voice_agent` would fail during 5.3 | Delete legacy `tests/test_agent.py` (recreated in 5.6) and use `pytest.importorskip("src.agent.voice_agent")` in `tests/test_prompts.py::test_i3_voice_pipeline_instructions_use_clinic_prompt` so it skips cleanly in 5.3 and automatically re-activates in 5.4. |
 
 ## 9. Open Questions
 None — all scope and design decisions were resolved during the Phase 5 interview.

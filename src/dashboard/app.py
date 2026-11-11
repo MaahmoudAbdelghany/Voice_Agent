@@ -5,13 +5,13 @@ Production Streamlit dashboard entry point with modern dark theme,
 bilingual support (EN/AR), real-time service health monitoring, and KPI telemetry.
 """
 
-import os
 from pathlib import Path
+
 import streamlit as st
 
 from src.config import settings
-from src.dashboard.i18n import t
 from src.dashboard.health import check_services_health
+from src.dashboard.i18n import t
 
 # 1. Page Configuration (Must be first Streamlit call)
 st.set_page_config(
@@ -63,7 +63,7 @@ lang = st.session_state.lang
 # 4. Sidebar Controls & System Telemetry
 with st.sidebar:
     st.markdown(f"### ⚙️ {t('sidebar_settings_title', lang)}")
-    
+
     # Language Toggle Selector
     lang_options = {"en": "English 🇺🇸", "ar": "العربية 🇸🇦"}
     current_index = 0 if lang == "en" else 1
@@ -73,7 +73,7 @@ with st.sidebar:
         index=current_index,
         key="lang_radio",
     )
-    
+
     # Update session state language based on selection
     new_lang = "en" if "English" in selected_lang_label else "ar"
     if new_lang != st.session_state.lang:
@@ -83,7 +83,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(f"### ℹ️ {t('sidebar_info_title', lang)}")
     st.markdown(f"**{t('sidebar_agent_persona', lang)}:** `{settings.agent_name}`")
-    st.markdown(f"**{t('sidebar_restaurant_name', lang)}:** `{settings.restaurant_name}`")
+    st.markdown(f"**{t('sidebar_clinic_name', lang)}:** `{settings.clinic_name}`")
     st.markdown(f"**{t('sidebar_version', lang)}:** `v0.1.0-prod`")
     
     st.markdown("---")
