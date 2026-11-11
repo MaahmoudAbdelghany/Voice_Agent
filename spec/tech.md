@@ -4,7 +4,7 @@
 
 | Layer | Technology | Version / Model | Justification / Role |
 |:---|:---|:---|:---|
-| **Voice Transport** | LiveKit Cloud / LiveKit Agents | SDK >= 0.8.0 | WebRTC low-latency streaming audio, room session orchestration |
+| **Voice Transport** | LiveKit Cloud / LiveKit Agents | SDK >= 1.7.0 | WebRTC low-latency streaming audio, room session orchestration |
 | **Speech-to-Text (STT)** | Deepgram | `nova-3` | Streaming transcription, punctuation, Egyptian Arabic (`ar`) & English |
 | **LLM Reasoning** | Groq Cloud | `llama-3.3-70b-versatile` | High-throughput token generation (>300 t/s) for sub-second voice SLA |
 | **LLM Stage Routing** | Groq Cloud | `llama-3.1-8b-instant` | Lightweight model bound to classification / extraction nodes (FinOps) |
@@ -36,7 +36,9 @@
 - STT Interim & Final transcription: **< 200ms**.
 - LLM Time-to-First-Token (TTFT): **< 300ms** via Groq.
 - TTS Streaming synthesis first chunk: **< 250ms**.
-- Tool execution timeout: **< 400ms**. Any database or RAG tool taking longer must abort and yield a friendly conversational filler.
+- Tool execution timeout (**< 400ms** filler threshold):
+  - **Read tools** (`check_doctor_availability`, `search_clinic_knowledge`, appointment `lookup`): must abort at **400ms** and yield a friendly localized conversational filler.
+  - **Write tools** (`book_appointment`, appointment `cancel` / `reschedule`, `transfer_to_receptionist`): must yield a friendly localized conversational filler at **400ms** while continuing execution shielded (`asyncio.shield`) up to a hard cap of **3,000ms** (`write_tool_hard_cap_ms`), escalating to the human receptionist if the 3s hard cap is exceeded so a committed booking is never misreported as failed.
 
 ### 2. Clinic Shift Window & Capacity Invariant (Atomic Booking)
 - Appointments are booked within defined doctor shift windows (e.g. 18:00–21:00).
