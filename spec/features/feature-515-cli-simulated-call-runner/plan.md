@@ -4,7 +4,7 @@
 - **Folder**: `spec/features/feature-515-cli-simulated-call-runner/`
 - **Phase branch**: `phase/5-livekit-voice-core`
 - **Size**: Medium (3 execution groups: Scripted Clinic LLM Provider & Scenario Catalog in `src/agent/scenarios.py`, CLI Runner in `scripts/test_call.py`, and CLI Smoke/Integration Verification)
-- **Status**: Approved (Phase Gate 1)
+- **Status**: Committed
 
 ---
 
@@ -22,7 +22,7 @@ Provide a deterministic, developer- and CI-friendly CLI call simulator (`scripts
     4. `emergency`: Caller reports severe chest pain (`ألم شديد في الصدر`) → immediate emergency instruction + receptionist handoff (`transfer_to_receptionist`) with zero LLM diagnosis.
     5. `guardrail`: Caller attempts prompt injection and asks for a medical diagnosis/prescription → blocked by `InputGuardrail` with safe Egyptian Arabic refusal.
     6. `unverified-booking`: Caller without a verified session phone (`caller_phone=None`) requests a booking → read inquiry succeeds, booking attempt is intercepted before DB write and escalated to receptionist.
-  - `run_simulated_scenario()` & `run_All_scenarios()` helpers returning structured `ScenarioRunReport` objects (turn transcripts, tool invocations, latency breakdown, FinOps tokens, persisted session path, pass/fail assertions).
+  - `run_simulated_scenario()` & `run_all_scenarios()` helpers returning structured `ScenarioRunReport` objects (turn transcripts, tool invocations, latency breakdown, FinOps tokens, persisted session path, pass/fail assertions).
 - **CLI Simulated Call Runner (`scripts/test_call.py`)**:
   - Modes:
     - `--mock-llm` (default): Runs against `ScriptedClinicLLMProvider` + seeded in-memory/temp SQLite clinic DB and local Qdrant clinic KB, requiring zero network or API keys.
@@ -67,13 +67,15 @@ flowchart LR
 ## 6. Expected Files / Areas Affected
 | Path | Change | Purpose |
 |:---|:---|:---|
-| `src/agent/scenarios.py` | Create | `ScriptedClinicLLMProvider`, `ScenarioDefinition`, `CLINIC_SCENARIOS` (`booking`, `manage`, `knowledge`, `emergency`, `guardrail`, `unverified-booking`), and `run_simulated_scenario()` |
+| `src/agent/scenarios.py` | Create | `ScriptedClinicLLMProvider`, `ScenarioDefinition`, `CLINIC_SCENARIOS` (`booking`, `manage`, `knowledge`, `emergency`, `guardrail`, `unverified-booking`), `run_simulated_scenario()`, and `run_all_scenarios()` |
 | `src/agent/__init__.py` | Modify | Export scenario runner types and `ScriptedClinicLLMProvider` |
 | `scripts/test_call.py` | Create | CLI entrypoint supporting `--scenario`, `--mock-llm`, `--live`, `--interactive`, `--phone`, `--lang`, `--save-session`, and `--livekit` |
+| `tests/test_simulated_scenarios.py` | Create | Dedicated unit, integration, and CLI edge-case verification suite (`T1.1`–`T1.3`, `T2.1`–`T2.4`, `T3.1`–`T3.2`), leaving `tests/test_agent.py` clean for Feature 5.6 |
 
 ## 7. Execution Groups
-- **Group 1 — Scripted Clinic Provider & Scenario Catalog (`src/agent/scenarios.py`)**: Implement `ScriptedClinicLLMProvider` conforming to `LLMProvider`, self-contained test DB/KB bootstrap helper, the 6 clinic scenarios (`booking`, `manage`, `knowledge`, `emergency`, `guardrail`, `unverified-booking`), and `run_simulated_scenario()`.
+- **Group 1 — Scripted Clinic Provider & Scenario Catalog (`src/agent/scenarios.py`)**: Implement `ScriptedClinicLLMProvider` conforming to `LLMProvider`, self-contained test DB/KB bootstrap helper, the 6 clinic scenarios (`booking`, `manage`, `knowledge`, `emergency`, `guardrail`, `unverified-booking`), `run_simulated_scenario()`, and `run_all_scenarios()`.
 - **Group 2 — CLI Simulated Call Runner (`scripts/test_call.py`)**: Build the `argparse` CLI supporting `--scenario <name|all>`, `--mock-llm` / `--live`, `--interactive`, `--phone`, `--lang`, `--save-session`, and `--livekit`, with formatted console output and non-zero exit codes on failed assertions.
+- **Group 3 — Automated Scenario & CLI Verification (`tests/test_simulated_scenarios.py`)**: Verify `ScriptedClinicLLMProvider` streaming, `CLINIC_SCENARIOS` keys, `test_call.py` flag parsing, multi-turn `ClinicTurnEngine` execution across all 6 scenarios, PII-redacted session JSON persistence, and missing-key / unknown-scenario error handling.
 
 ## 8. Risks & Trade-offs
 | Risk / Trade-off | Impact | Mitigation |
