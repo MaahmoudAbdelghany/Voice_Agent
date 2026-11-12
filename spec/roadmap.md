@@ -56,7 +56,7 @@ This roadmap is a **Living Document** under Spec-Driven Development (SDD). Each 
 - [x] **Feature 5.3**: Legacy Restaurant Purge & Codebase Sanitization (`src/tools/`, `src/agent/`, `src/dashboard/`, `src/config.py`).
 - [x] **Feature 5.4**: LiveKit Voice Pipeline Worker & Clinic Turn Engine registering all clinic tools (`src/agent/voice_agent.py`, `src/agent/turn_engine.py`, `scripts/generate_token.py`).
 - [x] **Feature 5.5**: CLI Simulated Call Runner & Clinic Scenarios (`scripts/test_call.py`, `src/agent/scenarios.py`).
-- [ ] **Feature 5.6**: Automated Voice Orchestration & Guardrail Test Suite (`tests/test_agent.py`).
+- [x] **Feature 5.6**: Automated Voice Orchestration & Guardrail Test Suite (`tests/test_agent.py`).
 
 ### Phase 6: LLMOps Production Operations, Identity & Reliability 📈
 *Goal: Keep the live system observable, continuously evaluated, access-controlled, and within SLA once real patients depend on it — Prometheus/Grafana telemetry, online sampled evaluation, SSO/RBAC with multi-branch isolation, load testing, and a formal SLI/SLO/SLA contract.*

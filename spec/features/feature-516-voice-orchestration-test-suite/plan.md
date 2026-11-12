@@ -4,7 +4,7 @@
 - **Folder**: `spec/features/feature-516-voice-orchestration-test-suite/`
 - **Phase branch**: `phase/5-livekit-voice-core`
 - **Size**: Medium (3 execution groups: Worker/Identity/Pipeline tests, Turn Engine/Tool Timeout/Barge-In/Cache tests, and Multi-Turn Scenario & Guardrail Integration tests in `tests/test_agent.py`)
-- **Status**: Approved (Phase Gate 1)
+- **Status**: Committed
 
 ---
 
