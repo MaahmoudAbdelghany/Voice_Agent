@@ -111,9 +111,12 @@ def load_all_call_sessions(
     sessions_dict: dict[str, CallSession] = {s.session_id: s for s in persisted}
 
     # Merge active in-memory sessions from global singleton only for default runtime storage
+    # projected through PII-redacted to_persisted_dict() so raw PII never reaches UI pages
     if storage_dir is None:
         for active_sess in global_session_manager.list_all_sessions():
-            sessions_dict[active_sess.session_id] = active_sess
+            sessions_dict[active_sess.session_id] = CallSession.model_validate(
+                active_sess.to_persisted_dict()
+            )
 
     all_sessions = list(sessions_dict.values())
     all_sessions.sort(key=lambda s: s.start_time, reverse=True)

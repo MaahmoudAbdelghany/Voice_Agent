@@ -381,14 +381,24 @@ class ModelGateway:
                 return min(requested, limit)
             return limit
 
+    @staticmethod
+    def _clean_spoken_snippet(raw: str | None) -> str | None:
+        if not raw:
+            return None
+        from src.ai_core.guardrails import escape_xml_delimiters
+
+        cleaned = escape_xml_delimiters(str(raw)).strip()
+        return cleaned or None
+
     async def _execute_search_fallback(self, query: str) -> str | None:
         """Execute Tier 3 knowledge base retrieval fallback within 400ms."""
         if self._search_fallback is not None:
             try:
                 res = self._search_fallback(query)
                 if inspect.isawaitable(res):
-                    return await asyncio.wait_for(res, timeout=0.4)
-                return str(res) if res else None
+                    awaited = await asyncio.wait_for(res, timeout=0.4)
+                    return self._clean_spoken_snippet(str(awaited) if awaited else None)
+                return self._clean_spoken_snippet(str(res) if res else None)
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"Tier 3 custom search fallback error: {e}")
                 return None
@@ -407,7 +417,7 @@ class ModelGateway:
                 and tool_res.data.get("found")
                 and tool_res.message
             ):
-                return tool_res.message
+                return self._clean_spoken_snippet(tool_res.message)
             return None
         except Exception as e:  # noqa: BLE001
             logger.warning(f"Tier 3 knowledge search fallback error: {e}")

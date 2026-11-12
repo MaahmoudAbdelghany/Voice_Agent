@@ -80,6 +80,8 @@ class CacheScope(BaseModel):
     category: str | None = None
     language: Literal["ar", "en"] = "ar"
     specialty: str | None = None
+    tenant_id: str = "default"
+    branch_id: str = "main"
 
 
 class CacheResult(BaseModel):
@@ -103,6 +105,8 @@ class CacheEntry(BaseModel):
     category: str | None
     language: str
     kb_version: str
+    tenant_id: str = "default"
+    branch_id: str = "main"
     created_at: float
     expires_at: float
 
@@ -146,6 +150,11 @@ class OutputValidator(Protocol):
 # Cacheability Policy & Default Output Validator
 # ==============================================================================
 
+_CACHE_DIGIT_TRANS = str.maketrans(
+    "٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹",
+    "01234567890123456789",
+)
+
 
 class CacheabilityPolicy:
     """
@@ -153,10 +162,18 @@ class CacheabilityPolicy:
     or LLM response is eligible for caching.
     """
 
-    # Mobile numbers (e.g., 010, 011, 012, 015 + 8 digits)
-    _PHONE_REGEX = re.compile(r"\b01[0125]\d{8}\b")
-    # Egyptian 14-digit National ID
-    _NATIONAL_ID_REGEX = re.compile(r"\b\d{14}\b")
+    # Mobile numbers (contiguous or spaced/hyphenated, e.g., 010 - 1234 - 5678, +20 101 234 5678)
+    _PHONE_REGEX = re.compile(
+        r"(?<!\d)(?:(?:\+?\s*2[\s\-]*0|0[\s\-]*0[\s\-]*2[\s\-]*0)[\s\-]*0?|0)"
+        r"[\s\-]*1[\s\-]*[0125](?:[\s\-]*\d){8}(?!\d)"
+    )
+    # Egyptian landline numbers (e.g., 02-33456789, +20 2 3345 6789)
+    _LANDLINE_REGEX = re.compile(
+        r"(?<!\d)(?:(?:\+?\s*2[\s\-]*0|0[\s\-]*0[\s\-]*2[\s\-]*0)[\s\-]*0?[23]|0[23])"
+        r"(?:[\s\-]*\d){7,8}(?!\d)"
+    )
+    # Egyptian 14-digit National ID (contiguous or spaced/hyphenated)
+    _NATIONAL_ID_REGEX = re.compile(r"(?<!\d)\d(?:[\s\-]*\d){13}(?!\d)")
     # General long digit sequence (>= 6 digits: accounts, booking refs, IDs)
     _LONG_DIGIT_REGEX = re.compile(r"\b\d{6,}\b")
 
@@ -200,6 +217,15 @@ class CacheabilityPolicy:
             ]
         )
 
+    @classmethod
+    def _contains_pii_digits(cls, text: str) -> bool:
+        ascii_text = text.translate(_CACHE_DIGIT_TRANS)
+        return bool(
+            cls._PHONE_REGEX.search(ascii_text)
+            or cls._LANDLINE_REGEX.search(ascii_text)
+            or cls._NATIONAL_ID_REGEX.search(ascii_text)
+        )
+
     def allows_query(
         self, query: str, scope: CacheScope | None = None
     ) -> tuple[bool, BypassReason | None]:
@@ -222,12 +248,11 @@ class CacheabilityPolicy:
         if detect_emergency(query):
             return False, BypassReason.EMERGENCY
 
-        # 3. PII / Numeric identifier checks
-        if self._PHONE_REGEX.search(query):
+        # 3. PII / Numeric identifier checks (ASCII, Arabic-Indic ٠-٩, Extended Arabic ۰-۹, grouped)
+        ascii_query = query.translate(_CACHE_DIGIT_TRANS)
+        if self._contains_pii_digits(query):
             return False, BypassReason.PERSONAL_QUERY
-        if self._NATIONAL_ID_REGEX.search(query):
-            return False, BypassReason.PERSONAL_QUERY
-        if self._LONG_DIGIT_REGEX.search(query):
+        if self._LONG_DIGIT_REGEX.search(ascii_query):
             return False, BypassReason.PERSONAL_QUERY
 
         # 4. Personal keywords checks (Arabic)
@@ -271,8 +296,8 @@ class CacheabilityPolicy:
         ):
             return False, "degraded_fallback_response"
 
-        # Check for leaked personal identifiers in generated text
-        if self._PHONE_REGEX.search(response_text) or self._NATIONAL_ID_REGEX.search(response_text):
+        # Check for leaked personal identifiers in generated text (ASCII, ٠-٩, ۰-۹, grouped)
+        if self._contains_pii_digits(response_text):
             return False, "contains_personal_identifiers"
 
         return True, None
@@ -396,7 +421,7 @@ class SemanticCacheStore:
                         distance=qmodels.Distance.COSINE,
                     ),
                 )
-                for field in ["category", "language", "kb_version"]:
+                for field in ["category", "language", "kb_version", "tenant_id", "branch_id"]:
                     try:
                         self.client.create_payload_index(
                             collection_name=self.collection_name,
@@ -417,12 +442,17 @@ class SemanticCacheStore:
         kb_version: str,
         score_threshold: float = 0.97,
         limit: int = 1,
+        tenant_id: str = "default",
+        branch_id: str = "main",
     ) -> list[dict[str, Any]]:
         """
-        Execute cosine similarity search with exact pre-filters for category, language, and kb_version.
+        Execute cosine similarity search with exact pre-filters for category, language,
+        kb_version, tenant_id, and branch_id.
         """
         self._ensure_collection()
         now = self._clock()
+        eff_tenant = (tenant_id or "default").strip().lower()
+        eff_branch = (branch_id or "main").strip().lower()
 
         query_filter = qmodels.Filter(
             must=[
@@ -434,6 +464,12 @@ class SemanticCacheStore:
                 ),
                 qmodels.FieldCondition(
                     key="kb_version", match=qmodels.MatchValue(value=kb_version)
+                ),
+                qmodels.FieldCondition(
+                    key="tenant_id", match=qmodels.MatchValue(value=eff_tenant)
+                ),
+                qmodels.FieldCondition(
+                    key="branch_id", match=qmodels.MatchValue(value=eff_branch)
                 ),
             ]
         )
@@ -476,6 +512,8 @@ class SemanticCacheStore:
                     "language": payload.get("language", ""),
                     "query_norm": payload.get("query_norm", ""),
                     "kb_version": payload.get("kb_version", ""),
+                    "tenant_id": payload.get("tenant_id", "default"),
+                    "branch_id": payload.get("branch_id", "main"),
                 }
             )
 
@@ -749,6 +787,8 @@ class CacheLadder:
             category=effective_scope.category,
             language=effective_scope.language,
             kb_version=self.kb_version,
+            tenant_id=effective_scope.tenant_id,
+            branch_id=effective_scope.branch_id,
         )
 
         # ----------------------------------------------------------------------
@@ -812,6 +852,8 @@ class CacheLadder:
                         kb_version=self.kb_version,
                         score_threshold=self.settings.cache_semantic_threshold,
                         limit=1,
+                        tenant_id=effective_scope.tenant_id,
+                        branch_id=effective_scope.branch_id,
                     ),
                     timeout=timeout_s,
                 )
@@ -831,6 +873,8 @@ class CacheLadder:
                         category=effective_scope.category,
                         language=effective_scope.language,
                         kb_version=self.kb_version,
+                        tenant_id=effective_scope.tenant_id,
+                        branch_id=effective_scope.branch_id,
                         created_at=now,
                         expires_at=now + ttl,
                     )
@@ -984,6 +1028,8 @@ class CacheLadder:
             category=scope.category,
             language=scope.language,
             kb_version=self.kb_version,
+            tenant_id=scope.tenant_id,
+            branch_id=scope.branch_id,
         )
         ttl = self._get_ttl_for_category(scope.category)
         now = self._clock()
@@ -995,6 +1041,8 @@ class CacheLadder:
             category=scope.category,
             language=scope.language,
             kb_version=self.kb_version,
+            tenant_id=scope.tenant_id,
+            branch_id=scope.branch_id,
             created_at=now,
             expires_at=now + ttl,
         )
@@ -1018,6 +1066,8 @@ class CacheLadder:
                     "category": scope.category.strip().lower(),
                     "language": scope.language.strip().lower(),
                     "kb_version": self.kb_version,
+                    "tenant_id": (scope.tenant_id or "default").strip().lower(),
+                    "branch_id": (scope.branch_id or "main").strip().lower(),
                     "created_at": now,
                     "expires_at": now + ttl,
                 }

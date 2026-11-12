@@ -17,6 +17,7 @@ import json
 import logging
 import math
 import os
+import re
 import tempfile
 import threading
 import uuid
@@ -378,6 +379,11 @@ class CallMetrics(BaseModel):
     def tool_timeout_count(self) -> int:
         """Alias for `tool_timeouts` used by voice turn orchestration."""
         return self.tool_timeouts
+
+    @property
+    def turn_count(self) -> int:
+        """Alias for `total_user_turns` used by CLI and diagnostic harnesses."""
+        return self.total_user_turns
 
     def record_turn_latency(
         self,
@@ -1061,6 +1067,48 @@ class CallSession(BaseModel):
     # Conversation Memory: Deterministic Context Summary & Sliding Window (R5.1–R5.3)
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _sanitize_context_slot(value: Any) -> str:
+        """Strip ASCII control chars/newlines and neutralize reserved XML tags in dynamic slots."""
+        if value is None:
+            return ""
+        text = str(value)
+        # Replace control characters (including \r, \n, \t, \x00-\x1f, \x7f) with single spaces
+        text = re.sub(r"[\x00-\x1f\x7f]+", " ", text)
+        try:
+            from src.ai_core.guardrails import escape_xml_delimiters
+
+            text = escape_xml_delimiters(text)
+        except Exception:  # noqa: BLE001
+            text = re.sub(r"<[^>]+>", "", text)
+        return re.sub(r"\s+", " ", text).strip()
+
+    @classmethod
+    def _fallback_scrub_pii(cls, payload: Any) -> Any:
+        """Fail-closed regex PII scrub used if get_pii_redactor() raises unexpectedly."""
+        digit_trans = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
+        nid_re = re.compile(r"(?<!\d)[23](?:[\s\-]*\d){13}(?!\d)")
+        phone_re = re.compile(
+            r"(?<!\d)(?:(?:\+?\s*2[\s\-]*0|0[\s\-]*0[\s\-]*2[\s\-]*0)[\s\-]*0?|0)"
+            r"[\s\-]*[123](?:[\s\-]*\d){7,9}(?!\d)"
+        )
+        email_re = re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b")
+
+        def _scrub_str(s: str) -> str:
+            norm = s.translate(digit_trans)
+            norm = nid_re.sub("[REDACTED_NATIONAL_ID]", norm)
+            norm = phone_re.sub("[REDACTED_PHONE]", norm)
+            norm = email_re.sub("[REDACTED_EMAIL]", norm)
+            return norm
+
+        if isinstance(payload, str):
+            return _scrub_str(payload)
+        if isinstance(payload, dict):
+            return {k: cls._fallback_scrub_pii(v) for k, v in payload.items()}
+        if isinstance(payload, list):
+            return [cls._fallback_scrub_pii(v) for v in payload]
+        return payload
+
     def build_context_summary(self) -> str:
         """
         Build a short deterministic system message summarizing known `ClinicCallContext` slots (R5.3).
@@ -1071,29 +1119,41 @@ class CallSession(BaseModel):
         parts: list[str] = []
 
         if ctx.patient_name:
-            parts.append(f"المريض: {ctx.patient_name}")
+            clean_name = self._sanitize_context_slot(ctx.patient_name)
+            if clean_name:
+                parts.append(f"المريض: {clean_name}")
         if ctx.requested_specialty:
-            parts.append(f"التخصص المطلوب: {ctx.requested_specialty}")
+            clean_spec = self._sanitize_context_slot(ctx.requested_specialty)
+            if clean_spec:
+                parts.append(f"التخصص المطلوب: {clean_spec}")
         if ctx.requested_doctor_name:
-            doc_str = ctx.requested_doctor_name
-            if ctx.requested_doctor_id:
-                doc_str += f" (ID={ctx.requested_doctor_id})"
-            parts.append(f"الطبيب: {doc_str}")
+            doc_str = self._sanitize_context_slot(ctx.requested_doctor_name)
+            if doc_str:
+                if ctx.requested_doctor_id:
+                    doc_str += f" (ID={ctx.requested_doctor_id})"
+                parts.append(f"الطبيب: {doc_str}")
         elif ctx.requested_doctor_id:
             parts.append(f"معرف الطبيب: {ctx.requested_doctor_id}")
         if ctx.requested_date:
-            parts.append(f"التاريخ: {ctx.requested_date}")
+            clean_date = self._sanitize_context_slot(ctx.requested_date)
+            if clean_date:
+                parts.append(f"التاريخ: {clean_date}")
         if ctx.visit_type:
-            parts.append(f"نوع الزيارة: {ctx.visit_type}")
+            clean_vt = self._sanitize_context_slot(ctx.visit_type)
+            if clean_vt:
+                parts.append(f"نوع الزيارة: {clean_vt}")
 
         if ctx.bookings:
             b_summaries = []
             for b in ctx.bookings:
-                item = f"{b.booking_code} ({b.action}"
+                b_code = self._sanitize_context_slot(b.booking_code)
+                b_act = self._sanitize_context_slot(b.action)
+                item = f"{b_code} ({b_act}"
                 if b.queue_number is not None:
                     item += f", نمرة {b.queue_number}"
                 if b.appointment_date:
-                    item += f", {b.appointment_date}"
+                    b_date = self._sanitize_context_slot(b.appointment_date)
+                    item += f", {b_date}"
                 item += ")"
                 b_summaries.append(item)
             parts.append("الحجوزات: " + " | ".join(b_summaries))
@@ -1101,7 +1161,9 @@ class CallSession(BaseModel):
         if ctx.emergency_flag:
             parts.append("تنبيه: حالة طوارئ طبية")
         elif ctx.escalation and ctx.escalation.reason:
-            parts.append(f"تحويل للاستقبال: {ctx.escalation.reason}")
+            clean_reason = self._sanitize_context_slot(ctx.escalation.reason)
+            if clean_reason:
+                parts.append(f"تحويل للاستقبال: {clean_reason}")
 
         if not parts:
             return ""
@@ -1207,39 +1269,63 @@ class CallSession(BaseModel):
         """
         Produce a PII-redacted dictionary representation suitable for disk persistence (R6.1).
         Uses `get_pii_redactor()` from `src.ai_core.guardrails` to mask Egyptian phone numbers,
-        14-digit national IDs, emails, and credit cards across `context` and `messages`
-        without mutating the in-memory `CallSession` object.
+        14-digit national IDs, emails, and credit cards across `room_name`, `participant_identity`,
+        `context`, and `messages` without mutating the in-memory `CallSession` object.
+        Fails closed via regex fallback scrub if `get_pii_redactor()` raises.
         """
         raw = json.loads(self.model_dump_json())
         try:
             from src.ai_core.guardrails import get_pii_redactor
 
             redactor = get_pii_redactor()
+            if isinstance(raw.get("room_name"), str):
+                raw["room_name"] = redactor.redact(raw["room_name"])
+            if isinstance(raw.get("participant_identity"), str):
+                raw["participant_identity"] = redactor.redact(raw["participant_identity"])
             if "context" in raw:
                 raw["context"] = redactor.redact_dict(raw["context"])
             if "messages" in raw and isinstance(raw["messages"], list):
                 raw["messages"] = redactor.redact_dict(raw["messages"])
         except Exception as exc:  # noqa: BLE001
-            logger.warning("PII redaction fallback during session export: %s", exc)
+            logger.warning("PII redactor failed during session export; applying fail-closed scrub: %s", exc)
+            if isinstance(raw.get("room_name"), str):
+                raw["room_name"] = self._fallback_scrub_pii(raw["room_name"])
+            if isinstance(raw.get("participant_identity"), str):
+                raw["participant_identity"] = self._fallback_scrub_pii(raw["participant_identity"])
+            if "context" in raw:
+                raw["context"] = self._fallback_scrub_pii(raw["context"])
+            if "messages" in raw:
+                raw["messages"] = self._fallback_scrub_pii(raw["messages"])
         return raw
 
     def to_summary_dict(self) -> dict[str, Any]:
-        """Compact summary dictionary suitable for analytics dashboards."""
+        """Compact PII-redacted summary dictionary suitable for analytics dashboards."""
         finops = self.metrics.finops_snapshot or {}
+
+        def _redact_opt(val: str | None) -> str | None:
+            if not val:
+                return val
+            try:
+                from src.ai_core.guardrails import get_pii_redactor
+
+                return get_pii_redactor().redact(val)
+            except Exception:  # noqa: BLE001
+                return str(self._fallback_scrub_pii(val))
+
         return {
             "session_id": self.session_id,
-            "room_name": self.room_name,
-            "participant_identity": self.participant_identity,
+            "room_name": _redact_opt(self.room_name) or "",
+            "participant_identity": _redact_opt(self.participant_identity) or "",
             "lifecycle": self.lifecycle.value,
             "activity": self.activity.value,
             "status": self.status.value,
             "start_time": self.start_time.isoformat(),
             "end_time": self.end_time.isoformat() if self.end_time else None,
             "duration_seconds": self.metrics.duration_seconds,
-            "patient_name": self.context.patient_name,
-            "patient_phone": self.context.patient_phone,
-            "customer_name": self.context.customer_name,
-            "customer_phone": self.context.customer_phone,
+            "patient_name": _redact_opt(self.context.patient_name),
+            "patient_phone": _redact_opt(self.context.patient_phone),
+            "customer_name": _redact_opt(self.context.customer_name),
+            "customer_phone": _redact_opt(self.context.customer_phone),
             "language": self.context.language,
             "requested_specialty": self.context.requested_specialty,
             "requested_doctor_name": self.context.requested_doctor_name,

@@ -28,21 +28,22 @@ if hasattr(sys.stdout, "reconfigure"):
 
 from livekit import api
 
-from src.config import settings
+from src.config import Settings, get_settings, settings
 from src.db.schemas import clean_egyptian_phone
+
+_DEV_ENVIRONMENTS: frozenset[str] = frozenset(
+    {"dev", "development", "test", "testing", "local"}
+)
 
 
 def _normalize_token_phone(raw_phone: str | None) -> str | None:
-    """Normalize Egyptian mobile numbers when valid, or return stripped non-empty phone."""
+    """Normalize and strictly validate Egyptian mobile numbers for JWT signing."""
     if raw_phone is None:
         return None
     stripped = str(raw_phone).strip()
     if not stripped:
         return None
-    try:
-        return clean_egyptian_phone(stripped)
-    except ValueError:
-        return stripped
+    return clean_egyptian_phone(stripped)
 
 
 def generate_livekit_token(
@@ -58,20 +59,38 @@ def generate_livekit_token(
     branch_id: str | None = None,
     api_key: str | None = None,
     api_secret: str | None = None,
+    settings_obj: Settings | None = None,
 ) -> str:
     """
     Generate a signed LiveKit JWT token for room join with audio publish/subscribe grants
     and verified caller participant attributes (`caller_phone`, `lang`, `tenant_id`, `branch_id`).
     """
-    eff_key = (api_key or settings.livekit_api_key or "devkey").strip()
-    eff_secret = (
-        api_secret
-        or settings.livekit_api_secret
-        or "secret123456789012345678901234567890"
+    cfg = settings_obj or get_settings()
+    is_dev_env = (cfg.environment or "").strip().lower() in _DEV_ENVIRONMENTS
+
+    raw_key = (api_key if api_key is not None else cfg.livekit_api_key or "").strip()
+    raw_secret = (
+        api_secret if api_secret is not None else cfg.livekit_api_secret or ""
     ).strip()
 
+    key_missing = not raw_key or raw_key.lower().startswith("your_") or "your_" in raw_key
+    secret_missing = (
+        not raw_secret or raw_secret.lower().startswith("your_") or "your_" in raw_secret
+    )
+
+    if not is_dev_env and (key_missing or secret_missing):
+        raise ValueError(
+            f"LiveKit API key and secret are required when environment={cfg.environment!r}; "
+            "offline devkey fallback is restricted to development/test environments."
+        )
+
+    eff_key = "devkey" if key_missing else raw_key
+    eff_secret = (
+        "secret123456789012345678901234567890" if secret_missing else raw_secret
+    )
+
     eff_phone = _normalize_token_phone(caller_phone if caller_phone is not None else phone)
-    eff_lang = (lang or settings.deepgram_language or "ar").strip()
+    eff_lang = (lang or cfg.deepgram_language or "ar").strip()
     eff_tenant = (tenant_id or "default").strip()
     eff_branch = (branch_id or "main").strip()
 
@@ -158,18 +177,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    token = generate_livekit_token(
-        room_name=args.room,
-        identity=args.identity,
-        name=args.name,
-        valid_hours=args.hours,
-        caller_phone=args.phone,
-        lang=args.lang,
-        tenant_id=args.tenant_id,
-        branch_id=args.branch_id,
-        api_key=args.api_key,
-        api_secret=args.api_secret,
-    )
+    try:
+        token = generate_livekit_token(
+            room_name=args.room,
+            identity=args.identity,
+            name=args.name,
+            valid_hours=args.hours,
+            caller_phone=args.phone,
+            lang=args.lang,
+            tenant_id=args.tenant_id,
+            branch_id=args.branch_id,
+            api_key=args.api_key,
+            api_secret=args.api_secret,
+        )
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
 
     if args.raw:
         print(token)

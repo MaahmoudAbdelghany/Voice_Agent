@@ -1,7 +1,7 @@
 [project]
 name = "voice-agent"
 version = "0.1.0"
-description = "Production-grade scalable Voice AI Agent for Customer Service"
+description = "Production-grade Voice AI Medical Receptionist for Egyptian Polyclinics"
 authors = [{ name = "Mahmoud Abdelghany" }]
 readme = "README.md"
 requires-python = ">=3.10"

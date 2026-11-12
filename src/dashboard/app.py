@@ -9,7 +9,10 @@ from pathlib import Path
 
 import streamlit as st
 
+from src.agent.session_manager import CallStatus
 from src.config import settings
+from src.dashboard.analytics_data import compute_dashboard_analytics
+from src.dashboard.calls_data import load_call_sessions
 from src.dashboard.health import check_services_health
 from src.dashboard.i18n import t
 
@@ -112,6 +115,20 @@ st.markdown(
 
 
 # 6. Top Overview KPI Cards
+_overview_sessions = load_call_sessions(
+    storage_dir=st.session_state.get("calls_storage_dir")
+)
+_overview_kpis = compute_dashboard_analytics(_overview_sessions)
+_avg_lat_val = _overview_kpis.get("avg_latency_ms", 0.0)
+_avg_lat_str = f"{round(_avg_lat_val)} ms" if _avg_lat_val > 0 else "0 ms"
+_active_calls_count = sum(
+    1
+    for _s in _overview_sessions
+    if _s.status not in (CallStatus.ENDED, CallStatus.ESCALATED)
+)
+_total_calls_count = _overview_kpis.get("total_calls", 0)
+_handoff_rate_str = f"{_overview_kpis.get('escalation_rate', 0.0):.1f}%"
+
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
@@ -119,7 +136,7 @@ with col1:
         f"""
         <div class="kpi-card">
             <div class="kpi-label">{t('kpi_turn_latency', lang)}</div>
-            <div class="kpi-value" style="color: #34D399;">680 ms</div>
+            <div class="kpi-value" style="color: #34D399;">{_avg_lat_str}</div>
             <div class="kpi-subtext">⚡ {t('kpi_turn_latency_sub', lang)}</div>
         </div>
         """,
@@ -131,7 +148,7 @@ with col2:
         f"""
         <div class="kpi-card">
             <div class="kpi-label">{t('kpi_active_calls', lang)}</div>
-            <div class="kpi-value" style="color: #60A5FA;">3</div>
+            <div class="kpi-value" style="color: #60A5FA;">{_active_calls_count}</div>
             <div class="kpi-subtext">📡 {t('kpi_active_calls_sub', lang)}</div>
         </div>
         """,
@@ -143,7 +160,7 @@ with col3:
         f"""
         <div class="kpi-card">
             <div class="kpi-label">{t('kpi_total_calls', lang)}</div>
-            <div class="kpi-value" style="color: #A78BFA;">142</div>
+            <div class="kpi-value" style="color: #A78BFA;">{_total_calls_count}</div>
             <div class="kpi-subtext">📊 {t('kpi_total_calls_sub', lang)}</div>
         </div>
         """,
@@ -155,7 +172,7 @@ with col4:
         f"""
         <div class="kpi-card">
             <div class="kpi-label">{t('kpi_handoff_rate', lang)}</div>
-            <div class="kpi-value" style="color: #FBBF24;">2.8%</div>
+            <div class="kpi-value" style="color: #FBBF24;">{_handoff_rate_str}</div>
             <div class="kpi-subtext">🎯 {t('kpi_handoff_rate_sub', lang)}</div>
         </div>
         """,

@@ -86,10 +86,10 @@ uv run ruff check .
 | T3.5 | ✅ | `tests/test_agent.py::test_input_and_output_guardrails_block_injection_and_diagnosis PASSED` — verified `InputGuardrail` blocks prompt injection & medication requests (`0` LLM calls) and `OutputGuardrail` scrubs unsafe LLM diagnosis & antibiotic dosage output before TTS yield (`cache.tier1_backend.size() == 0`). |
 | T3.6 | ✅ | `tests/test_agent.py::test_unallowed_tool_call_rejected PASSED` — verified non-allowlisted LLM tool calls (`drop_table`, `export_all_patient_records`) are blocked (`SpanStatus.BLOCKED`), logged at `WARNING`, never dispatched, and yield safe fallback. |
 | T3.7 | ✅ | `tests/test_agent.py::test_finops_budget_exhaustion_degrades_gracefully PASSED` — verified daily spend cap breach degrades to `TIER_3_SEARCH_ONLY` (`0` LLM calls, grounded clinic KB fallback) and per-call token budget breach degrades to `TIER_4_HUMAN_ESCALATION` + `transfer_to_receptionist`. |
-| T4.1 | ✅ | `uv run pytest -v` → `586 passed, 3 warnings in 80.22s` (zero regressions across entire test suite, including repository purity guard). |
-| T4.2 | ✅ | `uv run pytest tests/evals/test_golden_evals.py -v` → `10 passed, 2 warnings in 8.32s` (100% golden dataset exact-match, RAGAS thresholds, and adversarial/emergency interception). |
+| T4.1 | ✅ | `uv run pytest -v` → `594 passed, 3 warnings in ~78s` (zero regressions across entire test suite, including repository purity guard and deep-review hardening tests). |
+| T4.2 | ✅ | `uv run pytest tests/evals/test_golden_evals.py -v` → `10 passed, 2 warnings in ~3.3s` (100% golden dataset exact-match, RAGAS thresholds, and adversarial/emergency interception). |
 | T5.1 | ✅ | `uv run ruff check .` → `All checks passed!` (`0` lint/import errors). |
 | Type checks | ⏭ N/A | Not Applicable — no type checker is configured in `pyproject.toml`. |
-| T6.1 | ⏭ N/A | Deferred to Phase Gate 2 manual live voice call (`phase-overview.md` PI.9). |
-| T7.1 | ✅ | `uv run pytest tests/test_agent.py -v` → `17 passed, 2 warnings in 11.87s` (`< 15s` per `NFR1`, 100% offline & deterministic). |
+| T6.1 | ⏭ Deferred | Deferred to Phase Gate 2 manual live voice call (`phase-overview.md` PI.9). |
+| T7.1 | ✅ | `uv run pytest tests/test_agent.py -v` → `19 passed, 2 warnings in ~8.0s` (`< 15s` per `NFR1`, 100% offline & deterministic, including production secret guard and tool-loop cap tests). |
 

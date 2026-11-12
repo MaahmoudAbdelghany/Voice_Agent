@@ -5,97 +5,98 @@ Contains prompt templates, deterministic clinic messages, session manager,
 LiveKit-agnostic clinic turn engine, and real-time WebRTC voice pipeline worker.
 """
 
-from src.agent.messages import (
-    MEDICAL_SAFETY_REMINDER_AR,
-    SYSTEM_UNTRUSTED_DATA_RULES,
-)
-from src.agent.prompts import (
-    DEFAULT_SYSTEM_PROMPT,
-    FEW_SHOT_EXAMPLES,
-    MEDICAL_SAFETY_GUIDELINES,
-    STATIC_PROMPT_MAX_TOKENS,
-    TOOL_USAGE_GUIDELINES,
-    VOICE_STYLE_GUIDELINES,
-    build_dynamic_context,
-    build_emergency_message,
-    build_error_fallback_message,
-    build_goodbye_message,
-    build_greeting_message,
-    build_handoff_message,
-    build_interruption_acknowledgment,
-    build_medical_refusal_message,
-    build_out_of_scope_message,
-    build_static_system_prompt,
-    build_tool_filler_message,
-    estimate_prompt_tokens,
-    get_system_prompt,
-)
-from src.agent.scenarios import (
-    CLINIC_SCENARIOS,
-    CLINIC_SEED_ROSTER,
-    ScenarioAssertionResult,
-    ScenarioDefinition,
-    ScenarioRunReport,
-    ScenarioRuntimeContext,
-    ScenarioTurn,
-    ScriptedClinicLLMProvider,
-    ScriptedLLMResponse,
-    ScriptedStep,
-    ScriptedToolCall,
-    TurnTranscript,
-    build_turn_engine_for_mode,
-    find_next_shift_date,
-    is_live_llm_configured,
-    isolated_clinic_environment,
-    run_all_scenarios,
-    run_simulated_scenario,
-    seed_isolated_clinic_db,
-)
-from src.agent.session_manager import (
-    ALLOWED_LIFECYCLE_TRANSITIONS,
-    BookingRef,
-    CallActivity,
-    CallLifecycle,
-    CallMetrics,
-    CallSession,
-    CallStatus,
-    ClinicCallContext,
-    EscalationInfo,
-    ExtractedContext,
-    MessageRole,
-    SessionManager,
-    StagePercentiles,
-    TurnLatency,
-    TurnMessage,
-    compute_nearest_rank_percentiles,
-    session_manager,
-)
-from src.agent.turn_engine import (
-    CALLER_TOOL_ALLOWLIST,
-    READ_TOOLS,
-    WRITE_TOOLS,
-    ClinicTurnEngine,
-    VerifiedCallerIdentity,
-    get_caller_tool_definitions,
-    is_write_tool_call,
-    requires_verified_caller_phone,
-)
-from src.agent.voice_agent import (
-    ClinicVoiceAgent,
-    GatewayBackedLLM,
-    attach_session_lifecycle_hooks,
-    create_stt,
-    create_tts,
-    create_vad,
-    create_voice_pipeline,
-    entrypoint,
-    extract_latest_user_utterance,
-    extract_verified_caller_identity,
-    get_worker_options,
-    handle_session_close,
-    prewarm,
-    run_worker,
-)
+from __future__ import annotations
+
+import importlib
+from typing import Any
+
+_SUBMODULE_EXPORTS: dict[str, str] = {
+    # messages
+    "MEDICAL_SAFETY_REMINDER_AR": "src.agent.messages",
+    "SYSTEM_UNTRUSTED_DATA_RULES": "src.agent.messages",
+    # prompts
+    "DEFAULT_SYSTEM_PROMPT": "src.agent.prompts",
+    "FEW_SHOT_EXAMPLES": "src.agent.prompts",
+    "MEDICAL_SAFETY_GUIDELINES": "src.agent.prompts",
+    "STATIC_PROMPT_MAX_TOKENS": "src.agent.prompts",
+    "TOOL_USAGE_GUIDELINES": "src.agent.prompts",
+    "VOICE_STYLE_GUIDELINES": "src.agent.prompts",
+    "build_dynamic_context": "src.agent.prompts",
+    "build_emergency_message": "src.agent.prompts",
+    "build_error_fallback_message": "src.agent.prompts",
+    "build_goodbye_message": "src.agent.prompts",
+    "build_handoff_message": "src.agent.prompts",
+    "build_greeting_message": "src.agent.prompts",
+    "build_interruption_acknowledgment": "src.agent.prompts",
+    "build_medical_refusal_message": "src.agent.prompts",
+    "build_out_of_scope_message": "src.agent.prompts",
+    "build_static_system_prompt": "src.agent.prompts",
+    "build_tool_filler_message": "src.agent.prompts",
+    "estimate_prompt_tokens": "src.agent.prompts",
+    "get_system_prompt": "src.agent.prompts",
+    # scenarios
+    "CLINIC_SCENARIOS": "src.agent.scenarios",
+    "CLINIC_SEED_ROSTER": "src.agent.scenarios",
+    "ScenarioAssertionResult": "src.agent.scenarios",
+    "ScenarioDefinition": "src.agent.scenarios",
+    "ScenarioRunReport": "src.agent.scenarios",
+    "ScenarioRuntimeContext": "src.agent.scenarios",
+    "ScenarioTurn": "src.agent.scenarios",
+    "ScriptedClinicLLMProvider": "src.agent.scenarios",
+    "ScriptedLLMResponse": "src.agent.scenarios",
+    "ScriptedStep": "src.agent.scenarios",
+    "ScriptedToolCall": "src.agent.scenarios",
+    "TurnTranscript": "src.agent.scenarios",
+    "build_turn_engine_for_mode": "src.agent.scenarios",
+    "find_next_shift_date": "src.agent.scenarios",
+    "is_live_llm_configured": "src.agent.scenarios",
+    "isolated_clinic_environment": "src.agent.scenarios",
+    "run_all_scenarios": "src.agent.scenarios",
+    "run_simulated_scenario": "src.agent.scenarios",
+    "seed_isolated_clinic_db": "src.agent.scenarios",
+    # session_manager
+    "ALLOWED_LIFECYCLE_TRANSITIONS": "src.agent.session_manager",
+    "BookingRef": "src.agent.session_manager",
+    "CallActivity": "src.agent.session_manager",
+    "CallLifecycle": "src.agent.session_manager",
+    "CallMetrics": "src.agent.session_manager",
+    "CallSession": "src.agent.session_manager",
+    "CallStatus": "src.agent.session_manager",
+    "ClinicCallContext": "src.agent.session_manager",
+    "EscalationInfo": "src.agent.session_manager",
+    "ExtractedContext": "src.agent.session_manager",
+    "MessageRole": "src.agent.session_manager",
+    "SessionManager": "src.agent.session_manager",
+    "StagePercentiles": "src.agent.session_manager",
+    "TurnLatency": "src.agent.session_manager",
+    "TurnMessage": "src.agent.session_manager",
+    "compute_nearest_rank_percentiles": "src.agent.session_manager",
+    "session_manager": "src.agent.session_manager",
+    # turn_engine
+    "CALLER_TOOL_ALLOWLIST": "src.agent.turn_engine",
+    "READ_TOOLS": "src.agent.turn_engine",
+    "WRITE_TOOLS": "src.agent.turn_engine",
+    "ClinicTurnEngine": "src.agent.turn_engine",
+    "VerifiedCallerIdentity": "src.agent.turn_engine",
+    "get_caller_tool_definitions": "src.agent.turn_engine",
+    "is_write_tool_call": "src.agent.turn_engine",
+    "requires_verified_caller_phone": "src.agent.turn_engine",
+    # voice_agent
+    "ClinicVoiceAgent": "src.agent.voice_agent",
+    "GatewayBackedLLM": "src.agent.voice_agent",
+    "attach_session_lifecycle_hooks": "src.agent.voice_agent",
+    "create_stt": "src.agent.voice_agent",
+    "create_tts": "src.agent.voice_agent",
+    "create_vad": "src.agent.voice_agent",
+    "create_voice_pipeline": "src.agent.voice_agent",
+    "entrypoint": "src.agent.voice_agent",
+    "extract_latest_user_utterance": "src.agent.voice_agent",
+    "extract_verified_caller_identity": "src.agent.voice_agent",
+    "get_worker_options": "src.agent.voice_agent",
+    "handle_session_close": "src.agent.voice_agent",
+    "prewarm": "src.agent.voice_agent",
+    "run_worker": "src.agent.voice_agent",
+}
 
 __all__ = [
     "ALLOWED_LIFECYCLE_TRANSITIONS",
@@ -178,3 +179,18 @@ __all__ = [
     "seed_isolated_clinic_db",
     "session_manager",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    module_path = _SUBMODULE_EXPORTS.get(name)
+    if module_path is not None:
+        module = importlib.import_module(module_path)
+        attr = getattr(module, name)
+        globals()[name] = attr
+        return attr
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals().keys()) | set(__all__))
+

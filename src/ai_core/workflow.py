@@ -22,6 +22,7 @@ Guarantees:
 from __future__ import annotations
 
 import datetime as dt
+import importlib
 import logging
 import time
 from enum import Enum
@@ -52,6 +53,35 @@ from src.tools.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+_appointment_booking_mod = importlib.import_module("src.tools.appointment_booking")
+_gates_mod = importlib.import_module("src.tools.gates")
+_manage_appointment_mod = importlib.import_module("src.tools.manage_appointment")
+
+_ORIG_WORKFLOW_TODAY = get_cairo_today
+_ORIG_GATES_TODAY = _gates_mod.get_cairo_today
+_ORIG_GATES_NOW = _gates_mod._get_cairo_now
+
+
+def _resolve_workflow_clocks(wf_action: WorkflowAction) -> tuple[dt.date, dt.datetime]:
+    """Resolve Cairo today/now while honoring test monkeypatches across workflow, gates, and tool modules."""
+    if get_cairo_today is not _ORIG_WORKFLOW_TODAY:
+        today = get_cairo_today()
+    elif _gates_mod.get_cairo_today is not _ORIG_GATES_TODAY:
+        today = _gates_mod.get_cairo_today()
+    elif wf_action == WorkflowAction.BOOK:
+        today = _appointment_booking_mod.get_cairo_today()
+    else:
+        today = _manage_appointment_mod.get_cairo_today()
+
+    if _gates_mod._get_cairo_now is not _ORIG_GATES_NOW:
+        now_dt = _gates_mod._get_cairo_now()
+    elif wf_action == WorkflowAction.BOOK:
+        now_dt = _appointment_booking_mod.get_cairo_now()
+    else:
+        now_dt = _manage_appointment_mod.get_cairo_now()
+
+    return today, now_dt
 
 
 class WorkflowState(str, Enum):
@@ -226,11 +256,12 @@ class AppointmentWorkflowStateMachine:
                 notes=notes,
             )
 
+        from src.ai_core.guardrails import get_pii_redactor
+
         action_label = action.value if isinstance(action, WorkflowAction) else str(action)
-        with span_scope(
-            f"workflow.{action_label}",
-            kind=SpanKind.WORKFLOW,
-            input_payload={
+        redactor = get_pii_redactor()
+        safe_span_payload = redactor.redact_dict(
+            {
                 "action": action_label,
                 "patient_name": patient_name,
                 "patient_phone": patient_phone or phone,
@@ -239,7 +270,12 @@ class AppointmentWorkflowStateMachine:
                 "date": str(date) if date is not None else None,
                 "new_date": str(new_date) if new_date is not None else None,
                 "booking_code": booking_code,
-            },
+            }
+        )
+        with span_scope(
+            f"workflow.{action_label}",
+            kind=SpanKind.WORKFLOW,
+            input_payload=safe_span_payload,
         ) as sp:
             res = await self._execute_impl(
                 action,
@@ -350,7 +386,7 @@ class AppointmentWorkflowStateMachine:
             # Validate required slots per action before touching DB
             slot_error_msg: str | None = None
             slot_error_code: str | None = None
-            cairo_today = get_cairo_today()
+            cairo_today, cairo_now = _resolve_workflow_clocks(wf_action)
 
             if wf_action == WorkflowAction.BOOK:
                 if not effective_name or len(effective_name) < 2:
@@ -452,12 +488,16 @@ class AppointmentWorkflowStateMachine:
                         date=date,
                         visit_type=visit_type,
                         notes=notes,
+                        cairo_today=cairo_today,
+                        cairo_now=cairo_now,
                     )
                 elif wf_action == WorkflowAction.CANCEL:
                     verdict = await self.gate.verify_cancellation(
                         repo,
                         booking_code=booking_code,
                         phone=effective_phone,
+                        cairo_today=cairo_today,
+                        cairo_now=cairo_now,
                     )
                 elif wf_action == WorkflowAction.RESCHEDULE:
                     verdict = await self.gate.verify_reschedule(
@@ -465,6 +505,8 @@ class AppointmentWorkflowStateMachine:
                         booking_code=booking_code,
                         phone=effective_phone,
                         new_date=new_date,
+                        cairo_today=cairo_today,
+                        cairo_now=cairo_now,
                     )
                 else:
                     # LOOKUP gate check: verify ownership if booking_code and effective_phone given
@@ -711,9 +753,17 @@ class AppointmentWorkflowStateMachine:
                 step_traces=traces,
                 total_latency_ms=(time.perf_counter() - overall_start) * 1000.0,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             # Privacy invariant (NFR3): never log raw phone numbers
-            logger.exception("Unhandled error in AppointmentWorkflowStateMachine")
+            from src.ai_core.guardrails import get_pii_redactor
+
+            safe_err = get_pii_redactor().redact(str(exc))
+            logger.error(
+                "Unhandled error in AppointmentWorkflowStateMachine (%s): %s",
+                type(exc).__name__,
+                safe_err,
+                exc_info=False,
+            )
             err_msg = (
                 "عذراً، حدث خطأ تقني غير متوقع أثناء تنفيذ طلبك. "
                 "جاري تحويلك لموظف الاستقبال للمساعدة."

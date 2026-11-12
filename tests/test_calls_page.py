@@ -19,7 +19,6 @@ from src.agent.session_manager import (
     EscalationInfo,
     MessageRole,
     SessionManager,
-    TurnMessage,
 )
 from src.dashboard.calls_data import (
     filter_call_sessions,
@@ -339,6 +338,43 @@ class TestCallsPageTier2Integration:
         app.run(timeout=10)
         assert len(app.exception) == 0
 
+    def test_calls_page_stored_xss_payload_is_html_escaped(self, tmp_path: Path):
+        """Verify <img src=x onerror=alert(1)> in caller transcript/name is HTML-escaped."""
+        xss_dir = tmp_path / "xss_calls"
+        xss_dir.mkdir(parents=True, exist_ok=True)
+        mgr = SessionManager(storage_dir=xss_dir)
+
+        xss_payload = "<img src=x onerror=alert(1)>"
+        sess = mgr.create_session(
+            session_id="call-xss-probe-01",
+            room_name="clinic-room-xss",
+            participant_identity="caller-xss",
+            language="ar",
+        )
+        sess.context.patient_name = f"مريض {xss_payload}"
+        sess.context.customer_name = f"مريض {xss_payload}"
+        sess.context.requested_specialty = f"باطنة {xss_payload}"
+        sess.context.requested_doctor_name = f"د. طارق {xss_payload}"
+        sess.context.escalated = True
+        sess.context.escalation_department = f"reception {xss_payload}"
+        sess.context.escalation_reason = f"سبب {xss_payload}"
+        sess.add_turn(
+            role=MessageRole.USER,
+            content=f"مرحباً {xss_payload}",
+            stt_latency_ms=110.0,
+        )
+        sess.status = CallStatus.ESCALATED
+        mgr.save_session(sess.session_id)
+
+        app = AppTest.from_file(CALLS_PAGE_FILE)
+        app.session_state["calls_storage_dir"] = str(xss_dir)
+        app.run(timeout=10)
+        assert len(app.exception) == 0
+
+        rendered_html = "\n".join(m.value for m in app.markdown)
+        assert xss_payload not in rendered_html
+        assert "&lt;img src=x onerror=alert(1)&gt;" in rendered_html
+
 
 # ==============================================================================
 # Tier 3: Error & Edge-Case Verification Tests
@@ -379,13 +415,27 @@ class TestCallsPageTier3EdgeCases:
         filtered = filter_call_sessions([sess], search_query="empty")
         assert len(filtered) == 1
 
-    def test_tool_turn_without_result(self):
-        """Verify turn with role == TOOL but null tool_result does not fail."""
-        turn = TurnMessage(
+    def test_tool_turn_without_result(self, tmp_path: Path):
+        """Verify turn with role == TOOL and null tool_result persists and renders cleanly."""
+        null_tool_dir = tmp_path / "null_tool_calls"
+        mgr = SessionManager(storage_dir=null_tool_dir)
+        sess = mgr.create_session(session_id="call-null-tool-01", language="ar")
+        sess.add_turn(
             role=MessageRole.TOOL,
             content="Tool executed with empty result",
             tool_name="check_doctor_availability",
             tool_result=None,
         )
-        assert turn.tool_result is None
-        assert turn.role == MessageRole.TOOL
+        sess.status = CallStatus.ENDED
+        mgr.save_session(sess.session_id)
+
+        loaded = load_call_sessions(storage_dir=null_tool_dir)
+        assert len(loaded) == 1
+        assert loaded[0].messages[0].tool_result is None
+        assert loaded[0].messages[0].role == MessageRole.TOOL
+
+        app = AppTest.from_file(CALLS_PAGE_FILE)
+        app.session_state["calls_storage_dir"] = str(null_tool_dir)
+        app.run(timeout=10)
+        assert len(app.exception) == 0
+

@@ -3,7 +3,7 @@
 - **Phase branch**: `phase/5-livekit-voice-core`
 - **Roadmap section**: `spec/roadmap.md` → Phase 5
 - **Execution mode**: Phase mode (default, chosen by the human)
-- **Status**: Implementing (Approved at Phase Gate 1)
+- **Status**: Validated (Awaiting Phase Gate 2)
 
 ---
 
@@ -15,10 +15,10 @@ Serve the mission's core promise (`spec/mission.md`): an Egyptian-Arabic voice r
 |:---|:---|:---|:---|:---|:---|
 | 1 | Feature 5.1 | `spec/features/feature-511-clinic-persona-system-prompts/` | M | ✅ Done | — |
 | 2 | Feature 5.2 | `spec/features/feature-512-medical-call-session-state-metrics/` | M | ✅ Done | 5.1 |
-| 3 | Feature 5.3 | `spec/features/feature-513-legacy-restaurant-purge/` | M | 🆕 New | — |
-| 4 | Feature 5.4 | `spec/features/feature-514-livekit-voice-worker/` | M/L | 🆕 New | 5.1, 5.2, 5.3 |
-| 5 | Feature 5.5 | `spec/features/feature-515-cli-simulated-call-runner/` | M | 🆕 New | 5.4 |
-| 6 | Feature 5.6 | `spec/features/feature-516-voice-orchestration-test-suite/` | M | 🆕 New | 5.4, 5.5 |
+| 3 | Feature 5.3 | `spec/features/feature-513-legacy-restaurant-purge/` | M | ✅ Done | — |
+| 4 | Feature 5.4 | `spec/features/feature-514-livekit-voice-worker/` | M/L | ✅ Done | 5.1, 5.2, 5.3 |
+| 5 | Feature 5.5 | `spec/features/feature-515-cli-simulated-call-runner/` | M | ✅ Done | 5.4 |
+| 6 | Feature 5.6 | `spec/features/feature-516-voice-orchestration-test-suite/` | M | ✅ Done | 5.4, 5.5 |
 
 **Merge/split decisions made during the interview:**
 - New **Feature 5.3 — Legacy Restaurant Purge** inserted before the worker (human, Q2–Q4). Former 5.3/5.4/5.5 are renumbered 5.4/5.5/5.6.
@@ -77,14 +77,14 @@ flowchart LR
 **Phase-wide `tech.md` invariants:** §1 latency budget (as amended), §3 medical safety (no diagnosis, emergency → instruction + `transfer_to_receptionist`), §4 barge-in, §5 tool resilience, §6 session/privacy, §7 tracing hygiene (PII masked), §8 FinOps (150 max tokens/turn, 8,000/call, $10/day), §9 untrusted content (XML delimiters), §10 identity & allowlist.
 
 ## 5. Phase-Level Integration Validation
-- [ ] PI.1 — Simulated booking call end-to-end (`uv run python scripts/test_call.py --scenario booking`) → greeting, availability check, booking committed with queue number, session persisted PII-redacted, trace emitted.
-- [ ] PI.2 — Simulated emergency call (`--scenario emergency`) → emergency instruction + receptionist escalation, no LLM diagnosis.
-- [ ] PI.3 — Simulated unverified-caller booking attempt (`--scenario unverified-booking`) → no DB write, receptionist handoff offered.
-- [ ] PI.4 — No restaurant term or module remains anywhere in `src/`, `scripts/`, `tests/` (guard test from 5.3 stays green after 5.4–5.6).
-- [ ] PI.5 — Full suite: `uv run pytest -v`
-- [ ] PI.6 — Lint: `uv run ruff check .`
-- [ ] PI.7 — Golden evals (prompts/ai_core paths touched): `uv run pytest tests/evals/test_golden_evals.py -v`
-- [ ] PI.8 — Worker imports and builds its options without network/keys: `uv run python -c "import src.agent.voice_agent"`
+- [x] PI.1 — Simulated booking call end-to-end (`uv run python scripts/test_call.py --scenario booking`) → greeting, availability check, booking committed with queue number, session persisted PII-redacted, trace emitted.
+- [x] PI.2 — Simulated emergency call (`--scenario emergency`) → emergency instruction + receptionist escalation, no LLM diagnosis.
+- [x] PI.3 — Simulated unverified-caller booking attempt (`--scenario unverified-booking`) → no DB write, receptionist handoff offered.
+- [x] PI.4 — No restaurant term or module remains anywhere in `src/`, `scripts/`, `tests/` (guard test from 5.3 stays green after 5.4–5.6).
+- [x] PI.5 — Full suite: `uv run pytest -v` (`594 passed, 0 failed, 0 skipped`)
+- [x] PI.6 — Lint: `uv run ruff check .` (`All checks passed!`)
+- [x] PI.7 — Golden evals (prompts/ai_core paths touched): `uv run pytest tests/evals/test_golden_evals.py -v` (`10 passed`)
+- [x] PI.8 — Worker imports and builds its options without network/keys: `uv run python -c "import src.agent.voice_agent"` (`ServerType.ROOM`)
 - [ ] PI.9 — Manual (human, Phase Gate 2): real voice call through `livekit console` or the LiveKit playground with a token from `scripts/generate_token.py --phone …`; book, then cancel, then interrupt the agent mid-sentence, then say an emergency phrase.
 
 ## 6. Risks & Stop Conditions
@@ -101,7 +101,8 @@ Stop and ask the human if: a feature stays red after 2 fix attempts, or a fix ne
 ## 7. Execution Log (filled by the orchestrator)
 | Feature | Subagent result | Validation | Local commit | Notes |
 |:---|:---|:---|:---|:---|
-| Feature 5.3 | ✅ Implemented | ✅ 160 targeted / 533 full passed, ruff clean | `ca8828a` | Deleted 9 legacy files, cleaned 31 files, added purity guard |
-| Feature 5.4 | ✅ Implemented | ✅ 24 worker tests / 558 full passed, ruff clean | `bedbcde` | Created `turn_engine.py`, `voice_agent.py`, `test_voice_worker.py`, signed JWT `--phone`/`--lang` |
-| Feature 5.5 | ✅ Implemented | ✅ 11 scenario tests + 6/6 CLI scenarios / 569 full passed, ruff clean | `2698073` | Created `scenarios.py`, `scripts/test_call.py`, `test_simulated_scenarios.py` |
-| Feature 5.6 | ✅ Implemented | ✅ 17 agent tests (11.0s) / 10 golden evals / 586 full passed, ruff clean | `ad80eb4` | Created `tests/test_agent.py` covering full voice orchestration & guardrails |
+| Feature 5.3 | ✅ Implemented | ✅ 160 targeted / 533 full passed, ruff clean | `92aac2c` | Deleted 9 legacy files, cleaned 31 files, added purity guard |
+| Feature 5.4 | ✅ Implemented | ✅ 24 worker tests / 558 full passed, ruff clean | `d478aa0` | Created `turn_engine.py`, `voice_agent.py`, `test_voice_worker.py`, signed JWT `--phone`/`--lang` |
+| Feature 5.5 | ✅ Implemented | ✅ 11 scenario tests + 6/6 CLI scenarios / 569 full passed, ruff clean | `e903cec` | Created `scenarios.py`, `scripts/test_call.py`, `test_simulated_scenarios.py` |
+| Feature 5.6 | ✅ Implemented | ✅ 17 agent tests (11.0s) / 10 golden evals / 586 full passed, ruff clean | `b45f66e` | Created `tests/test_agent.py` covering full voice orchestration & guardrails |
+| Phase 5 Deep Review | ✅ 4-lens review + fixes | ✅ 19 agent tests / 6/6 CLI scenarios / 10 golden evals / 594 full passed, ruff clean | `fix(phase5)` | Resolved Security/PII, Architecture, Spec Drift, and Test Isolation findings; wrote `phase-review.md` |

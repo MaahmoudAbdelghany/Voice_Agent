@@ -35,6 +35,12 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
+    # --- Runtime Environment ---
+    environment: str = Field(
+        default="development",
+        description="Runtime deployment environment (development, test, staging, production)",
+    )
+
     # --- LiveKit Real-time Voice Infrastructure ---
     livekit_url: str = Field(
         default="wss://demo.livekit.cloud",

@@ -73,7 +73,14 @@ from src.config import Settings
 from src.db.base import Base
 from src.db.models import Appointment, Doctor, DoctorSchedule, Patient, Specialty
 from src.db.schemas import DayOfWeek
-from src.tools import ToolResult, appointment_booking_tool, get_idempotency_store
+from src.tools import (
+    ToolResult,
+    appointment_booking_tool,
+    doctor_availability_tool,
+    get_idempotency_store,
+    manage_appointment_tool,
+    receptionist_handoff_tool,
+)
 from src.tools.doctor_availability import CAIRO_TZ
 
 FROZEN_TODAY = date(2026, 10, 24)  # Saturday (DayOfWeek.SATURDAY = 0)
@@ -148,7 +155,11 @@ class ScriptedGateway:
 
 
 def _build_offline_cache(cfg: Settings | None = None) -> CacheLadder:
-    eff_cfg = cfg or Settings(cache_semantic_enabled=False, llama_guard_enabled=False)
+    eff_cfg = cfg or Settings(
+        _env_file=None,
+        cache_semantic_enabled=False,
+        llama_guard_enabled=False,
+    )
     return CacheLadder(
         settings=eff_cfg,
         tier1_backend=InMemoryLRUBackend(max_entries=64),
@@ -205,8 +216,15 @@ async def sqlite_clinic_db(tmp_path):
         await session.commit()
         doctor_id = doctor.id
 
-    prev_factory = appointment_booking_tool.session_factory
-    appointment_booking_tool.session_factory = factory
+    db_tools = (
+        doctor_availability_tool,
+        appointment_booking_tool,
+        manage_appointment_tool,
+        receptionist_handoff_tool,
+    )
+    prev_factories = [t.session_factory for t in db_tools]
+    for t in db_tools:
+        t.session_factory = factory
     with (
         patch("src.tools.gates.get_cairo_today", return_value=FROZEN_TODAY),
         patch("src.tools.appointment_booking.get_cairo_today", return_value=FROZEN_TODAY),
@@ -215,7 +233,8 @@ async def sqlite_clinic_db(tmp_path):
         try:
             yield factory, doctor_id
         finally:
-            appointment_booking_tool.session_factory = prev_factory
+            for t, prev in zip(db_tools, prev_factories):
+                t.session_factory = prev
             get_idempotency_store().clear()
             await engine.dispose()
 
@@ -859,15 +878,13 @@ async def test_t2_6_session_close_hook_persists_pii_redacted_json_with_ended_lif
     voice_agent.call_session.add_assistant_message("أهلاً بحضرتك يا أستاذ محمود.")
 
     # Emit LiveKit AgentSession 'close' event and await persistence completion
+    assert callable(handle_session_close)
     agent_session.emit("close", SimpleNamespace(reason="user_initiated"))
     persisted_path = storage_dir / f"{sid}.json"
-    for _ in range(40):
+    for _ in range(50):
         if persisted_path.exists():
             break
         await asyncio.sleep(0.02)
-
-    if not persisted_path.exists():
-        await handle_session_close(voice_agent.call_session, manager=mgr)
 
     assert persisted_path.exists()
     raw_json = persisted_path.read_text(encoding="utf-8")
@@ -1290,10 +1307,11 @@ async def test_t3_6_barge_in_generator_close_preserves_shielded_sqlite_write(
     from src.tools import async_execute_tool as real_async_execute_tool
 
     write_started = asyncio.Event()
+    release_write = asyncio.Event()
 
     async def delayed_real_sqlite_booking(name: str, args: dict[str, Any]) -> ToolResult:
         write_started.set()
-        await asyncio.sleep(0.16)
+        await release_write.wait()
         return await real_async_execute_tool(name, args)
 
     engine = ClinicTurnEngine(
@@ -1317,7 +1335,7 @@ async def test_t3_6_barge_in_generator_close_preserves_shielded_sqlite_write(
         caller_identity=identity,
     )
 
-    # Consume the 50ms filler chunk while the 160ms SQLite write is mid-flight
+    # Consume the filler chunk while the SQLite write is gated on release_write
     first_chunk = await gen.__anext__()
     assert first_chunk == build_tool_filler_message("book_appointment", language="ar")
     assert write_started.is_set()
@@ -1328,6 +1346,7 @@ async def test_t3_6_barge_in_generator_close_preserves_shielded_sqlite_write(
     # Allow the shielded background write task to finish committing to SQLite
     pending_tasks = list(engine.inflight_write_tasks)
     assert len(pending_tasks) >= 1
+    release_write.set()
     await asyncio.gather(*pending_tasks)
 
     async with factory() as db_sess:

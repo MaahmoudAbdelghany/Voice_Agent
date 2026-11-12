@@ -5,7 +5,7 @@
 - **فرع المرحلة:** `phase/5-livekit-voice-core`
 - **القسم في خارطة الطريق:** `spec/roadmap.md` ← المرحلة الخامسة (`Phase 5`)
 - **وضع التنفيذ:** وضع المرحلة الكاملة (`Phase mode` — الوضع الافتراضي باختيارك)
-- **الحالة:** مسودة (`Draft`) ← معتمدة (`Phase Gate 1`) ← قيد التنفيذ (`Implementing`) ← تم التحقق (`Validated`) ← معتمدة (`Phase Gate 2`) ← مدمجة (`Merged`)
+- **الحالة:** تم التحقق — بانتظار اعتماد `Phase Gate 2` (`Validated — Awaiting Phase Gate 2`)
 
 ---
 
@@ -22,10 +22,10 @@
 |:---|:---|:---|:---|:---|:---|
 | ١ | `Feature 5.1` | `spec/features/feature-511-clinic-persona-system-prompts/` | متوسط (`M`) | ✅ مكتملة | — |
 | ٢ | `Feature 5.2` | `spec/features/feature-512-medical-call-session-state-metrics/` | متوسط (`M`) | ✅ مكتملة | `5.1` |
-| ٣ | `Feature 5.3` | `spec/features/feature-513-legacy-restaurant-purge/` | متوسط (`M`) | 🆕 جديدة | — |
-| ٤ | `Feature 5.4` | `spec/features/feature-514-livekit-voice-worker/` | متوسط/كبير (`M/L`) | 🆕 جديدة | `5.1`, `5.2`, `5.3` |
-| ٥ | `Feature 5.5` | `spec/features/feature-515-cli-simulated-call-runner/` | متوسط (`M`) | 🆕 جديدة | `5.4` |
-| ٦ | `Feature 5.6` | `spec/features/feature-516-voice-orchestration-test-suite/` | متوسط (`M`) | 🆕 جديدة | `5.4`, `5.5` |
+| ٣ | `Feature 5.3` | `spec/features/feature-513-legacy-restaurant-purge/` | متوسط (`M`) | ✅ مكتملة | — |
+| ٤ | `Feature 5.4` | `spec/features/feature-514-livekit-voice-worker/` | متوسط/كبير (`M/L`) | ✅ مكتملة | `5.1`, `5.2`, `5.3` |
+| ٥ | `Feature 5.5` | `spec/features/feature-515-cli-simulated-call-runner/` | متوسط (`M`) | ✅ مكتملة | `5.4` |
+| ٦ | `Feature 5.6` | `spec/features/feature-516-voice-orchestration-test-suite/` | متوسط (`M`) | ✅ مكتملة | `5.4`, `5.5` |
 
 ### قرارات الدمج والتقسيم أثناء المقابلة
 - **إدراج ميزة جديدة أولاً (`Feature 5.3 — Legacy Restaurant Purge`):** تُنفَّذ قبل بناء الـ Worker (بناءً على إجابات الأسئلة ٢–٤)، مع إعادة ترقيم الميزات السابقة `5.3` و`5.4` و`5.5` لتصبح `5.4` و`5.5` و`5.6`.
@@ -101,14 +101,14 @@ flowchart LR
 ---
 
 ## ٥. التحقق التكاملي على مستوى المرحلة (`Phase-Level Validation`)
-- [ ] **فحص `PI.1` — محاكاة مكالمة حجز كاملة** (`uv run python scripts/test_call.py --scenario booking`): الترحيب، وفحص المواعيد المتاحة، وتأكيد الحجز برقم الدور، وحفظ الجلسة بعد تقنيع البيانات الشخصية، وإصدار أثر التتبّع (`Trace`).
-- [ ] **فحص `PI.2` — محاكاة مكالمة طوارئ** (`--scenario emergency`): نطق توجيه الطوارئ مع التحويل لموظف الاستقبال بدون أي تشخيص من الـ LLM.
-- [ ] **فحص `PI.3` — محاكاة حجز لمتصل غير موثّق الرقم** (`--scenario unverified-booking`): عدم كتابة أي سجل في قاعدة البيانات وعرض التحويل لموظف الاستقبال.
-- [ ] **فحص `PI.4` — نقاء الكود من المطعم:** عدم بقاء أي مصطلح أو ملف خاص بالمطعم في `src/` أو `scripts/` أو `tests/` (بقاء اختبار الحماية من `5.3` أخضر بعد اكتمال `5.4`–`5.6`).
-- [ ] **فحص `PI.5` — حزمة الاختبارات الكاملة:** نجاح الأمر `uv run pytest -v`.
-- [ ] **فحص `PI.6` — فحص جودة الكود:** نظافة مخرجات `uv run ruff check .`.
-- [ ] **فحص `PI.7` — التقييمات الذهبية (`Golden Evals`):** نجاح الأمر `uv run pytest tests/evals/test_golden_evals.py -v`.
-- [ ] **فحص `PI.8` — استيراد الـ Worker بدون إنترنت أو مفاتيح:** نجاح الأمر `uv run python -c "import src.agent.voice_agent"`.
+- [x] **فحص `PI.1` — محاكاة مكالمة حجز كاملة** (`uv run python scripts/test_call.py --scenario booking`): الترحيب، وفحص المواعيد المتاحة، وتأكيد الحجز برقم الدور، وحفظ الجلسة بعد تقنيع البيانات الشخصية، وإصدار أثر التتبّع (`Trace`).
+- [x] **فحص `PI.2` — محاكاة مكالمة طوارئ** (`--scenario emergency`): نطق توجيه الطوارئ مع التحويل لموظف الاستقبال بدون أي تشخيص من الـ LLM.
+- [x] **فحص `PI.3` — محاكاة حجز لمتصل غير موثّق الرقم** (`--scenario unverified-booking`): عدم كتابة أي سجل في قاعدة البيانات وعرض التحويل لموظف الاستقبال.
+- [x] **فحص `PI.4` — نقاء الكود من المطعم:** عدم بقاء أي مصطلح أو ملف خاص بالمطعم في `src/` أو `scripts/` أو `tests/` (بقاء اختبار الحماية من `5.3` أخضر بعد اكتمال `5.4`–`5.6`).
+- [x] **فحص `PI.5` — حزمة الاختبارات الكاملة:** نجاح الأمر `uv run pytest -v` (`594 passed, 0 failed, 0 skipped`).
+- [x] **فحص `PI.6` — فحص جودة الكود:** نظافة مخرجات `uv run ruff check .` (`All checks passed!`).
+- [x] **فحص `PI.7` — التقييمات الذهبية (`Golden Evals`):** نجاح الأمر `uv run pytest tests/evals/test_golden_evals.py -v` (`10 passed`).
+- [x] **فحص `PI.8` — استيراد الـ Worker بدون إنترنت أو مفاتيح:** نجاح الأمر `uv run python -c "import src.agent.voice_agent"` (`ServerType.ROOM`).
 - [ ] **فحص `PI.9` — فحص يدوي بواسطتك عند `Phase Gate 2`:** إجراء مكالمة صوتية حقيقية عبر `livekit console` أو LiveKit Playground باستخدام توكن من `scripts/generate_token.py --phone …`؛ لتجربة الحجز، ثم الإلغاء، ثم مقاطعة الوكيل أثناء الكلام (`Barge-in`)، ثم قول جملة طوارئ.
 
 ---
@@ -131,5 +131,10 @@ flowchart LR
 
 | الميزة | نتيجة التنفيذ | التحقق (`Validation`) | الـ Commit المحلي | ملاحظات |
 |:---|:---|:---|:---|:---|
+| `Feature 5.3` | ✅ تم التنفيذ | ✅ `160` اختبار مستهدف / `533` شامل، و`ruff` نظيف | `92aac2c` | حذف `9` ملفات مطعم قديمة، وتطهير `31` ملفاً، وإضافة اختبار حماية نقاء الكود |
+| `Feature 5.4` | ✅ تم التنفيذ | ✅ `24` اختبار Worker / `558` شامل، و`ruff` نظيف | `d478aa0` | بناء `turn_engine.py` و`voice_agent.py` و`test_voice_worker.py` وتوكن JWT موقّع (`--phone`/`--lang`) |
+| `Feature 5.5` | ✅ تم التنفيذ | ✅ `11` اختبار سيناريو + `6/6` سيناريوهات CLI / `569` شامل | `e903cec` | بناء `scenarios.py` و`scripts/test_call.py` و`test_simulated_scenarios.py` |
+| `Feature 5.6` | ✅ تم التنفيذ | ✅ `17` اختبار وكيل (`11.0s`) + `10` تقييمات ذهبية / `586` شامل | `b45f66e` | بناء حزمة اختبارات التوجيه الصوتي وحواجز الأمان في `tests/test_agent.py` |
+| مراجعة عميقة (`Deep Review`) | ✅ فحص ٤ عدسات وإصلاح كامل | ✅ `19` اختبار وكيل (`~8s`) + `6/6` CLI + `10` ذهبية / `594` شامل | `fix(phase5)` | معالجة ملاحظات الأمان والـ PII والمعمارية وعزل قواعد بيانات الاختبار وتحديث التوثيق وكتابة `phase-review.md` |
 
 </div>

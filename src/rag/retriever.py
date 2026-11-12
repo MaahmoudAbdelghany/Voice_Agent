@@ -27,11 +27,30 @@ class QdrantKnowledgeRetriever:
     Seamlessly operates with Qdrant Cloud or local in-memory client.
     """
 
-    def __init__(self, collection_name: str | None = None):
+    def __init__(self, collection_name: str | None = None, *, lazy: bool = False):
         self.collection_name = collection_name or settings.qdrant_collection
-        self.client = self._init_client()
         self.embeddings = embedding_service
-        self._ensure_collection()
+        self._client: QdrantClient | None = None
+        self._collection_ensured: bool = False
+        if not lazy and not settings.is_qdrant_cloud():
+            self._client = self._init_client()
+            self._collection_ensured = True
+            self._ensure_collection()
+
+    @property
+    def client(self) -> QdrantClient:
+        """Lazily resolve Qdrant client and ensure collection exists."""
+        if self._client is None:
+            self._client = self._init_client()
+        if not self._collection_ensured:
+            self._collection_ensured = True
+            self._ensure_collection()
+        return self._client
+
+    @client.setter
+    def client(self, value: QdrantClient) -> None:
+        self._client = value
+        self._collection_ensured = True
 
     def _init_client(self) -> QdrantClient:
         """Initializes Qdrant client based on configuration."""
@@ -50,12 +69,15 @@ class QdrantKnowledgeRetriever:
 
     def _ensure_collection(self) -> None:
         """Ensure collection exists in Qdrant with appropriate vector configuration."""
+        if self._client is None:
+            self._client = self._init_client()
+        self._collection_ensured = True
         try:
-            collections = self.client.get_collections().collections
+            collections = self._client.get_collections().collections
             exists = any(col.name == self.collection_name for col in collections)
             if not exists:
                 logger.info(f"Creating collection '{self.collection_name}' in Qdrant...")
-                self.client.create_collection(
+                self._client.create_collection(
                     collection_name=self.collection_name,
                     vectors_config=qmodels.VectorParams(
                         size=self.embeddings.dimension,
@@ -63,7 +85,7 @@ class QdrantKnowledgeRetriever:
                     ),
                 )
                 try:
-                    self.client.create_payload_index(
+                    self._client.create_payload_index(
                         collection_name=self.collection_name,
                         field_name="category",
                         field_schema=qmodels.PayloadSchemaType.KEYWORD,
@@ -235,5 +257,22 @@ class QdrantKnowledgeRetriever:
         return "\n\n".join(context_blocks)
 
 
-# Singleton instance
-retriever = QdrantKnowledgeRetriever()
+_retriever_singleton: QdrantKnowledgeRetriever | None = None
+
+
+def get_retriever() -> QdrantKnowledgeRetriever:
+    """Return the lazy module-level QdrantKnowledgeRetriever singleton."""
+    global _retriever_singleton
+    if "retriever" in globals():
+        return globals()["retriever"]
+    if _retriever_singleton is None:
+        _retriever_singleton = QdrantKnowledgeRetriever(lazy=True)
+        globals()["retriever"] = _retriever_singleton
+    return _retriever_singleton
+
+
+def __getattr__(name: str) -> Any:
+    if name == "retriever":
+        return get_retriever()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+

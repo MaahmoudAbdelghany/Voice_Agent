@@ -778,6 +778,11 @@ async def test_unverified_caller_write_blocked_and_escalated() -> None:
         assert seeded_code in "".join(lookup_chunks)
         assert sess_book.metrics.tool_calls_succeeded == 3
         assert sess_book.lifecycle == CallLifecycle.ACTIVE
+        lookup_tool_msg = [m for m in sess_book.messages if m.tool_name == "manage_appointment"][-1]
+        assert lookup_tool_msg.tool_result is not None
+        lookup_data = lookup_tool_msg.tool_result.get("data") or {}
+        assert "patient_name" not in lookup_data
+        assert "patient_phone" not in lookup_data
 
         # Attempt write: book_appointment -> intercepted & escalated
         blocked_book_chunks = await _collect_chunks(
@@ -818,6 +823,36 @@ async def test_unverified_caller_write_blocked_and_escalated() -> None:
         assert sess_cancel.lifecycle == CallLifecycle.ESCALATED
         assert sess_cancel.context.escalated is True
 
+        # 3. Attempt write: manage_appointment(action='reschedule') -> intercepted & DB row untouched
+        engine_resched, _, _, _, _ = _build_engine_bundle(
+            steps=[
+                ScriptedLLMResponse(
+                    tool_calls=[
+                        ScriptedToolCall(
+                            id="call_write_reschedule_blocked",
+                            name="manage_appointment",
+                            arguments={
+                                "action": "reschedule",
+                                "booking_code": seeded_code,
+                                "new_date": rt.second_shift_date.isoformat(),
+                            },
+                        )
+                    ]
+                )
+            ]
+        )
+        sess_resched = CallSession(session_id="sess-unverified-reschedule")
+        blocked_resched_chunks = await _collect_chunks(
+            engine_resched.run_turn(
+                f"أجّل الحجز رقم {seeded_code}",
+                call_session=sess_resched,
+                caller_identity=unverified_identity,
+            )
+        )
+        assert "موظف الاستقبال" in "".join(blocked_resched_chunks)
+        assert sess_resched.lifecycle == CallLifecycle.ESCALATED
+        assert sess_resched.context.escalated is True
+
         # Verify zero new bookings were inserted and the pre-seeded booking remains CONFIRMED
         async with rt.session_factory() as db:
             all_appts = list((await db.execute(select(Appointment))).scalars().all())
@@ -838,7 +873,7 @@ async def test_write_tool_slow_filler_and_shielded_commit() -> None:
 
         cfg = _make_offline_settings(
             session_tool_timeout_ms=50.0,
-            write_tool_hard_cap_ms=1000.0,
+            write_tool_hard_cap_ms=2000.0,
         )
 
         async def slow_real_booking_executor(
@@ -906,7 +941,7 @@ async def test_read_tool_timeout_aborts_and_yields_filler() -> None:
     """
     cfg = _make_offline_settings(
         session_tool_timeout_ms=50.0,
-        write_tool_hard_cap_ms=800.0,
+        write_tool_hard_cap_ms=1500.0,
     )
     read_cancelled = False
 
@@ -914,7 +949,7 @@ async def test_read_tool_timeout_aborts_and_yields_filler() -> None:
         nonlocal read_cancelled
         assert tool_name == "check_doctor_availability"
         try:
-            await asyncio.sleep(0.35)
+            await asyncio.Event().wait()
         except asyncio.CancelledError:
             read_cancelled = True
             raise
@@ -965,11 +1000,11 @@ async def test_read_tool_timeout_aborts_and_yields_filler() -> None:
 async def test_write_tool_hard_cap_escalates_to_receptionist() -> None:
     """
     T3.3 (R3): Verify a write tool exceeding `write_tool_hard_cap_ms` emits the initial
-    filler and then escalates automatically to `transfer_to_receptionist`.
+    filler, cancels the hung write task, and escalates automatically to `transfer_to_receptionist`.
     """
     cfg = _make_offline_settings(
         session_tool_timeout_ms=50.0,
-        write_tool_hard_cap_ms=130.0,
+        write_tool_hard_cap_ms=140.0,
     )
     handoff_exec = AsyncMock(
         return_value=ToolResult(
@@ -978,9 +1013,15 @@ async def test_write_tool_hard_cap_escalates_to_receptionist() -> None:
             data={"ticket_id": "ESC-HARDCAP-01", "department": "reception", "urgency": "urgent"},
         )
     )
+    write_cancelled = False
 
     async def hung_write_executor(_name: str, _args: dict[str, Any]) -> ToolResult:
-        await asyncio.sleep(0.30)
+        nonlocal write_cancelled
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            write_cancelled = True
+            raise
         return ToolResult(success=True, message="اكتمل بعد الحد الأقصى")
 
     engine, _, _, _, _ = _build_engine_bundle(
@@ -1014,7 +1055,9 @@ async def test_write_tool_hard_cap_escalates_to_receptionist() -> None:
             caller_identity=identity,
         )
     )
+    await asyncio.sleep(0)
 
+    assert write_cancelled is True
     assert chunks[0] == build_tool_filler_message("book_appointment", language="ar")
     assert build_handoff_message(language="ar") in "".join(chunks)
     handoff_exec.assert_awaited_once()
@@ -1042,13 +1085,14 @@ async def test_barge_in_mid_write_shields_db_transaction(
 
         cfg = _make_offline_settings(
             session_tool_timeout_ms=50.0,
-            write_tool_hard_cap_ms=1500.0,
+            write_tool_hard_cap_ms=2000.0,
         )
         write_started = asyncio.Event()
+        release_write = asyncio.Event()
 
         async def delayed_sqlite_write(tool_name: str, arguments: dict[str, Any]) -> ToolResult:
             write_started.set()
-            await asyncio.sleep(0.18)
+            await release_write.wait()
             return await async_execute_tool(tool_name, arguments)
 
         engine, _, _, _, _ = _build_engine_bundle(
@@ -1097,7 +1141,7 @@ async def test_barge_in_mid_write_shields_db_transaction(
             model_settings=ModelSettings(),
         )
 
-        # Receive the 50ms filler while the 180ms SQLite transaction is actively in flight
+        # Receive the filler chunk while the SQLite transaction is gated on release_write
         first_chunk = await gen.__anext__()
         assert first_chunk == build_tool_filler_message("book_appointment", language="ar")
         assert write_started.is_set()
@@ -1115,9 +1159,10 @@ async def test_barge_in_mid_write_shields_db_transaction(
         assert len(done_callbacks) == 1
         done_callbacks[0](interrupted_handle)
 
-        # Shielded background write task must still be alive and commit cleanly to SQLite
+        # Shielded background write task must still be alive and commit cleanly once released
         pending = list(engine.inflight_write_tasks)
         assert len(pending) >= 1
+        release_write.set()
         await asyncio.gather(*pending)
 
         async with rt.session_factory() as db:
@@ -1670,5 +1715,148 @@ async def test_all_six_clinic_simulated_scenarios() -> None:
     assert by_key["unverified-booking"].escalated is True
     assert by_key["unverified-booking"].db_appointments_count == 0
     assert "transfer_to_receptionist" in by_key["unverified-booking"].tools_invoked
+
+
+@pytest.mark.asyncio
+async def test_production_livekit_secret_guard_and_non_mobile_sip_caller_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify:
+    1. Non-dev environment (`environment="production"`) with missing/placeholder LiveKit
+       credentials raises `ValueError` in `get_worker_options` and `generate_livekit_token`.
+    2. Non-mobile/anonymous SIP caller IDs (`+20227900000`, `+966501234567`, `anonymous`)
+       normalize cleanly to `caller_phone=None` (`is_verified=False`) without crashing
+       `caller_session_scope`.
+    3. `extract_verified_caller_identity` prefers signed `attributes["caller_name"]` over
+       mutable `participant.name` and sanitizes invalid `tenant_id` / `branch_id` values.
+    """
+    from src.agent.prompts import build_handoff_message
+
+    prod_cfg = Settings(
+        _env_file=None,
+        environment="production",
+        livekit_url="wss://clinic.livekit.cloud",
+        livekit_api_key="",
+        livekit_api_secret="",
+    )
+    with pytest.raises(ValueError, match=r"(?i)livekit.*key"):
+        get_worker_options(settings_obj=prod_cfg)
+
+    placeholder_cfg = Settings(
+        _env_file=None,
+        environment="production",
+        livekit_url="wss://clinic.livekit.cloud",
+        livekit_api_key="your_livekit_api_key",
+        livekit_api_secret="your_livekit_api_secret",
+    )
+    with pytest.raises(ValueError, match=r"(?i)livekit.*key"):
+        get_worker_options(settings_obj=placeholder_cfg)
+
+    import scripts.generate_token as gen_token_mod
+
+    monkeypatch.setattr(gen_token_mod, "get_settings", lambda: prod_cfg)
+    with pytest.raises(ValueError, match=r"(?i)livekit.*key"):
+        generate_livekit_token(room_name="prod-room", identity="caller-1")
+
+    # Non-mobile / landline / international / anonymous SIP numbers never crash ClinicTurnEngine
+    handoff_exec = AsyncMock(
+        return_value=ToolResult(
+            success=True,
+            message="تم التحويل لموظف الاستقبال",
+            data={"ticket_id": "ESC-NONMOB-1", "department": "reception"},
+        )
+    )
+    for raw_non_mobile in ("+20227900000", "+966501234567", "anonymous", "unknown"):
+        sip_p = SimpleNamespace(
+            name="Untrusted Display Name",
+            attributes={
+                "sip.phoneNumber": raw_non_mobile,
+                "caller_name": "الاسم الموثق",
+                "tenant_id": "../evil_tenant",
+                "branch_id": "bad/branch",
+            },
+        )
+        ident = extract_verified_caller_identity(sip_p)
+        assert ident.caller_phone is None
+        assert ident.is_verified is False
+        assert ident.source == "unverified"
+        assert ident.caller_name == "الاسم الموثق"
+        assert ident.tenant_id == "default"
+        assert ident.branch_id == "main"
+
+        engine_nm, _, _, _, _ = _build_engine_bundle(
+            steps=[
+                ScriptedLLMResponse(
+                    tool_calls=[
+                        ScriptedToolCall(
+                            id="call_nm_book",
+                            name="book_appointment",
+                            arguments={
+                                "patient_name": "الاسم الموثق",
+                                "doctor_id": 1,
+                                "date": "2026-11-16",
+                                "visit_type": "examination",
+                            },
+                        )
+                    ]
+                )
+            ],
+            handoff_executor=handoff_exec,
+        )
+        nm_sess = CallSession(session_id=f"sess-nm-{raw_non_mobile}")
+        nm_chunks = await _collect_chunks(
+            engine_nm.run_turn(
+                "احجزلي كشف لو سمحت",
+                call_session=nm_sess,
+                caller_identity=ident,
+            )
+        )
+        assert build_handoff_message(language="ar") in "".join(nm_chunks) or "الاستقبال" in "".join(nm_chunks)
+        assert nm_sess.lifecycle == CallLifecycle.ESCALATED
+
+
+@pytest.mark.asyncio
+async def test_max_tool_rounds_per_turn_halts_infinite_tool_loop() -> None:
+    """Verify `max_tool_rounds_per_turn=3` halts runaway LLM tool loops deterministically."""
+    cfg = _make_offline_settings(max_tool_rounds_per_turn=3)
+    looping_steps = [
+        ScriptedLLMResponse(
+            tool_calls=[
+                ScriptedToolCall(
+                    id=f"call_loop_{idx}",
+                    name="check_doctor_availability",
+                    arguments={"specialty": "الباطنة"},
+                )
+            ]
+        )
+        for idx in range(6)
+    ]
+    fast_read = AsyncMock(
+        return_value=ToolResult(
+            success=True,
+            message="دكتور أحمد متاح",
+            data={"doctors": [{"name_ar": "د. أحمد", "examination_fee": 350.0}]},
+        )
+    )
+    engine, provider, _, _, _ = _build_engine_bundle(
+        steps=looping_steps,
+        settings_obj=cfg,
+        tool_executor=fast_read,
+    )
+    session = CallSession(session_id="sess-max-rounds-cap")
+    chunks = await _collect_chunks(
+        engine.run_turn(
+            "إيه مواعيد الباطنة؟",
+            call_session=session,
+            caller_identity=VerifiedCallerIdentity(caller_phone=None),
+        )
+    )
+
+    assert fast_read.await_count == 3
+    # Initial call + 3 post-tool follow-ups (capped at round 3)
+    assert len(provider.calls) <= 4
+    assert "".join(chunks).strip() != ""
+
 
 

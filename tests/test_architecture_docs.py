@@ -12,8 +12,9 @@ Verifies that:
 4. Every configuration key listed under an ADR's `Code References` is an actual
    field on `src.config.Settings` (`Settings.model_fields`).
 5. `spec/architecture.md` exists, contains the RTL wrapper, includes the
-   Technical Debt section and links to all 9 ADRs, defines `classDef planned`,
-   and contains exactly 6 Mermaid diagrams matching the required C4 diagram types.
+   Built-vs-Planned legend and links to all 9 ADRs, defines `classDef planned`,
+   contains zero purged restaurant references, and contains exactly 6 Mermaid
+   diagrams matching the required C4 diagram types.
 """
 
 from __future__ import annotations

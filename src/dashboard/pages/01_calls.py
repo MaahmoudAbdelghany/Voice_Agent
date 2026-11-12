@@ -6,6 +6,7 @@ multi-criteria search and filtering, audio playback with synthetic fallback,
 and turn-by-turn chat transcripts with per-turn latency telemetry and tool execution traces.
 """
 
+import html
 from pathlib import Path
 
 import streamlit as st
@@ -293,15 +294,21 @@ else:
         # Escalation Alert Banner
         if selected_session.context.escalated or selected_session.status == CallStatus.ESCALATED:
             esc_obj = selected_session.context.escalation
-            esc_reason = (
-                (esc_obj.reason if esc_obj and esc_obj.reason else None)
-                or selected_session.context.escalation_reason
-                or "Caller requested clinic receptionist assistance"
+            esc_reason = html.escape(
+                str(
+                    (esc_obj.reason if esc_obj and esc_obj.reason else None)
+                    or selected_session.context.escalation_reason
+                    or "Caller requested clinic receptionist assistance"
+                ),
+                quote=True,
             )
-            esc_dept = (
-                (esc_obj.department if esc_obj and esc_obj.department else None)
-                or selected_session.context.escalation_department
-                or "reception"
+            esc_dept = html.escape(
+                str(
+                    (esc_obj.department if esc_obj and esc_obj.department else None)
+                    or selected_session.context.escalation_department
+                    or "reception"
+                ),
+                quote=True,
             )
             st.markdown(
                 f"""
@@ -324,11 +331,26 @@ else:
 
         with meta_col1:
             st.markdown(f"#### 👤 {t('detail_customer_card_title', lang)}")
-            patient_name = selected_session.context.patient_name or selected_session.context.customer_name or "N/A"
-            patient_phone = selected_session.context.patient_phone or selected_session.context.customer_phone or "N/A"
-            specialty_val = selected_session.context.requested_specialty or "N/A"
-            doctor_val = selected_session.context.requested_doctor_name or "N/A"
-            sentiment_val = selected_session.context.sentiment.capitalize()
+            patient_name = html.escape(
+                str(selected_session.context.patient_name or selected_session.context.customer_name or "N/A"),
+                quote=True,
+            )
+            patient_phone = html.escape(
+                str(selected_session.context.patient_phone or selected_session.context.customer_phone or "N/A"),
+                quote=True,
+            )
+            specialty_val = html.escape(
+                str(selected_session.context.requested_specialty or "N/A"),
+                quote=True,
+            )
+            doctor_val = html.escape(
+                str(selected_session.context.requested_doctor_name or "N/A"),
+                quote=True,
+            )
+            sentiment_val = html.escape(
+                str(selected_session.context.sentiment).capitalize(),
+                quote=True,
+            )
 
             pills_html = f"""
             <div>
@@ -355,7 +377,7 @@ else:
                     + (f" • #{b.queue_number}" if b.queue_number else "")
                     for b in selected_session.context.bookings
                 ]
-                bookings_str = " | ".join(booking_items)
+                bookings_str = html.escape(" | ".join(booking_items), quote=True)
                 st.markdown(
                     f"""<div style="margin-top: 6px;"><span class="slot-pill" style="border-color: #60A5FA; color: #93C5FD;">
                     📅 <strong>{t('detail_bookings', lang)}:</strong> {bookings_str}</span></div>""",
@@ -371,12 +393,13 @@ else:
             
             audio_badge_class = "demo-audio-tag" if is_demo else "real-audio-tag"
             audio_badge_text = t("audio_player_demo_badge", lang) if is_demo else t("audio_player_real_badge", lang)
+            safe_session_id = html.escape(str(selected_session.session_id), quote=True)
             
             st.markdown(
                 f"""
                 <div class="audio-card">
                     <div class="audio-header">
-                        <span style="font-weight: 600; font-size: 0.9rem;">{selected_session.session_id}.wav</span>
+                        <span style="font-weight: 600; font-size: 0.9rem;">{safe_session_id}.wav</span>
                         <span class="{audio_badge_class}">{audio_badge_text}</span>
                     </div>
                 </div>
@@ -404,6 +427,7 @@ else:
                 # Turn direction logic: Arabic text receives RTL direction
                 is_msg_ar = any("\u0600" <= c <= "\u06FF" for c in msg.content)
                 text_dir = 'dir="rtl" style="text-align: right;"' if is_msg_ar else 'dir="ltr"'
+                safe_msg_content = html.escape(str(msg.content), quote=True)
 
                 if msg.role == MessageRole.USER:
                     st.markdown(
@@ -416,7 +440,7 @@ else:
                                 {f'<span class="turn-tag">STT: {round(msg.stt_latency_ms)}ms</span>' if msg.stt_latency_ms else ''}
                             </div>
                             <div class="chat-bubble chat-bubble-user">
-                                {msg.content}
+                                {safe_msg_content}
                             </div>
                         </div>
                         """,
@@ -447,7 +471,7 @@ else:
                                 {badge_html}
                             </div>
                             <div class="chat-bubble chat-bubble-assistant">
-                                {msg.content}
+                                {safe_msg_content}
                             </div>
                         </div>
                         """,
@@ -455,7 +479,7 @@ else:
                     )
 
                 elif msg.role == MessageRole.TOOL:
-                    tool_label = msg.tool_name or "tool"
+                    tool_label = html.escape(str(msg.tool_name or "tool"), quote=True)
                     with st.expander(f"⚙️ {t('role_tool', lang)}: `{tool_label}`", expanded=False):
                         if msg.tool_arguments:
                             st.caption(f"**{t('tool_args_title', lang)}:**")
@@ -464,7 +488,7 @@ else:
                             st.caption(f"**{t('tool_result_title', lang)}:**")
                             st.json(msg.tool_result)
                         elif msg.content:
-                            st.write(msg.content)
+                            st.text(str(msg.content))
 
 # ==============================================================================
 # 9. Global Footer

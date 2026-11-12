@@ -980,3 +980,78 @@ async def test_tier1_hit_latency():
 
     # Must be under 5ms
     assert avg_lat < 5.0
+
+
+def test_cacheability_policy_rejects_arabic_indic_and_grouped_pii():
+    """Verify CacheabilityPolicy rejects Arabic-Indic, Extended Arabic, and spaced/hyphenated phones & NIDs."""
+    from src.ai_core.cache import CacheabilityPolicy
+
+    policy = CacheabilityPolicy()
+    for pii_query in [
+        "استفسار عن رقم ٠١٠١٢٣٤٥٦٧٨",
+        "استفسار عن رقم ۰۱۲۳۴۵۶۷۸۹۰",
+        "التواصل على 010 - 1234 - 5678",
+        "الرقم القومي ٢٩٥٠١١٥٠١٠١٢٣٤",
+        "الرقم القومي 2950115-0101-234",
+    ]:
+        allowed_q, reason_q = policy.allows_query(pii_query)
+        assert allowed_q is False, f"Expected query '{pii_query}' to be rejected"
+        assert reason_q == BypassReason.PERSONAL_QUERY
+
+        allowed_r, reason_r = policy.allows_response(
+            f"تم التسجيل على {pii_query}",
+            DegradationTier.TIER_1_PRIMARY,
+        )
+        assert allowed_r is False, f"Expected response containing '{pii_query}' to be rejected"
+        assert reason_r == "contains_personal_identifiers"
+
+
+@pytest.mark.asyncio
+async def test_cache_scope_isolates_tenants_and_branches():
+    """Verify Tier-1 exact and Tier-2 semantic cache isolate entries across tenant_id and branch_id."""
+    clock = FakeClock()
+    embedder = ScriptedEmbeddingService()
+    qdrant = QdrantClient(":memory:")
+    semantic_store = SemanticCacheStore(
+        client=qdrant,
+        collection_name="test_tenant_branch_isolation",
+        clock=clock.time,
+    )
+    ladder = CacheLadder(
+        semantic_store=semantic_store,
+        embeddings=embedder,  # type: ignore[arg-type]
+        clock=clock.time,
+    )
+
+    scope_maadi = CacheScope(
+        category="pricing",
+        language="ar",
+        tenant_id="noor_clinic",
+        branch_id="maadi",
+    )
+    scope_nasr = CacheScope(
+        category="pricing",
+        language="ar",
+        tenant_id="noor_clinic",
+        branch_id="nasr_city",
+    )
+    scope_other_tenant = CacheScope(
+        category="pricing",
+        language="ar",
+        tenant_id="shifa_clinic",
+        branch_id="maadi",
+    )
+
+    await ladder.store("سعر كشف الباطنة", scope_maadi, "سعر الكشف في فرع المعادي 350 جنيه")
+
+    hit_maadi = await ladder.lookup("سعر كشف الباطنة", scope_maadi)
+    assert hit_maadi.hit is True
+    assert "350" in (hit_maadi.text or "")
+
+    # Different branch or different tenant must MISS both Tier 1 and Tier 2!
+    miss_nasr = await ladder.lookup("سعر كشف الباطنة", scope_nasr)
+    assert miss_nasr.hit is False
+
+    miss_other_tenant = await ladder.lookup("سعر كشف الباطنة", scope_other_tenant)
+    assert miss_other_tenant.hit is False
+

@@ -53,12 +53,15 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
-# Arabic-Indic to ASCII numeral translation table
-_ARABIC_INDIC_TO_ASCII = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+# Arabic-Indic (٠-٩) and Extended Arabic (۰-۹) to ASCII numeral translation table
+_ARABIC_INDIC_TO_ASCII = str.maketrans(
+    "٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹",
+    "01234567890123456789",
+)
 
 
 def _to_ascii_digits(text: str) -> str:
-    """Convert Arabic-Indic digits (٠-٩) to standard ASCII digits (0-9)."""
+    """Convert Arabic-Indic (٠-٩) and Extended Arabic (۰-۹) digits to ASCII digits (0-9)."""
     return text.translate(_ARABIC_INDIC_TO_ASCII) if text else ""
 
 
@@ -966,6 +969,9 @@ VALID_EG_GOVERNORATE_CODES: frozenset[str] = frozenset(
 )
 
 
+_ANY_PII_DIGIT_CLS = r"0-9\u0660-\u0669\u06f0-\u06f9"
+
+
 class EgyptianNationalIDRecognizer(PatternRecognizer):
     """
     Custom Egyptian 14-digit National ID recognizer (الرقم القومي المصري).
@@ -976,20 +982,23 @@ class EgyptianNationalIDRecognizer(PatternRecognizer):
     - Digits 6-7: Day (01-31)
     - Digits 8-9: Valid Egyptian Governorate code (01-35, 88)
     - Digits 10-14: 5 serial + check digits
-    Supports both ASCII (0-9) and Arabic-Indic (٠-٩) digits.
+    Supports ASCII (0-9), Arabic-Indic (٠-٩), Extended Arabic (۰-۹), and spaced/hyphenated grouping.
     """
 
     entity_type = PIIEntityType.EG_NATIONAL_ID
     replacement = "[REDACTED_NATIONAL_ID]"
     priority = 10  # Highest priority to prevent partial phone/digit overlap
 
-    _CANDIDATE_14_RE = re.compile(r"(?<!\d)[0-9\u0660-\u0669]{14}(?!\d)")
+    _CANDIDATE_14_RE = re.compile(
+        rf"(?<![{_ANY_PII_DIGIT_CLS}])[{_ANY_PII_DIGIT_CLS}]"
+        rf"(?:[\s\-]*[{_ANY_PII_DIGIT_CLS}]){{13}}(?![{_ANY_PII_DIGIT_CLS}])"
+    )
 
     def analyze(self, text: str) -> list[PIIEntityMatch]:
         matches: list[PIIEntityMatch] = []
         for m in self._CANDIDATE_14_RE.finditer(text):
             raw_span = m.group(0)
-            ascii_digits = _to_ascii_digits(raw_span)
+            ascii_digits = re.sub(r"\D", "", _to_ascii_digits(raw_span))
             if len(ascii_digits) != 14 or not ascii_digits.isdigit():
                 continue
 
@@ -1025,25 +1034,29 @@ class EgyptianPhoneRecognizer(PatternRecognizer):
     Matches:
     - Egyptian mobile numbers: 010, 011, 012, 015 (+20 / 0020 optional, spaces/hyphens allowed)
     - Egyptian landline numbers: 02, 03, etc. with country code or area separator
-    Supports both ASCII (0-9) and Arabic-Indic (٠-٩) numerals.
+    Supports ASCII (0-9), Arabic-Indic (٠-٩), and Extended Arabic (۰-۹) numerals.
     """
 
     entity_type = PIIEntityType.EG_PHONE
     replacement = "[REDACTED_PHONE]"
     priority = 8
 
-    # Matches Egyptian mobile numbers (ASCII & Arabic-Indic)
+    # Matches Egyptian mobile numbers (ASCII, Arabic-Indic ٠-٩, Extended Arabic ۰-۹, spaced/hyphenated)
     _MOBILE_RE = re.compile(
-        r"(?<!\w)(?:\+?\s*(?:20|٢٠)|(?:00|٠٠)\s*(?:20|٢٠))?[\s\-]*"
-        r"(?:0|٠)?(?:10|11|12|15|١٠|١١|١٢|١٥)[\s\-]*"
-        r"(?:[0-9\u0660-\u0669][\s\-]*){7}[0-9\u0660-\u0669](?!\d)"
+        rf"(?<![{_ANY_PII_DIGIT_CLS}])"
+        r"(?:(?:\+?\s*[2٢۲][\s\-]*[0٠۰]|[0٠۰][\s\-]*[0٠۰][\s\-]*[2٢۲][\s\-]*[0٠۰])[\s\-]*[0٠۰]?|[0٠۰])"
+        r"[\s\-]*[1١۱][\s\-]*[0125٠١٢٥۰۱۲۵]"
+        rf"(?:[\s\-]*[{_ANY_PII_DIGIT_CLS}]){{8}}"
+        rf"(?![{_ANY_PII_DIGIT_CLS}])"
     )
 
     # Matches Egyptian landline numbers (e.g. +20 2 3345 6789 or 02-33456789)
     _LANDLINE_RE = re.compile(
-        r"(?<!\w)(?:(?:\+?\s*(?:20|٢٠)|(?:00|٠٠)\s*(?:20|٢٠))[\s\-]*(?:0|٠)?[23٢٣]|"
-        r"(?:02|03|٠٢|٠٣))[\s\-]*"
-        r"(?:[0-9\u0660-\u0669][\s\-]*){6,7}[0-9\u0660-\u0669](?!\d)"
+        rf"(?<![{_ANY_PII_DIGIT_CLS}])"
+        r"(?:(?:\+?\s*[2٢۲][\s\-]*[0٠۰]|[0٠۰][\s\-]*[0٠۰][\s\-]*[2٢۲][\s\-]*[0٠۰])[\s\-]*[0٠۰]?[23٢٣۲۳]|"
+        r"[0٠۰][23٢٣۲۳])"
+        rf"(?:[\s\-]*[{_ANY_PII_DIGIT_CLS}]){{7,8}}"
+        rf"(?![{_ANY_PII_DIGIT_CLS}])"
     )
 
     def analyze(self, text: str) -> list[PIIEntityMatch]:
@@ -1073,8 +1086,8 @@ class CreditCardRecognizer(PatternRecognizer):
     priority = 6
 
     _CARD_RE = re.compile(
-        r"(?<!\d)(?:[0-9\u0660-\u0669]{4}[\s\-]){3}[0-9\u0660-\u0669]{4}(?!\d)|"
-        r"(?<!\d)[0-9\u0660-\u0669]{16}(?!\d)"
+        rf"(?<![{_ANY_PII_DIGIT_CLS}])(?:[{_ANY_PII_DIGIT_CLS}]{{4}}[\s\-]){{3}}[{_ANY_PII_DIGIT_CLS}]{{4}}(?![{_ANY_PII_DIGIT_CLS}])|"
+        rf"(?<![{_ANY_PII_DIGIT_CLS}])[{_ANY_PII_DIGIT_CLS}]{{16}}(?![{_ANY_PII_DIGIT_CLS}])"
     )
 
     def analyze(self, text: str) -> list[PIIEntityMatch]:

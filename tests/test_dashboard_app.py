@@ -81,46 +81,80 @@ class TestDashboardTier1Unit:
 class TestDashboardTier2Integration:
     """Integration tests running the full Streamlit app via the AppTest simulator."""
 
-    def test_dashboard_app_renders_cleanly(self):
+    def test_dashboard_app_renders_cleanly(self, tmp_path: Path):
         """Verify the Streamlit dashboard renders clinic_name with zero unhandled exceptions."""
         at = AppTest.from_file(APP_FILE)
+        at.session_state["calls_storage_dir"] = str(tmp_path)
         at.run()
 
         assert not at.exception, f"App raised unhandled exceptions: {at.exception}"
         sidebar_md = " ".join(m.value for m in at.sidebar.markdown)
         assert settings.clinic_name in sidebar_md
 
-    def test_dashboard_kpi_metrics_rendered(self):
-        """Verify that KPI cards and values appear in the rendered app output."""
-        at = AppTest.from_file(APP_FILE)
-        at.run()
-        
-        markdown_text = " ".join([m.value for m in at.markdown])
-        assert "680 ms" in markdown_text
-        assert "142" in markdown_text
-        assert "2.8%" in markdown_text
+    def test_dashboard_kpi_metrics_rendered(self, tmp_path: Path):
+        """Verify KPI cards render live empty-state zeros and real computed session metrics."""
+        from src.agent.session_manager import CallStatus, MessageRole, SessionManager
 
-    def test_dashboard_language_toggle_integration(self):
+        empty_dir = tmp_path / "empty_kpis"
+        empty_dir.mkdir(parents=True, exist_ok=True)
+
+        at_empty = AppTest.from_file(APP_FILE)
+        at_empty.session_state["calls_storage_dir"] = str(empty_dir)
+        at_empty.run()
+        assert not at_empty.exception
+
+        empty_md = " ".join(m.value for m in at_empty.markdown)
+        assert "0 ms" in empty_md
+        assert "0.0%" in empty_md
+        assert "680 ms" not in empty_md
+        assert "142" not in empty_md
+        assert "2.8%" not in empty_md
+
+        populated_dir = tmp_path / "populated_kpis"
+        mgr = SessionManager(storage_dir=populated_dir)
+        s1 = mgr.create_session(session_id="kpi-sess-1", language="ar")
+        s1.add_turn(role=MessageRole.ASSISTANT, content="أهلاً", latency_ms=420.0)
+        s1.status = CallStatus.ENDED
+        mgr.save_session(s1.session_id)
+
+        s2 = mgr.create_session(session_id="kpi-sess-2", language="ar")
+        s2.add_turn(role=MessageRole.ASSISTANT, content="جاري التحويل", latency_ms=580.0)
+        s2.context.escalated = True
+        s2.status = CallStatus.ESCALATED
+        mgr.save_session(s2.session_id)
+
+        at_pop = AppTest.from_file(APP_FILE)
+        at_pop.session_state["calls_storage_dir"] = str(populated_dir)
+        at_pop.run()
+        assert not at_pop.exception
+
+        pop_md = " ".join(m.value for m in at_pop.markdown)
+        assert "500 ms" in pop_md
+        assert "50.0%" in pop_md
+
+    def test_dashboard_language_toggle_integration(self, tmp_path: Path):
         """Verify that switching language updates the rendered text to Arabic."""
         at = AppTest.from_file(APP_FILE)
+        at.session_state["calls_storage_dir"] = str(tmp_path)
         at.run()
-        
+
         # Verify initial English title
         initial_markdown = " ".join([m.value for m in at.markdown])
         assert "Voice AI Agent Operations" in initial_markdown
-        
+
         # Select Arabic option from radio using set_value
         at.radio(key="lang_radio").set_value("العربية 🇸🇦").run()
-        
+
         # Verify Arabic title is rendered
         arabic_markdown = " ".join([m.value for m in at.markdown])
         assert "مركز عمليات المساعد الصوتي الذكي" in arabic_markdown
 
-    def test_service_status_badges_rendered(self):
+    def test_service_status_badges_rendered(self, tmp_path: Path):
         """Verify that service health cards appear in rendered output."""
         at = AppTest.from_file(APP_FILE)
+        at.session_state["calls_storage_dir"] = str(tmp_path)
         at.run()
-        
+
         markdown_text = " ".join([m.value for m in at.markdown])
         assert "LiveKit Cloud" in markdown_text
         assert "Qdrant Vector DB" in markdown_text
@@ -141,7 +175,7 @@ class TestDashboardTier3EdgeCases:
              patch.object(Settings, "is_tts_configured", return_value=False), \
              patch.object(Settings, "is_stt_configured", return_value=False), \
              patch.object(Settings, "is_qdrant_cloud", return_value=False):
-            
+
             health = check_services_health()
             assert health["livekit"]["status"] == "unconfigured"
             assert health["groq"]["status"] == "unconfigured"
@@ -156,10 +190,12 @@ class TestDashboardTier3EdgeCases:
             assert health["livekit"]["status"] == "offline"
             assert "Connection refused" in health["livekit"]["details"]
 
-    def test_app_resilience_when_css_missing(self):
+    def test_app_resilience_when_css_missing(self, tmp_path: Path):
         """Verify the dashboard still renders cleanly even if the CSS file is absent."""
         fake_css_path = Path(__file__).parent / "non_existent_file.css"
         with patch("src.dashboard.app.CSS_PATH", fake_css_path):
             at = AppTest.from_file(APP_FILE)
+            at.session_state["calls_storage_dir"] = str(tmp_path)
             at.run()
             assert not at.exception
+

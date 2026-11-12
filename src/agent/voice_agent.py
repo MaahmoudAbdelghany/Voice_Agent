@@ -21,6 +21,7 @@ import asyncio
 import email.utils
 import json
 import logging
+import re
 import time
 from collections.abc import AsyncGenerator, Mapping
 from pathlib import Path
@@ -66,6 +67,10 @@ _OFFLINE_ELEVENLABS_KEY = "el_offline_placeholder_key"
 _OFFLINE_LIVEKIT_KEY = "devkey"
 _OFFLINE_LIVEKIT_SECRET = "secret123456789012345678901234567890"
 _DEFAULT_ELEVENLABS_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"
+_SAFE_SCOPE_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+_DEV_ENVIRONMENTS: frozenset[str] = frozenset(
+    {"dev", "development", "test", "testing", "local"}
+)
 
 _clock_skew_checked: bool = False
 _clock_skew_offset_s: float = 0.0
@@ -207,22 +212,31 @@ def extract_verified_caller_identity(
         or r_meta.get("branch_id")
         or "main"
     )
+    tenant_str = str(raw_tenant).strip()
+    branch_str = str(raw_branch).strip()
+    safe_tenant = tenant_str if _SAFE_SCOPE_ID_RE.fullmatch(tenant_str) else "default"
+    safe_branch = branch_str if _SAFE_SCOPE_ID_RE.fullmatch(branch_str) else "main"
 
+    signed_name = p_attrs.get("caller_name") or p_attrs.get("patient_name")
     p_name = getattr(participant, "name", None) if participant is not None else None
-    caller_name = (
-        str(p_name).strip()
-        if p_name and str(p_name).strip()
-        else (str(p_attrs.get("caller_name")).strip() if p_attrs.get("caller_name") else None)
-    )
+    if signed_name and str(signed_name).strip():
+        caller_name: str | None = str(signed_name).strip()
+    elif p_name and str(p_name).strip():
+        caller_name = str(p_name).strip()
+    else:
+        caller_name = None
 
-    return VerifiedCallerIdentity(
+    identity = VerifiedCallerIdentity(
         caller_phone=resolved_phone,
         caller_name=caller_name,
-        tenant_id=str(raw_tenant).strip() or "default",
-        branch_id=str(raw_branch).strip() or "main",
+        tenant_id=safe_tenant,
+        branch_id=safe_branch,
         language=resolved_lang,
         source=source,
     )
+    if not identity.is_verified and identity.source != "unverified":
+        identity = identity.model_copy(update={"source": "unverified"})
+    return identity
 
 
 # ==============================================================================
@@ -693,12 +707,27 @@ async def entrypoint(ctx: JobContext) -> None:
 def get_worker_options(*, settings_obj: Settings | None = None) -> WorkerOptions:
     """
     Construct `livekit.agents.WorkerOptions` bound to `entrypoint` and `prewarm`
-    using offline-safe credential fallbacks when cloud env vars are unset (`T1.6`, `T7.1`).
+    using offline-safe credential fallbacks strictly in dev/test environments (`T1.6`, `T7.1`).
     """
     cfg = settings_obj or get_settings()
+    is_dev_env = (cfg.environment or "").strip().lower() in _DEV_ENVIRONMENTS
+
+    raw_key = (cfg.livekit_api_key or "").strip()
+    raw_secret = (cfg.livekit_api_secret or "").strip()
+    key_missing = not raw_key or raw_key.lower().startswith("your_") or "your_" in raw_key
+    secret_missing = (
+        not raw_secret or raw_secret.lower().startswith("your_") or "your_" in raw_secret
+    )
+
+    if not is_dev_env and (key_missing or secret_missing):
+        raise ValueError(
+            f"LiveKit API key and secret are required when environment={cfg.environment!r}; "
+            "offline devkey fallback is restricted to development/test environments."
+        )
+
     ws_url = (cfg.livekit_url or "").strip() or "ws://localhost:7880"
-    api_key = _resolve_api_key(cfg.livekit_api_key, _OFFLINE_LIVEKIT_KEY)
-    api_secret = _resolve_api_key(cfg.livekit_api_secret, _OFFLINE_LIVEKIT_SECRET)
+    api_key = _OFFLINE_LIVEKIT_KEY if key_missing else raw_key
+    api_secret = _OFFLINE_LIVEKIT_SECRET if secret_missing else raw_secret
 
     return WorkerOptions(
         entrypoint_fnc=entrypoint,

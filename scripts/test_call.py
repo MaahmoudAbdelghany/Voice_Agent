@@ -302,7 +302,7 @@ async def _run_interactive_loop(
             )
             print(
                 f"Call ended ({call_session.lifecycle.value}) | "
-                f"turns={call_session.metrics.turn_count} | "
+                f"turns={getattr(call_session.metrics, 'turn_count', call_session.metrics.total_user_turns)} | "
                 f"tools={call_session.metrics.total_tool_calls} | "
                 f"tokens={snap.get('total_tokens', 0)}"
             )

@@ -907,7 +907,7 @@ def _assert_booking(
         ),
         ScenarioAssertionResult(
             name="spoken_confirmation_includes_queue_and_code",
-            passed=("نمرة" in last_reply or "APT-" in last_reply or len(bookings) >= 1),
+            passed=("نمرة" in last_reply and "APT-" in last_reply),
             detail=last_reply[:120],
         ),
     ]

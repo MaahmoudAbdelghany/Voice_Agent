@@ -17,7 +17,6 @@ from typing import Any
 from src.ai_core.guardrails import wrap_retrieved_context
 from src.config import settings
 from src.rag.embeddings import embedding_service as default_embedding_service
-from src.rag.retriever import retriever as default_retriever
 from src.tools.schemas import (
     ClinicKnowledgeSearchOutput,
     KnowledgeChunk,
@@ -120,10 +119,13 @@ class ClinicKnowledgeSearchTool:
         """Resolve retriever instance lazily on access."""
         if self._retriever is None:
             if settings.hybrid_search_enabled:
-                from src.rag.hybrid_retriever import hybrid_retriever
-                self._retriever = hybrid_retriever
+                from src.rag.hybrid_retriever import get_hybrid_retriever
+
+                self._retriever = get_hybrid_retriever()
             else:
-                self._retriever = default_retriever
+                from src.rag.retriever import get_retriever
+
+                self._retriever = get_retriever()
         return self._retriever
 
     @retriever.setter

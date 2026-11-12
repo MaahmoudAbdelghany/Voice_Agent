@@ -246,6 +246,9 @@ class ManageAppointmentTool:
                     )
 
             data_item = serialize_appointment(appt)
+            if not phone:
+                data_item.pop("patient_name", None)
+                data_item.pop("patient_phone", None)
             if appt.status == AppointmentStatus.CONFIRMED.value:
                 msg = (
                     f"حجز حضرتك مع {data_item['doctor_name_ar']} ({data_item['specialty_name_ar']}) "
@@ -718,9 +721,16 @@ class ManageAppointmentTool:
                     res.data["spoof_attempt_blocked"] = spoof_blocked
                 return res
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             # Privacy: no patient phone or name logged (NFR-4)
-            logger.exception("Unexpected error in manage_appointment execution")
+            from src.ai_core.guardrails import get_pii_redactor
+
+            redacted_err = get_pii_redactor().redact(str(exc))
+            logger.error(
+                "Unexpected error in manage_appointment execution (%s): %s",
+                type(exc).__name__,
+                redacted_err,
+            )
             return _failure(
                 str(action),
                 "عذراً، حدث خطأ أثناء تنفيذ هذا الإجراء. هل يمكنك إعادة المحاولة؟",

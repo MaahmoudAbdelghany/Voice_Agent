@@ -51,6 +51,40 @@ def setup_knowledge_tool():
     knowledge_search_tool.retriever = original_retriever
 
 
+@pytest.fixture(autouse=True)
+async def isolate_clinic_db_tools(tmp_path: Path):
+    """Bind all 4 relational clinic tool singletons to an isolated tmp_path SQLite database."""
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+    from src.db.base import Base
+
+    db_file = (tmp_path / "isolated_tools_test.db").as_posix()
+    engine = create_async_engine(
+        f"sqlite+aiosqlite:///{db_file}",
+        connect_args={"check_same_thread": False, "timeout": 30},
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+
+    tools = (
+        doctor_availability_tool,
+        appointment_booking_tool,
+        manage_appointment_tool,
+        receptionist_handoff_tool,
+    )
+    prev_factories = [t.session_factory for t in tools]
+    for t in tools:
+        t.session_factory = factory
+    try:
+        yield factory
+    finally:
+        for t, prev in zip(tools, prev_factories):
+            t.session_factory = prev
+        await engine.dispose()
+
+
 def test_deleted_legacy_modules_raise_module_not_found():
     """T1.1: Deleted legacy restaurant modules must not be importable."""
     for mod_name in (
@@ -165,16 +199,25 @@ def test_execute_unregistered_and_legacy_tools():
         assert removed_name in (result.error or "")
 
 
-def test_execute_tool_invalid_arguments():
-    """Verify validation errors return safe error ToolResult without unhandled exception."""
-    result = execute_tool(
-        tool_name="book_appointment",
-        arguments={"visit_type": "examination"},  # Missing required patient_name, doctor, date
-    )
+def test_execute_tool_invalid_arguments(caplog: pytest.LogCaptureFixture):
+    """Verify validation errors return safe ToolResult and redact PII in log output."""
+    import logging
+
+    raw_phone = "01099887766"
+    with caplog.at_level(logging.INFO):
+        result = execute_tool(
+            tool_name="book_appointment",
+            arguments={
+                "visit_type": "examination",
+                "patient_phone": raw_phone,
+            },  # Missing required patient_name, doctor, date
+        )
     assert isinstance(result, ToolResult)
     assert result.success is False
     assert "حدث خطأ أثناء تنفيذ هذا الإجراء" in result.message
     assert result.error is not None
+    for rec in caplog.records:
+        assert raw_phone not in rec.getMessage()
 
 
 @pytest.mark.asyncio
@@ -187,6 +230,74 @@ async def test_async_execute_tool_success():
     assert isinstance(result, ToolResult)
     assert result.success is True
     assert result.data["found"] is True
+
+
+@pytest.mark.asyncio
+async def test_async_execute_tool_unverified_lookup_masks_patient_pii(isolate_clinic_db_tools):
+    """Verify unverified lookup by booking_code succeeds without leaking patient_name or patient_phone."""
+    import datetime as dt
+
+    from src.db.models import Doctor, DoctorSchedule, Specialty
+    from src.db.repository import ClinicRepository
+    from src.db.schemas import DayOfWeek, VisitType
+    from src.tools.doctor_availability import get_cairo_today
+
+    today = get_cairo_today()
+    target_date = today + dt.timedelta(days=1)
+    dow = DayOfWeek.from_date(target_date).value
+
+    async with isolate_clinic_db_tools() as db:
+        spec = Specialty(code="cardio", name_ar="القلب", name_en="Cardiology")
+        db.add(spec)
+        await db.flush()
+        doc = Doctor(
+            specialty_id=spec.id,
+            name_ar="د. حسام موافي",
+            name_en="Dr. Hossam",
+            examination_fee=400.0,
+            consultation_fee=200.0,
+            is_active=True,
+        )
+        db.add(doc)
+        await db.flush()
+        sched = DoctorSchedule(
+            doctor_id=doc.id,
+            day_of_week=dow,
+            start_time=dt.time(18, 0),
+            end_time=dt.time(22, 0),
+            max_capacity=10,
+        )
+        db.add(sched)
+        await db.commit()
+
+        repo = ClinicRepository(db)
+        patient = await repo.get_or_create_patient("سري للغاية", "01055443322")
+        await db.commit()
+        appt = await repo.create_appointment(
+            patient_id=patient.id,
+            doctor_id=doc.id,
+            appointment_date=target_date,
+            visit_type=VisitType.EXAMINATION,
+        )
+        await db.commit()
+        b_code = appt.booking_code
+
+    # Unverified lookup (no CallerSessionContext phone)
+    res = await async_execute_tool(
+        "manage_appointment",
+        {"action": "lookup", "booking_code": b_code},
+    )
+    assert res.success is True
+    assert res.data is not None
+    appts = res.data["appointments"]
+    assert len(appts) == 1
+    appt_item = appts[0]
+    assert appt_item["booking_code"] == b_code
+    assert appt_item["queue_number"] == 1
+    assert "patient_name" not in appt_item
+    assert "patient_phone" not in appt_item
+    assert "سري للغاية" not in res.message
+    assert "01055443322" not in res.message
 
 
 @pytest.mark.asyncio
@@ -230,6 +341,8 @@ def test_repository_purity_guard_no_legacy_restaurant_symbols():
         "restaurant_address",
         "restaurant_hours",
         "reservation_draft",
+        "kitchen_manager",
+        "delivery_dispatch",
     )
 
     files_to_scan: list[Path] = []
@@ -255,3 +368,4 @@ def test_repository_purity_guard_no_legacy_restaurant_symbols():
                 violations.append(f"{rel}: contains '{token}'")
 
     assert not violations, "Legacy restaurant identifiers found:\n" + "\n".join(violations)
+
