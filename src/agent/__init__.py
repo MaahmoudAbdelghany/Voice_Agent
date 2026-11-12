@@ -1,7 +1,8 @@
 """
 LiveKit Voice Agent Core Package.
 
-Contains prompt templates, deterministic clinic messages, session manager, and real-time voice pipeline.
+Contains prompt templates, deterministic clinic messages, session manager,
+LiveKit-agnostic clinic turn engine, and real-time WebRTC voice pipeline worker.
 """
 
 from src.agent.messages import (
@@ -48,17 +49,46 @@ from src.agent.session_manager import (
     compute_nearest_rank_percentiles,
     session_manager,
 )
+from src.agent.turn_engine import (
+    CALLER_TOOL_ALLOWLIST,
+    READ_TOOLS,
+    WRITE_TOOLS,
+    ClinicTurnEngine,
+    VerifiedCallerIdentity,
+    get_caller_tool_definitions,
+    is_write_tool_call,
+    requires_verified_caller_phone,
+)
+from src.agent.voice_agent import (
+    ClinicVoiceAgent,
+    GatewayBackedLLM,
+    attach_session_lifecycle_hooks,
+    create_stt,
+    create_tts,
+    create_vad,
+    create_voice_pipeline,
+    entrypoint,
+    extract_latest_user_utterance,
+    extract_verified_caller_identity,
+    get_worker_options,
+    handle_session_close,
+    prewarm,
+    run_worker,
+)
 
 __all__ = [
     "ALLOWED_LIFECYCLE_TRANSITIONS",
+    "CALLER_TOOL_ALLOWLIST",
     "DEFAULT_SYSTEM_PROMPT",
     "FEW_SHOT_EXAMPLES",
     "MEDICAL_SAFETY_GUIDELINES",
     "MEDICAL_SAFETY_REMINDER_AR",
+    "READ_TOOLS",
     "STATIC_PROMPT_MAX_TOKENS",
     "SYSTEM_UNTRUSTED_DATA_RULES",
     "TOOL_USAGE_GUIDELINES",
     "VOICE_STYLE_GUIDELINES",
+    "WRITE_TOOLS",
     "BookingRef",
     "CallActivity",
     "CallLifecycle",
@@ -66,13 +96,18 @@ __all__ = [
     "CallSession",
     "CallStatus",
     "ClinicCallContext",
+    "ClinicTurnEngine",
+    "ClinicVoiceAgent",
     "EscalationInfo",
     "ExtractedContext",
+    "GatewayBackedLLM",
     "MessageRole",
     "SessionManager",
     "StagePercentiles",
     "TurnLatency",
     "TurnMessage",
+    "VerifiedCallerIdentity",
+    "attach_session_lifecycle_hooks",
     "build_dynamic_context",
     "build_emergency_message",
     "build_error_fallback_message",
@@ -85,7 +120,21 @@ __all__ = [
     "build_static_system_prompt",
     "build_tool_filler_message",
     "compute_nearest_rank_percentiles",
+    "create_stt",
+    "create_tts",
+    "create_vad",
+    "create_voice_pipeline",
+    "entrypoint",
     "estimate_prompt_tokens",
+    "extract_latest_user_utterance",
+    "extract_verified_caller_identity",
+    "get_caller_tool_definitions",
     "get_system_prompt",
+    "get_worker_options",
+    "handle_session_close",
+    "is_write_tool_call",
+    "prewarm",
+    "requires_verified_caller_phone",
+    "run_worker",
     "session_manager",
 ]

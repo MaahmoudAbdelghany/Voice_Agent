@@ -4,7 +4,7 @@
 - **Folder**: `spec/features/feature-514-livekit-voice-worker/`
 - **Phase branch**: `phase/5-livekit-voice-core`
 - **Size**: Medium/Large (4 execution groups: LiveKit-agnostic Clinic Turn Engine, Verified Caller Identity & Token Utility, LiveKit Worker + `llm_node` Adapter, and Unit Verification)
-- **Status**: Approved (Phase Gate 1)
+- **Status**: Committed
 
 ---
 
@@ -102,16 +102,20 @@ sequenceDiagram
 | Path | Change | Purpose |
 |:---|:---|:---|
 | `src/config.py` | Modify | Add `write_tool_hard_cap_ms: float = 3000.0` and `max_tool_rounds_per_turn: int = 3` |
-| `pyproject.toml` | Modify | Update `livekit-agents>=1.7.0` constraint to match lockfile |
+| `pyproject.toml` | Modify | Update `livekit-agents` and plugin constraints to `>=1.7.0` to match lockfile |
+| `uv.lock` | Modify | Sync project metadata lock entry with updated `pyproject.toml` constraints |
+| `src/agent/session_manager.py` | Modify | Add `ClinicCallContext.is_emergency` and `CallMetrics.tool_timeout_count` property aliases synced with `emergency_flag` and `tool_timeouts` |
 | `src/agent/turn_engine.py` | Create | LiveKit-agnostic `ClinicTurnEngine`, `VerifiedCallerIdentity`, allowlist enforcement, read/write timeout orchestration, and Phase 4 integration |
 | `src/agent/voice_agent.py` | Create | `ClinicVoiceAgent(Agent)` with `llm_node` override, STT/TTS/VAD factories, verified identity extraction, barge-in & lifecycle hooks, lazy clock-skew patch, and `entrypoint` / `run_worker` |
 | `src/agent/__init__.py` | Modify | Export `ClinicTurnEngine`, `VerifiedCallerIdentity`, `ClinicVoiceAgent`, and worker factories |
 | `scripts/generate_token.py` | Modify | Add `--phone`, `--lang`, `--tenant-id`, `--branch-id` options writing signed JWT participant attributes |
+| `tests/test_voice_worker.py` | Create | Unit, integration, and edge-case tests verifying `T1.1`–`T1.8`, `T2.1`–`T2.6`, and `T3.1`–`T3.6` |
 
 ## 7. Execution Groups
-- **Group 1 — Config, Dependency Pin & Signed Token Attributes**: Add `write_tool_hard_cap_ms` and `max_tool_rounds_per_turn` to `src/config.py`; update `pyproject.toml` `livekit-agents>=1.7.0`; enhance `scripts/generate_token.py` to embed `caller_phone`, `lang`, `tenant_id`, and `branch_id` into LiveKit JWT claims (`attributes`).
+- **Group 1 — Config, Dependency Pin & Signed Token Attributes**: Add `write_tool_hard_cap_ms` and `max_tool_rounds_per_turn` to `src/config.py`; update `pyproject.toml` `livekit-agents>=1.7.0` (`uv.lock`); enhance `scripts/generate_token.py` to embed `caller_phone`, `lang`, `tenant_id`, and `branch_id` into LiveKit JWT claims (`attributes`).
 - **Group 2 — Clinic Turn Engine (`src/agent/turn_engine.py`)**: Implement `VerifiedCallerIdentity`, `CALLER_TOOL_ALLOWLIST`, `WRITE_TOOLS` vs `READ_TOOLS` classification, and `ClinicTurnEngine.run_turn()` integrating `trace_scope`, `finops_session_scope`, `caller_session_scope`, `InputGuardrail`, `FinOpsController`, `CacheLadder`, `ModelGateway.astream`, shielded write-tool timeout with 400ms filler and 3s hard cap, unverified-caller write interception, `OutputGuardrail`, and `CallSession` metric/turn recording.
 - **Group 3 — LiveKit Voice Worker (`src/agent/voice_agent.py` & `src/agent/__init__.py`)**: Implement `extract_verified_caller_identity(participant, room)`, lazy `_apply_livekit_clock_skew_patch()`, `create_stt()`, `create_tts()`, `create_vad()`, `ClinicVoiceAgent(Agent)` with `llm_node` override bridging `llm.ChatContext` to `ClinicTurnEngine`, `create_voice_pipeline()`, event hooks (`user_input_transcribed`, `speech_created`, `agent_state_changed`, `close`, barge-in interruption tracking), `prewarm()`, `get_worker_options()`, and `entrypoint()`.
+- **Group 4 — Automated Worker & Turn Engine Verification (`tests/test_voice_worker.py`)**: Verify all unit (`T1.1`–`T1.8`), integration (`T2.1`–`T2.6`), and edge-case (`T3.1`–`T3.6`) requirements offline.
 
 ## 8. Risks & Trade-offs
 | Risk / Trade-off | Impact | Mitigation |

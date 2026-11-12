@@ -54,7 +54,7 @@ This roadmap is a **Living Document** under Spec-Driven Development (SDD). Each 
 - [x] **Feature 5.1**: Egyptian Clinic Assistant Persona, System Prompts & Medical Guardrails (`src/agent/prompts.py`, `src/agent/messages.py`).
 - [x] **Feature 5.2**: Medical Call Session State & Metric Tracking (`src/agent/session_manager.py`).
 - [x] **Feature 5.3**: Legacy Restaurant Purge & Codebase Sanitization (`src/tools/`, `src/agent/`, `src/dashboard/`, `src/config.py`).
-- [ ] **Feature 5.4**: LiveKit Voice Pipeline Worker & Clinic Turn Engine registering all clinic tools (`src/agent/voice_agent.py`, `src/agent/turn_engine.py`, `scripts/generate_token.py`).
+- [x] **Feature 5.4**: LiveKit Voice Pipeline Worker & Clinic Turn Engine registering all clinic tools (`src/agent/voice_agent.py`, `src/agent/turn_engine.py`, `scripts/generate_token.py`).
 - [ ] **Feature 5.5**: CLI Simulated Call Runner & Clinic Scenarios (`scripts/test_call.py`, `src/agent/scenarios.py`).
 - [ ] **Feature 5.6**: Automated Voice Orchestration & Guardrail Test Suite (`tests/test_agent.py`).
 

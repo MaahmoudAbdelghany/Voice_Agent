@@ -225,6 +225,9 @@ class ClinicCallContext(BaseModel):
         return out
 
     def __setattr__(self, name: str, value: Any) -> None:
+        if name == "is_emergency":
+            super().__setattr__("emergency_flag", bool(value))
+            return
         super().__setattr__(name, value)
         # Keep paired aliases in sync on direct attribute assignment
         if name == "patient_name":
@@ -240,6 +243,11 @@ class ClinicCallContext(BaseModel):
             if isinstance(value, EscalationInfo):
                 super().__setattr__("escalation_reason", value.reason)
                 super().__setattr__("escalation_department", value.department)
+
+    @property
+    def is_emergency(self) -> bool:
+        """Alias for `emergency_flag` used by voice turn orchestration."""
+        return self.emergency_flag
 
     @property
     def booking_codes(self) -> list[str]:
@@ -359,6 +367,17 @@ class CallMetrics(BaseModel):
     # FinOps single-source-of-truth snapshot & Langfuse trace linkage (R4.4, R4.5)
     finops_snapshot: dict[str, Any] | None = None
     trace_ids: list[str] = Field(default_factory=list)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "tool_timeout_count":
+            super().__setattr__("tool_timeouts", int(value))
+            return
+        super().__setattr__(name, value)
+
+    @property
+    def tool_timeout_count(self) -> int:
+        """Alias for `tool_timeouts` used by voice turn orchestration."""
+        return self.tool_timeouts
 
     def record_turn_latency(
         self,

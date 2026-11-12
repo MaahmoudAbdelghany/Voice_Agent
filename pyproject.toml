@@ -7,11 +7,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     # LiveKit Voice Agent Core & Plugins
-    "livekit-agents>=0.8.0",
-    "livekit-plugins-deepgram>=0.6.0",
-    "livekit-plugins-groq>=0.2.0",
-    "livekit-plugins-elevenlabs>=0.7.0",
-    "livekit-plugins-silero>=0.6.0",
+    "livekit-agents>=1.7.0",
+    "livekit-plugins-deepgram>=1.7.0",
+    "livekit-plugins-groq>=1.7.0",
+    "livekit-plugins-elevenlabs>=1.7.0",
+    "livekit-plugins-silero>=1.7.0",
     # Vector DB & Embeddings (RAG)
     "qdrant-client>=1.9.0",
     "fastembed>=0.3.0",

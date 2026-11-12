@@ -589,6 +589,20 @@ class Settings(BaseSettings):
         description="Directory path for persisted PII-redacted call session JSON artifacts",
     )
 
+    # --- LiveKit Voice Pipeline Worker & Clinic Turn Engine (Feature 5.4) ---
+    write_tool_hard_cap_ms: float = Field(
+        default=3000.0,
+        ge=10.0,
+        le=30000.0,
+        description="Hard timeout cap in milliseconds for shielded write tools before receptionist escalation (default: 3000ms)",
+    )
+    max_tool_rounds_per_turn: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Maximum bounded LLM <-> tool execution rounds per conversational turn (default: 3)",
+    )
+
     # --- App & Observability ---
     dashboard_port: int = Field(
         default=8501,
