@@ -12,8 +12,8 @@
 ## دليل الترميز البصري في المخططات (Built vs. Planned Legend)
 
 التزاماً بمبدأ **الكود هو مصدر الحقيقة (As-Built Source of Truth)**:
-- **المكوّنات المبنية فعلياً (Phases 1–4 & Initial Dashboard)**: تُرسم **بخط متصل (`Solid Line`)** وتعمل حالياً في المستودع مع تغطية اختبارية كاملة.
-- **المكوّنات المخطط لاستكمالها في المراحل القادمة (Phases 5, 6, 8)**: تُرسم **بخط متقطع (`Dashed Line`)** وتُميَّز بالصنف البصري `classDef planned` مع الوسم الصريح `[Planned]`.
+- **المكوّنات المبنية فعلياً (Phases 1–5 & Core Admin Dashboard)**: تُرسم **بخط متصل (`Solid Line`)** وتعمل حالياً في المستودع مع تغطية اختبارية كاملة.
+- **المكوّنات المخطط لاستكمالها في المراحل القادمة (Phases 6, 8)**: تُرسم **بخط متقطع (`Dashed Line`)** وتُميَّز بالصنف البصري `classDef planned` مع الوسم الصريح `[Planned]`.
 
 ---
 
@@ -35,7 +35,7 @@ flowchart TB
     Developer["AI Engineer / GitHub PR"]:::actor
 
     subgraph ClinicPlatform["Egyptian Polyclinic Voice AI Platform"]
-        VoiceWorker["LiveKit WebRTC Voice Worker + Silero VAD [Planned - Phase 5]"]:::planned
+        VoiceWorker["LiveKit WebRTC Voice Worker + Silero VAD + ClinicTurnEngine (Built - Phase 5)"]:::built
         AICore["Enterprise AI Core, Hybrid RAG, Guardrails & Clinic Tools (Built - Phases 1-4)"]:::built
         AdminUI["Streamlit Clinic Admin Dashboard (Built Core / Phase 7 Expansion)"]:::built
         Langfuse["Self-Hosted Langfuse Trace Server (ADR-004)"]:::built
@@ -43,7 +43,7 @@ flowchart TB
     end
 
     subgraph CloudProviders["External AI & Media Providers"]
-        Deepgram["Deepgram Nova-3 STT / ElevenLabs Turbo v2.5 TTS [Planned - Phase 5]"]:::planned
+        Deepgram["Deepgram Nova-3 STT / ElevenLabs Turbo v2.5 TTS (Phase 5)"]:::external
         Groq["Groq Cloud: Llama-3.3-70B & Llama-3.1-8B + Llama Guard 3 (ADR-003, ADR-005)"]:::external
         Gemini["Google Gemini: gemini-2.0-flash Backup LLM (ADR-003)"]:::external
         OpenAIJudge["OpenAI: gpt-4o-mini RAGAS CI Judge Only (ADR-006)"]:::external
@@ -65,7 +65,7 @@ flowchart TB
 
 ## 2. مخطط الحاويات والمكوّنات البرمجية — المستوى الثاني والثالث (C4 Level 2/3: Containers & `src/` Components)
 
-يوضّح هذا المخطط البنية الداخلية للحزم البرمجية في `src/` (`src/ai_core/`، `src/rag/`، `src/tools/`، `src/db/`، `src/config.py`) وكيفية تفاعلها مع مخازن البيانات.
+يوضّح هذا المخطط البنية الداخلية للحزم البرمجية في `src/` (`src/agent/`، `src/ai_core/`، `src/rag/`، `src/tools/`، `src/db/`، `src/dashboard/`، `src/config.py`) وكيفية تفاعلها مع مخازن البيانات.
 
 - القرارات المرتبطة: [ADR-001](./adr/001-hybrid-search-rrf.md)، [ADR-002](./adr/002-deterministic-gates-vs-prompt-rules.md)، [ADR-003](./adr/003-multi-tier-model-gateway.md)، [ADR-004](./adr/004-self-hosted-langfuse-tracing.md)، [ADR-005](./adr/005-finops-budgets-and-stage-routing.md)، [ADR-007](./adr/007-owasp-trust-layer.md)، [ADR-008](./adr/008-three-tier-cache-ladder.md)، [ADR-009](./adr/009-state-machine-over-agent-loop.md).
 
@@ -77,8 +77,9 @@ flowchart TB
 
     Config["src/config.py: Typed Pydantic Settings"]:::built
 
-    subgraph AgentLayer["src/agent/ — Voice Pipeline Layer"]
-        VoiceAgent["voice_agent.py & session_manager.py [Planned - Phase 5 Wiring]"]:::planned
+    subgraph AgentLayer["src/agent/ — LiveKit Voice Pipeline & Turn Orchestration (Phase 5)"]
+        VoiceAgent["voice_agent.py, prompts.py, messages.py & scenarios.py: ClinicVoiceAgent, GatewayBackedLLM, Silero VAD"]:::built
+        TurnEngine["turn_engine.py & session_manager.py: ClinicTurnEngine, VerifiedCallerIdentity, SessionManager"]:::built
     end
 
     subgraph AICoreLayer["src/ai_core/ — Enterprise AI Core & Resilience (Phase 4)"]
@@ -97,7 +98,7 @@ flowchart TB
         ManageTool["manage_appointment.py: ManageAppointmentTool"]:::built
         AvailTool["doctor_availability.py: DoctorAvailabilityTool"]:::built
         KBTool["knowledge_search.py: ClinicKnowledgeSearchTool"]:::built
-        HandoffTool["human_handoff.py: ReceptionistEscalationTool"]:::built
+        HandoffTool["human_handoff.py: ReceptionistHandoffTool"]:::built
     end
 
     subgraph RAGLayer["src/rag/ — Hybrid Knowledge Engine (Phase 2 & 4.3)"]
@@ -115,17 +116,18 @@ flowchart TB
         QdrantStore[("Qdrant Vector DB: clinic_kb & semantic_cache")]:::storage
     end
 
-    VoiceAgent -.-> Guardrails
+    VoiceAgent --> TurnEngine
+    TurnEngine --> Guardrails
     Guardrails --> Cache
     Cache --> FinOps
     FinOps --> Gateway
-    Gateway --> Workflow
+    TurnEngine --> Workflow
     Workflow --> Gates
     Gates --> BookingTool
     Gates --> ManageTool
-    Gateway --> AvailTool
-    Gateway --> KBTool
-    Gateway --> HandoffTool
+    TurnEngine --> AvailTool
+    TurnEngine --> KBTool
+    TurnEngine --> HandoffTool
     KBTool --> HybridRet
     Sanitizer --> HybridRet
     HybridRet <--> QdrantStore
@@ -136,10 +138,12 @@ flowchart TB
     HandoffTool --> Repo
     Repo --> Models
     Models <--> SQLitePG
+    TurnEngine -.-> Tracing
     Guardrails -.-> Tracing
     Cache -.-> Tracing
     Gateway -.-> Tracing
     Workflow -.-> Tracing
+    Config -.-> AgentLayer
     Config -.-> AICoreLayer
 ```
 
@@ -147,7 +151,7 @@ flowchart TB
 
 ## 3. مخطط التتابع الزمني لدورة مكالمة حجز كاملة (Sequence Diagram: End-to-End Booking Call Lifecycle)
 
-يوضّح هذا المخطط المسار الزمني الكامل لطلب مريض حجز موعد جديد، بدءاً من فحص حواجز الحماية، مروراً بالكاش وبوابة FinOps وبوابة النماذج، ثم آلة الحالة المحدودة وبوابة الشروط المسبقة ومفتاح عدم التكرار، وصولاً إلى المعاملة الذرية في قاعدة البيانات وتصدير أثر التتبع المنقّى من البيانات الشخصية.
+يوضّح هذا المخطط المسار الزمني الكامل لطلب مريض حجز موعد جديد عبر `ClinicTurnEngine`، بدءاً من فحص حواجز الحماية، مروراً بالكاش وبوابة FinOps وبوابة النماذج، ثم آلة الحالة المحدودة وبوابة الشروط المسبقة ومفتاح عدم التكرار، وصولاً إلى المعاملة الذرية في قاعدة البيانات وتصدير أثر التتبع المنقّى من البيانات الشخصية.
 
 - القرارات المرتبطة: [ADR-002](./adr/002-deterministic-gates-vs-prompt-rules.md)، [ADR-003](./adr/003-multi-tier-model-gateway.md)، [ADR-004](./adr/004-self-hosted-langfuse-tracing.md)، [ADR-005](./adr/005-finops-budgets-and-stage-routing.md)، [ADR-007](./adr/007-owasp-trust-layer.md)، [ADR-008](./adr/008-three-tier-cache-ladder.md)، [ADR-009](./adr/009-state-machine-over-agent-loop.md).
 
@@ -155,6 +159,7 @@ flowchart TB
 sequenceDiagram
     autonumber
     actor Caller as Patient Caller
+    participant Engine as ClinicTurnEngine (turn_engine.py)
     participant Guard as Input/OutputGuardrail (guardrails.py)
     participant Cache as CacheLadder (cache.py)
     participant FinOps as FinOpsController (finops.py)
@@ -164,17 +169,18 @@ sequenceDiagram
     participant DB as ClinicRepository / Async DB (repository.py)
     participant Trace as HierarchicalTracer (tracing.py)
 
-    Caller->>Guard: Spoken Arabic booking request (with CallerSessionContext phone)
-    Guard->>Guard: Check injection, emergency & medical ban (< 20ms CPU)
-    Guard->>Guard: Wrap in <caller_utterance> XML delimiter
-    Guard->>Cache: Lookup query in CacheabilityPolicy
-    Cache-->>Guard: BYPASS (personal booking intent is never cached)
-    Guard->>FinOps: check_budget(session_id, stage=DIALOGUE)
+    Caller->>Engine: Spoken Arabic booking request + VerifiedCallerIdentity
+    Engine->>Guard: InputGuardrail.check() (< 20ms CPU)
+    Guard-->>Engine: Allowed + wrapped in <caller_utterance> XML delimiter
+    Engine->>Cache: Lookup query in CacheLadder (tenant & branch scoped)
+    Cache-->>Engine: BYPASS (personal booking intent is never cached)
+    Engine->>GW: generate_turn(session_id, stage=DIALOGUE, caller_tools)
+    GW->>FinOps: check_budget(session_id, stage=DIALOGUE)
     FinOps-->>GW: ALLOWED (clamped max_tokens <= 150, < 8k call budget, < $10 daily cap)
-    GW->>GW: Primary Groq llama-3.3-70b-versatile emits book_appointment tool call
-    GW->>FSM: execute(action=BOOK, slots, session_phone)
+    GW-->>Engine: Primary Groq llama-3.3-70b-versatile emits book_appointment tool call
+    Engine->>FSM: async_execute_tool -> execute(action=BOOK, slots, caller_session_scope)
     FSM->>FSM: INIT -> SLOT_COLLECTION (verify name, session phone, doctor, date)
-    FSM->>Gate: PRECONDITION_GATE: check_booking_preconditions()
+    FSM->>Gate: PRECONDITION_GATE: verify_booking()
     Gate->>DB: Query active Doctor, DoctorSchedule & current_bookings_count
     DB-->>Gate: Shift active & current_bookings < max_capacity
     Gate-->>FSM: GateVerdict(allowed=True, schedule_id, fee)
@@ -183,11 +189,14 @@ sequenceDiagram
     FSM->>DB: ATOMIC_EXECUTION: assign queue_number & insert Appointment
     DB-->>FSM: Confirmed Appointment (booking_code, queue_number)
     FSM->>Gate: Store result in IdempotencyStore (TTL 24h)
-    FSM-->>GW: WorkflowExecutionResult(terminal_state=COMPLETED)
-    GW->>FinOps: prune_tool_payload() & record_usage(prompt_tokens, completion_tokens)
-    GW->>Guard: OutputGuardrail.validate(arabic_response)
-    Guard-->>Caller: Polite Egyptian Arabic confirmation + queue number
-    GW-)Trace: Async span export after EgyptianPIIRedactor.redact_dict() (< 1ms hot-path)
+    FSM-->>Engine: WorkflowExecutionResult(terminal_state=COMPLETED)
+    Engine->>FinOps: prune_tool_payload() & sync_session_snapshot()
+    Engine->>GW: Post-tool spoken confirmation synthesis
+    GW-->>Engine: Grounded Egyptian Arabic confirmation
+    Engine->>Guard: OutputGuardrail.validate(arabic_response, grounding)
+    Guard-->>Engine: Safe grounded confirmation
+    Engine-->>Caller: Stream sentence chunks (queue_number + booking_code)
+    Engine-)Trace: Async span export after EgyptianPIIRedactor.redact_dict() (< 1ms hot-path)
 ```
 
 ---
@@ -354,18 +363,5 @@ erDiagram
         datetime resolved_at
     }
 ```
-
----
-
-## 7. سجل الديون التقنية المستبعدة من المخططات (Technical Debt — Legacy Restaurant Artifacts)
-
-بموجب القرار الهندسي المتفق عليه (السؤال الخامس والقيود `C2`)، يحتوي المستودع على بقايا قديمة من النموذج الأولي السابق (نموذج المطعم) تم الإبقاء عليها مؤقتاً لعدم كسر اختبارات التوافق الرجعي، ولكنها **مستبعدة تماماً من معمارية العيادة الطبية ومن المخططات أعلاه**:
-
-| الملف البرمجي أو الاختبار | الوصف | خطة المعالجة المستقبلية |
-|:---|:---|:---|
-| `src/tools/order_status.py` | أداة قديمة للاستعلام عن حالة طلبات المطعم | تُحذف في تنظيف ما قبل الإطلاق النهائي بعد إزالة الاختبارات المرتبطة بها |
-| `src/tools/reservation.py` | أداة قديمة لحجز طاولات المطعم (حلّت محلها `src/tools/appointment_booking.py`) | تُحذف مع `order_status.py` |
-| `src/tools/legacy_schemas.py` | مخططات Pydantic القديمة لأدوات المطعم (حلّت محلها `src/tools/schemas.py`) | تُحذف بعد ترحيل أي إشارات متبقية في اختبارات التوافق |
-| `tests/test_order_status.py` و`tests/test_reservation.py` و`tests/test_tools.py` | اختبارات وحدات قديمة تختبر أدوات المطعم المذكورة أعلاه | تُستبدل بالكامل باختبارات `tests/test_clinic_tools.py` و`tests/test_agent.py` في المرحلة الخامسة |
 
 </div>

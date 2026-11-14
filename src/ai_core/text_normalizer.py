@@ -18,8 +18,11 @@ logger = logging.getLogger(__name__)
 _TASHKEEL_REGEX = re.compile(r"[\u064B-\u0652\u0670]")
 _TATWEEL_REGEX = re.compile(r"\u0640")
 
-# Arabic-Indic digits to ASCII digits translation table
-_ARABIC_INDIC_TRANS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+# Arabic-Indic (٠-٩) and Extended Arabic (۰-۹) digits to ASCII digits translation table
+_ARABIC_INDIC_TRANS = str.maketrans(
+    "٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹",
+    "01234567890123456789",
+)
 
 # Punctuation to strip (Arabic and Latin punctuation & symbols)
 _PUNCTUATION_REGEX = re.compile(r"[؟،؛!?:.,;\-_'\"`~()[\]{}<>/\\|+=*&^%$#@~]")
@@ -36,7 +39,7 @@ def normalize_query(text: str) -> str:
     3. Unify Alef variants (أ / إ / آ / ٱ -> ا).
     4. Unify Alif Maqsura to Ya (ى -> ي).
     5. Unify Ta Marbuta to Ha (ة -> ه).
-    6. Convert Arabic-Indic numerals (٠-٩) to ASCII digits (0-9).
+    6. Convert Arabic-Indic (٠-٩) and Extended Arabic (۰-۹) numerals to ASCII digits (0-9).
     7. Strip punctuation and symbols.
     8. Collapse redundant whitespaces into a single space and strip.
 
@@ -65,7 +68,7 @@ def normalize_query(text: str) -> str:
     # 5. Unify Ta Marbuta (ة -> ه)
     s = s.replace("ة", "ه")
 
-    # 6. Convert Arabic-Indic numerals to standard ASCII digits
+    # 6. Convert Arabic-Indic and Extended Arabic numerals to standard ASCII digits
     s = s.translate(_ARABIC_INDIC_TRANS)
 
     # 7. Strip punctuation
@@ -82,17 +85,21 @@ def build_exact_key(
     category: str | None,
     language: str,
     kb_version: str,
+    tenant_id: str = "default",
+    branch_id: str = "main",
 ) -> str:
     """
     Generate deterministic 64-character SHA-256 hash key for Tier 1 Exact Cache.
 
-    Format: normalized_query | category | language | kb_version
+    Format: normalized_query | category | language | kb_version | tenant_id | branch_id
     """
     cat = (category or "").strip().lower()
     lang = (language or "ar").strip().lower()
     kb_v = (kb_version or "unknown").strip()
+    tenant = (tenant_id or "default").strip().lower()
+    branch = (branch_id or "main").strip().lower()
 
-    composite = f"{normalized_query}|{cat}|{lang}|{kb_v}"
+    composite = f"{normalized_query}|{cat}|{lang}|{kb_v}|{tenant}|{branch}"
     return hashlib.sha256(composite.encode("utf-8")).hexdigest()
 
 

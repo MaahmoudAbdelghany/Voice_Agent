@@ -9,8 +9,6 @@ Defines strongly-typed, voice-optimized input and output contracts for:
 5. Appointment Management: Lookup / Cancel / Reschedule (``manage_appointment``)
 6. Clinic Knowledge Search via RAG (``search_clinic_knowledge``)
 7. Human Receptionist Escalation (``transfer_to_receptionist``)
-
-Legacy restaurant schemas were relocated to ``src.tools.legacy_schemas``.
 """
 
 import datetime as dt

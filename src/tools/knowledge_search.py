@@ -17,7 +17,6 @@ from typing import Any
 from src.ai_core.guardrails import wrap_retrieved_context
 from src.config import settings
 from src.rag.embeddings import embedding_service as default_embedding_service
-from src.rag.retriever import retriever as default_retriever
 from src.tools.schemas import (
     ClinicKnowledgeSearchOutput,
     KnowledgeChunk,
@@ -120,10 +119,13 @@ class ClinicKnowledgeSearchTool:
         """Resolve retriever instance lazily on access."""
         if self._retriever is None:
             if settings.hybrid_search_enabled:
-                from src.rag.hybrid_retriever import hybrid_retriever
-                self._retriever = hybrid_retriever
+                from src.rag.hybrid_retriever import get_hybrid_retriever
+
+                self._retriever = get_hybrid_retriever()
             else:
-                self._retriever = default_retriever
+                from src.rag.retriever import get_retriever
+
+                self._retriever = get_retriever()
         return self._retriever
 
     @retriever.setter
@@ -418,14 +420,12 @@ async def async_search_clinic_knowledge(
 
 
 # ==============================================================================
-# Backward-compatibility aliases (deprecated; replaced in Phase 5)
+# Clinic Knowledge Search Aliases
 # ==============================================================================
 KnowledgeSearchTool = ClinicKnowledgeSearchTool
 knowledge_search_tool = clinic_knowledge_search_tool
 search_knowledge = search_clinic_knowledge
 async_search_knowledge = async_search_clinic_knowledge
-search_restaurant_knowledge = search_clinic_knowledge
-async_search_restaurant_knowledge = async_search_clinic_knowledge
 
 __all__ = [
     "ALLOWED_CATEGORIES",
@@ -433,13 +433,11 @@ __all__ = [
     "KnowledgeSearchTool",
     "async_search_clinic_knowledge",
     "async_search_knowledge",
-    "async_search_restaurant_knowledge",
     "clean_markdown_for_speech",
     "clinic_knowledge_search_tool",
     "is_emergency_content",
     "knowledge_search_tool",
     "search_clinic_knowledge",
     "search_knowledge",
-    "search_restaurant_knowledge",
     "trim_to_sentence_boundary",
 ]

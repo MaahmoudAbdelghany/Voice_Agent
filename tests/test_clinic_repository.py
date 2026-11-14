@@ -349,16 +349,18 @@ async def test_appointment_cancellation_and_capacity_recovery(async_test_session
 
 
 @pytest.mark.asyncio
-async def test_clinic_database_seeder_execution():
+async def test_clinic_database_seeder_execution(tmp_path):
     """Test running database seeder pipeline in both reset and idempotent modes."""
+    test_db_url = f"sqlite+aiosqlite:///{(tmp_path / 'seeder_clinic.db').as_posix()}"
+
     # 1. Reset mode
-    counts = await seed_clinic_database(reset=True)
+    counts = await seed_clinic_database(reset=True, database_url=test_db_url)
     assert counts["specialties"] == 5
     assert counts["doctors"] == 10
     assert counts["schedules"] == 30
 
     # 2. Idempotent re-run mode (must not crash or violate constraints)
-    counts_rerun = await seed_clinic_database(reset=False)
+    counts_rerun = await seed_clinic_database(reset=False, database_url=test_db_url)
     assert counts_rerun["specialties"] == 5
     assert counts_rerun["doctors"] == 10
     assert counts_rerun["schedules"] == 30

@@ -48,29 +48,28 @@ def test_clinic_settings_defaults():
     assert app_settings.is_database_configured() is True
 
 
-def test_legacy_restaurant_aliases():
-    """Verify backward compatibility aliases delegate to clinic fields."""
+def test_no_legacy_restaurant_attributes_or_aliases():
+    """T1.6: Settings defines no restaurant_* attributes and ignores legacy restaurant keys."""
     app_settings = Settings()
+    for removed_attr in (
+        "restaurant_name",
+        "restaurant_phone",
+        "restaurant_address",
+        "restaurant_hours",
+    ):
+        assert not hasattr(app_settings, removed_attr)
 
-    assert app_settings.restaurant_name == app_settings.clinic_name
-    assert app_settings.restaurant_phone == app_settings.clinic_phone
-    assert app_settings.restaurant_address == app_settings.clinic_address
-    assert app_settings.restaurant_hours == app_settings.clinic_working_hours
-
-
-def test_legacy_dict_initialization_mapping():
-    """Verify legacy dictionary keys map to clinic fields when initialized directly."""
-    legacy_settings = Settings(
+    # Passing legacy keys in dict initialization is ignored and does not override clinic defaults
+    untouched = Settings(
         restaurant_name="مطعم الأندلس",
         restaurant_phone="01011112222",
         restaurant_address="الدقي، الجيزة",
         restaurant_hours="10:00 - 24:00",
     )
-
-    assert legacy_settings.clinic_name == "مطعم الأندلس"
-    assert legacy_settings.clinic_phone == "01011112222"
-    assert legacy_settings.clinic_address == "الدقي، الجيزة"
-    assert legacy_settings.clinic_working_hours == "10:00 - 24:00"
+    assert untouched.clinic_name == app_settings.clinic_name
+    assert untouched.clinic_phone == app_settings.clinic_phone
+    assert untouched.clinic_address == app_settings.clinic_address
+    assert untouched.clinic_working_hours == app_settings.clinic_working_hours
 
 
 def test_declarative_base_naming_conventions():

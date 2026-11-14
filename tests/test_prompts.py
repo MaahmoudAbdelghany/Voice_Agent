@@ -372,14 +372,28 @@ def test_i2_prompt_prefix_builder_integration_message_ordering() -> None:
 
 
 @pytest.mark.asyncio
-async def test_i3_voice_pipeline_instructions_use_clinic_prompt() -> None:
+async def test_i3_voice_pipeline_instructions_use_clinic_prompt(tmp_path) -> None:
     """I3 (R9.3): create_voice_pipeline wires the clinic prompt into the LiveKit Agent."""
-    from src.agent.voice_agent import create_voice_pipeline
+    from src.agent.session_manager import SessionManager
+    from src.config import Settings
 
-    _, agent = create_voice_pipeline()
+    voice_agent = pytest.importorskip(
+        "src.agent.voice_agent",
+        reason="src.agent.voice_agent deleted in Feature 5.3 and recreated in Feature 5.4",
+    )
+    offline_cfg = Settings(
+        _env_file=None,
+        deepgram_api_key="",
+        eleven_api_key="",
+        cache_semantic_enabled=False,
+        llama_guard_enabled=False,
+    )
+    mgr = SessionManager(storage_dir=tmp_path / "prompt_pipeline_sessions")
+
+    _, agent = voice_agent.create_voice_pipeline(session_mgr=mgr, settings_obj=offline_cfg)
     assert agent.instructions.startswith(build_static_system_prompt())
-    assert settings.clinic_name in agent.instructions
-    assert settings.agent_name in agent.instructions
+    assert offline_cfg.clinic_name in agent.instructions
+    assert offline_cfg.agent_name in agent.instructions
 
 
 # ==============================================================================

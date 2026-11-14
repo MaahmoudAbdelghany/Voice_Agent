@@ -16,11 +16,12 @@ import sys
 from datetime import time
 
 from sqlalchemy import select
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import selectinload
 
 from src.config import get_settings
 from src.db.models import Doctor, DoctorSchedule, Specialty
-from src.db.session import close_db, get_async_session, get_engine, init_db
+from src.db.session import close_db, get_async_session, get_engine, get_session_factory, init_db
 
 logging.basicConfig(
     level=logging.INFO,
@@ -201,133 +202,143 @@ SPECIALTIES_SEED = [
 # Seeder Logic
 # ==============================================================================
 
-async def seed_clinic_database(reset: bool = False) -> dict[str, int]:
+async def seed_clinic_database(
+    reset: bool = False,
+    database_url: str | None = None,
+) -> dict[str, int]:
     """
     Seed or update clinic specialties, doctors, and schedules.
 
     Args:
         reset: If True, drops all existing tables and rebuilds fresh.
                If False, executes an idempotent upsert preserving bookings.
+        database_url: Optional SQLAlchemy database URL override (e.g. for isolated tests).
 
     Returns:
         Dictionary with count of specialties, doctors, and schedules seeded.
     """
     settings = get_settings()
+    target_db_url = database_url or settings.database_url
     logger.info("Initializing database for clinic: '%s'", settings.clinic_name)
-    logger.info("Database URL: %s", settings.database_url)
+    safe_db_url = make_url(target_db_url).render_as_string(hide_password=True)
+    logger.info("Database URL: %s", safe_db_url)
 
-    engine = get_engine(settings.database_url)
+    engine = get_engine(target_db_url)
+    session_factory = get_session_factory(engine)
 
-    if reset:
-        logger.warning("Reset flag detected: Dropping and recreating all tables...")
-        await init_db(engine=engine, reset=True)
-        logger.info("All tables recreated cleanly.")
-    else:
-        # Ensure tables exist
-        await init_db(engine=engine, reset=False)
+    try:
+        if reset:
+            logger.warning("Reset flag detected: Dropping and recreating all tables...")
+            await init_db(engine=engine, reset=True)
+            logger.info("All tables recreated cleanly.")
+        else:
+            # Ensure tables exist
+            await init_db(engine=engine, reset=False)
 
-    counts = {"specialties": 0, "doctors": 0, "schedules": 0}
+        counts = {"specialties": 0, "doctors": 0, "schedules": 0}
 
-    async with get_async_session() as session:
-        for spec_data in SPECIALTIES_SEED:
-            # 1. Upsert Specialty
-            stmt = (
-                select(Specialty)
-                .options(selectinload(Specialty.doctors))
-                .where(Specialty.code == spec_data["code"])
-            )
-            res = await session.execute(stmt)
-            specialty = res.scalars().first()
-
-            if not specialty:
-                specialty = Specialty(
-                    code=spec_data["code"],
-                    name_ar=spec_data["name_ar"],
-                    name_en=spec_data["name_en"],
-                    description=spec_data["description"],
+        async with get_async_session(session_factory=session_factory) as session:
+            for spec_data in SPECIALTIES_SEED:
+                # 1. Upsert Specialty
+                stmt = (
+                    select(Specialty)
+                    .options(selectinload(Specialty.doctors))
+                    .where(Specialty.code == spec_data["code"])
                 )
-                session.add(specialty)
-                await session.flush()
-                logger.info("Created Specialty: %s (%s)", specialty.name_ar, specialty.code)
-            else:
-                specialty.name_ar = spec_data["name_ar"]
-                specialty.name_en = spec_data["name_en"]
-                specialty.description = spec_data["description"]
-                await session.flush()
+                res = await session.execute(stmt)
+                specialty = res.scalars().first()
 
-            counts["specialties"] += 1
-
-            # 2. Upsert Doctors for this Specialty
-            for doc_data in spec_data["doctors"]:
-                doc_stmt = (
-                    select(Doctor)
-                    .options(selectinload(Doctor.schedules))
-                    .where(
-                        Doctor.specialty_id == specialty.id,
-                        Doctor.name_ar == doc_data["name_ar"],
+                if not specialty:
+                    specialty = Specialty(
+                        code=spec_data["code"],
+                        name_ar=spec_data["name_ar"],
+                        name_en=spec_data["name_en"],
+                        description=spec_data["description"],
                     )
-                )
-                doc_res = await session.execute(doc_stmt)
-                doctor = doc_res.scalars().first()
-
-                if not doctor:
-                    doctor = Doctor(
-                        specialty_id=specialty.id,
-                        name_ar=doc_data["name_ar"],
-                        name_en=doc_data["name_en"],
-                        title=doc_data["title"],
-                        examination_fee=doc_data["examination_fee"],
-                        consultation_fee=doc_data["consultation_fee"],
-                        is_active=True,
-                    )
-                    session.add(doctor)
+                    session.add(specialty)
                     await session.flush()
-                    logger.info("  Created Doctor: %s (%s)", doctor.name_ar, doctor.title)
+                    logger.info("Created Specialty: %s (%s)", specialty.name_ar, specialty.code)
                 else:
-                    doctor.title = doc_data["title"]
-                    doctor.examination_fee = doc_data["examination_fee"]
-                    doctor.consultation_fee = doc_data["consultation_fee"]
-                    doctor.is_active = True
+                    specialty.name_ar = spec_data["name_ar"]
+                    specialty.name_en = spec_data["name_en"]
+                    specialty.description = spec_data["description"]
                     await session.flush()
 
-                counts["doctors"] += 1
+                counts["specialties"] += 1
 
-                # 3. Upsert Schedules for this Doctor
-                for sched_data in doc_data["schedules"]:
-                    sched_stmt = select(DoctorSchedule).where(
-                        DoctorSchedule.doctor_id == doctor.id,
-                        DoctorSchedule.day_of_week == sched_data["day_of_week"],
-                        DoctorSchedule.start_time == sched_data["start"],
+                # 2. Upsert Doctors for this Specialty
+                for doc_data in spec_data["doctors"]:
+                    doc_stmt = (
+                        select(Doctor)
+                        .options(selectinload(Doctor.schedules))
+                        .where(
+                            Doctor.specialty_id == specialty.id,
+                            Doctor.name_ar == doc_data["name_ar"],
+                        )
                     )
-                    sched_res = await session.execute(sched_stmt)
-                    schedule = sched_res.scalars().first()
+                    doc_res = await session.execute(doc_stmt)
+                    doctor = doc_res.scalars().first()
 
-                    if not schedule:
-                        schedule = DoctorSchedule(
-                            doctor_id=doctor.id,
-                            day_of_week=sched_data["day_of_week"],
-                            start_time=sched_data["start"],
-                            end_time=sched_data["end"],
-                            max_capacity=sched_data["capacity"],
+                    if not doctor:
+                        doctor = Doctor(
+                            specialty_id=specialty.id,
+                            name_ar=doc_data["name_ar"],
+                            name_en=doc_data["name_en"],
+                            title=doc_data["title"],
+                            examination_fee=doc_data["examination_fee"],
+                            consultation_fee=doc_data["consultation_fee"],
                             is_active=True,
                         )
-                        session.add(schedule)
+                        session.add(doctor)
+                        await session.flush()
+                        logger.info("  Created Doctor: %s (%s)", doctor.name_ar, doctor.title)
                     else:
-                        schedule.end_time = sched_data["end"]
-                        schedule.max_capacity = sched_data["capacity"]
-                        schedule.is_active = True
+                        doctor.title = doc_data["title"]
+                        doctor.examination_fee = doc_data["examination_fee"]
+                        doctor.consultation_fee = doc_data["consultation_fee"]
+                        doctor.is_active = True
+                        await session.flush()
 
-                    counts["schedules"] += 1
+                    counts["doctors"] += 1
 
-        await session.commit()
+                    # 3. Upsert Schedules for this Doctor
+                    for sched_data in doc_data["schedules"]:
+                        sched_stmt = select(DoctorSchedule).where(
+                            DoctorSchedule.doctor_id == doctor.id,
+                            DoctorSchedule.day_of_week == sched_data["day_of_week"],
+                            DoctorSchedule.start_time == sched_data["start"],
+                        )
+                        sched_res = await session.execute(sched_stmt)
+                        schedule = sched_res.scalars().first()
 
-    logger.info(
-        "Seeding completed successfully! Total: %d specialties, %d doctors, %d shift schedules.",
-        counts["specialties"],
-        counts["doctors"],
-        counts["schedules"],
-    )
-    return counts
+                        if not schedule:
+                            schedule = DoctorSchedule(
+                                doctor_id=doctor.id,
+                                day_of_week=sched_data["day_of_week"],
+                                start_time=sched_data["start"],
+                                end_time=sched_data["end"],
+                                max_capacity=sched_data["capacity"],
+                                is_active=True,
+                            )
+                            session.add(schedule)
+                        else:
+                            schedule.end_time = sched_data["end"]
+                            schedule.max_capacity = sched_data["capacity"]
+                            schedule.is_active = True
+
+                        counts["schedules"] += 1
+
+            await session.commit()
+
+        logger.info(
+            "Seeding completed successfully! Total: %d specialties, %d doctors, %d shift schedules.",
+            counts["specialties"],
+            counts["doctors"],
+            counts["schedules"],
+        )
+        return counts
+    finally:
+        await engine.dispose()
 
 
 # ==============================================================================

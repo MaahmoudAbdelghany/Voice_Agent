@@ -18,8 +18,7 @@ from typing import Any
 
 from src.ai_core.text_normalizer import normalize_query
 from src.config import settings
-from src.rag.retriever import QdrantKnowledgeRetriever
-from src.rag.retriever import retriever as default_retriever
+from src.rag.retriever import QdrantKnowledgeRetriever, get_retriever
 
 logger = logging.getLogger(__name__)
 
@@ -134,11 +133,8 @@ ARABIC_STOP_WORDS: frozenset[str] = frozenset(
         "طلب",
         "طلبات",
         "توصيل",
-        "دليفري",
         "شحن",
-        "منيو",
         "طعام",
-        "مطعم",
         "أكل",
         "اكل",
         "مواعيد",
@@ -621,9 +617,12 @@ class HybridKnowledgeRetriever:
         dense_retriever: QdrantKnowledgeRetriever | None = None,
         collection_name: str | None = None,
     ):
-        self.dense_retriever = dense_retriever or QdrantKnowledgeRetriever(
-            collection_name=collection_name
-        )
+        if dense_retriever is not None:
+            self.dense_retriever = dense_retriever
+        elif collection_name is None:
+            self.dense_retriever = get_retriever()
+        else:
+            self.dense_retriever = QdrantKnowledgeRetriever(collection_name=collection_name)
         self.bm25_index = BM25Index(
             k1=settings.hybrid_bm25_k1,
             b=settings.hybrid_bm25_b,
@@ -891,5 +890,22 @@ class HybridKnowledgeRetriever:
             return False
 
 
-# Global singleton hybrid retriever instance
-hybrid_retriever = HybridKnowledgeRetriever(dense_retriever=default_retriever)
+_hybrid_retriever_singleton: HybridKnowledgeRetriever | None = None
+
+
+def get_hybrid_retriever() -> HybridKnowledgeRetriever:
+    """Return the lazy module-level HybridKnowledgeRetriever singleton."""
+    global _hybrid_retriever_singleton
+    if "hybrid_retriever" in globals():
+        return globals()["hybrid_retriever"]
+    if _hybrid_retriever_singleton is None:
+        _hybrid_retriever_singleton = HybridKnowledgeRetriever(dense_retriever=get_retriever())
+        globals()["hybrid_retriever"] = _hybrid_retriever_singleton
+    return _hybrid_retriever_singleton
+
+
+def __getattr__(name: str) -> Any:
+    if name == "hybrid_retriever":
+        return get_hybrid_retriever()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+

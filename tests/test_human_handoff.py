@@ -186,12 +186,28 @@ def test_messages_no_markdown_no_restaurant_words():
 
 
 def test_legacy_value_mapping(handoff_tool):
-    """Test legacy parameter and enum normalization."""
+    """Test legacy parameter and enum normalization without restaurant aliases."""
+    from src.tools.human_handoff import DEPARTMENT_NAMES_ARABIC
+
     assert handoff_tool._normalize_urgency("high") == "urgent"
     assert handoff_tool._normalize_urgency("critical") == "emergency"
     assert handoff_tool._normalize_department("customer_support") == "reception"
-    assert handoff_tool._normalize_department("kitchen_manager") == "reception"
+    assert handoff_tool._normalize_department("unknown_dept") == "reception"
     assert handoff_tool._normalize_department("billing") == "billing"
+    assert "kitchen_manager" not in DEPARTMENT_NAMES_ARABIC
+    assert "delivery_dispatch" not in DEPARTMENT_NAMES_ARABIC
+
+
+def test_default_timeout_uses_write_tool_hard_cap():
+    """Verify ReceptionistHandoffTool defaults timeout_s to write_tool_hard_cap_ms / 1000.0."""
+    from src.config import get_settings
+    from src.tools.human_handoff import ReceptionistHandoffTool
+
+    default_tool = ReceptionistHandoffTool()
+    assert default_tool.timeout_s == get_settings().write_tool_hard_cap_ms / 1000.0
+
+    explicit_tool = ReceptionistHandoffTool(timeout_s=0.05)
+    assert explicit_tool.timeout_s == 0.05
 
 
 # ==============================================================================

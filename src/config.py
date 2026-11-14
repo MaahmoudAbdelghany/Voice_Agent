@@ -6,9 +6,8 @@ Provides type safety, default values, and credential validation.
 """
 
 from pathlib import Path
-from typing import Any
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 VALID_CLINIC_CATEGORIES: frozenset[str] = frozenset(
@@ -34,6 +33,12 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
+    )
+
+    # --- Runtime Environment ---
+    environment: str = Field(
+        default="development",
+        description="Runtime deployment environment (development, test, staging, production)",
     )
 
     # --- LiveKit Real-time Voice Infrastructure ---
@@ -590,6 +595,20 @@ class Settings(BaseSettings):
         description="Directory path for persisted PII-redacted call session JSON artifacts",
     )
 
+    # --- LiveKit Voice Pipeline Worker & Clinic Turn Engine (Feature 5.4) ---
+    write_tool_hard_cap_ms: float = Field(
+        default=3000.0,
+        ge=10.0,
+        le=30000.0,
+        description="Hard timeout cap in milliseconds for shielded write tools before receptionist escalation (default: 3000ms)",
+    )
+    max_tool_rounds_per_turn: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Maximum bounded LLM <-> tool execution rounds per conversational turn (default: 3)",
+    )
+
     # --- App & Observability ---
     dashboard_port: int = Field(
         default=8501,
@@ -599,31 +618,6 @@ class Settings(BaseSettings):
         default="INFO",
         description="Logging level (DEBUG, INFO, WARNING, ERROR)",
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def handle_legacy_fields(cls, data: Any) -> Any:
-        """Map legacy restaurant keys to clinic fields if clinic keys are absent or overridden."""
-        if isinstance(data, dict):
-            if "restaurant_name" in data and (
-                "clinic_name" not in data or data.get("clinic_name") == "مجمع عيادات النور التخصصي"
-            ):
-                data["clinic_name"] = data["restaurant_name"]
-            if "restaurant_phone" in data and (
-                "clinic_phone" not in data or data.get("clinic_phone") == "+20 2 3345 6789"
-            ):
-                data["clinic_phone"] = data["restaurant_phone"]
-            if "restaurant_address" in data and (
-                "clinic_address" not in data
-                or data.get("clinic_address") == "شارع النصر، المعادي، القاهرة، مصر"
-            ):
-                data["clinic_address"] = data["restaurant_address"]
-            if "restaurant_hours" in data and (
-                "clinic_working_hours" not in data
-                or "السبت" in str(data.get("clinic_working_hours", ""))
-            ):
-                data["clinic_working_hours"] = data["restaurant_hours"]
-        return data
 
     @field_validator("cache_allowed_categories")
     @classmethod
@@ -646,27 +640,6 @@ class Settings(BaseSettings):
                 f"Invalid categories in cache_ttl_by_category: {invalid}. Must be in {set(VALID_CLINIC_CATEGORIES)}"
             )
         return v
-
-    # --- Backward-Compatibility Aliases ---
-    @property
-    def restaurant_name(self) -> str:
-        """Legacy alias delegating to clinic_name."""
-        return self.clinic_name
-
-    @property
-    def restaurant_phone(self) -> str:
-        """Legacy alias delegating to clinic_phone."""
-        return self.clinic_phone
-
-    @property
-    def restaurant_address(self) -> str:
-        """Legacy alias delegating to clinic_address."""
-        return self.clinic_address
-
-    @property
-    def restaurant_hours(self) -> str:
-        """Legacy alias delegating to clinic_working_hours."""
-        return self.clinic_working_hours
 
     def is_livekit_configured(self) -> bool:
         """Check if LiveKit credentials are provided."""

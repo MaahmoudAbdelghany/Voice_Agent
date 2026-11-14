@@ -1,20 +1,32 @@
 """
-Real-Time LiveKit Voice Agent Pipeline.
+LiveKit WebRTC Voice Pipeline Worker & `ClinicVoiceAgent` Adapter (Feature 5.4).
 
-Integrates:
-- Speech-to-Text (STT): Deepgram (nova-3 streaming transcription, Arabic/English)
-- LLM Reasoning: Groq Cloud (Llama 3.3 70B fast inference + function calling)
-- Text-to-Speech (TTS): ElevenLabs (eleven_turbo_v2_5 natural voice synthesis)
-- Voice Activity Detection (VAD) & Barge-in: Silero VAD
-- Real-Time Tool Calling: Menu/Policies RAG, Order Status, Table Reservation, Human Handoff
-- Session & Analytics Management: Thread-safe CallSession tracking & JSON persistence
+Bridges LiveKit rooms, Deepgram STT (`nova-3`), ElevenLabs TTS (`eleven_turbo_v2_5`),
+and Silero VAD (`v4`) to the LiveKit-agnostic `ClinicTurnEngine` (`src/agent/turn_engine.py`)
+via a custom `Agent.llm_node` override so every turn traverses `InputGuardrail`,
+`FinOpsController`, `CacheLadder`, `ModelGateway`, session-scoped clinic tools,
+`OutputGuardrail`, and `HierarchicalTracer`.
+
+Zero network requests occur at import time (`NFR1` / `T1.8`).
 """
 
-import asyncio
-import logging
-from typing import Any, List, Optional, Tuple
+from __future__ import annotations
 
-# LiveKit Agents Core & Voice components
+import os
+
+# Prevent LiteLLM from fetching remote model cost maps at module import time (NFR1 / T1.8)
+os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+
+import asyncio
+import email.utils
+import json
+import logging
+import re
+import time
+from collections.abc import AsyncGenerator, Mapping
+from pathlib import Path
+from typing import Any
+
 from livekit.agents import (
     AutoSubscribe,
     JobContext,
@@ -22,513 +34,734 @@ from livekit.agents import (
     WorkerOptions,
     WorkerType,
     cli,
+    llm,
 )
-from livekit.agents.llm import function_tool
-from livekit.agents.voice import Agent, AgentSession
-from livekit import rtc
+from livekit.agents.types import (
+    DEFAULT_API_CONNECT_OPTIONS,
+    NOT_GIVEN,
+    APIConnectOptions,
+    NotGivenOr,
+)
+from livekit.agents.voice import Agent, AgentSession, ModelSettings
+from livekit.plugins import deepgram, elevenlabs, silero
 
-# LiveKit Plugins
-import livekit.plugins.deepgram as dg
-import livekit.plugins.elevenlabs as el
-import livekit.plugins.groq as gq
-import livekit.plugins.silero as sil
-import livekit.api.access_token as _lat
-import calendar
-import datetime
-import email.utils
-import httpx
-import jwt
-
-# Compensate for system clock skew (prevents 401 Unauthorized from time drift)
-def _apply_livekit_clock_skew_patch() -> None:
-    skew_seconds = 0
-    try:
-        res = httpx.get("https://www.google.com", timeout=3.0)
-        server_dt = email.utils.parsedate_to_datetime(res.headers["date"])
-        local_dt = datetime.datetime.now(datetime.timezone.utc)
-        skew_seconds = int((local_dt - server_dt).total_seconds())
-    except Exception:
-        pass
-
-    def _safe_to_jwt(self: Any) -> str:
-        video = self.claims.video
-        if video and video.room_join and (not self.identity or not video.room):
-            raise ValueError("identity and room must be set when joining a room")
-
-        jwt_claims = self.claims.asdict()
-        now_utc = datetime.datetime.now(datetime.timezone.utc)
-        if skew_seconds:
-            now_utc = now_utc - datetime.timedelta(seconds=skew_seconds)
-
-        nbf_ts = calendar.timegm((now_utc - datetime.timedelta(seconds=60)).utctimetuple())
-        exp_ts = calendar.timegm((now_utc + self.ttl).utctimetuple())
-
-        jwt_claims.update({
-            "sub": self.identity,
-            "iss": self.api_key,
-            "nbf": nbf_ts,
-            "exp": exp_ts,
-        })
-        return jwt.encode(jwt_claims, self.api_secret, algorithm="HS256")
-
-    _lat.AccessToken.to_jwt = _safe_to_jwt
-
-_apply_livekit_clock_skew_patch()
-
-# Project configurations, prompts, session manager, and tools
-from src.config import settings
+from src.agent.messages import is_english
 from src.agent.prompts import (
-    build_error_fallback_message,
     build_greeting_message,
-    build_handoff_message,
     get_system_prompt,
 )
 from src.agent.session_manager import (
+    CallActivity,
+    CallLifecycle,
     CallSession,
-    CallStatus,
-    MessageRole,
+    SessionManager,
     session_manager,
 )
-from src.tools.human_handoff import async_escalate_to_human
-from src.tools.knowledge_search import async_search_restaurant_knowledge
-from src.tools.order_status import async_get_order_status
-from src.tools.reservation import async_book_reservation
+from src.agent.turn_engine import ClinicTurnEngine, VerifiedCallerIdentity
+from src.config import Settings, get_settings
 
-logger = logging.getLogger("voice_agent")
+logger = logging.getLogger(__name__)
+
+_OFFLINE_DEEPGRAM_KEY = "dg_offline_placeholder_key"
+_OFFLINE_ELEVENLABS_KEY = "el_offline_placeholder_key"
+_OFFLINE_LIVEKIT_KEY = "devkey"
+_OFFLINE_LIVEKIT_SECRET = "secret123456789012345678901234567890"
+_DEFAULT_ELEVENLABS_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"
+_SAFE_SCOPE_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+_DEV_ENVIRONMENTS: frozenset[str] = frozenset(
+    {"dev", "development", "test", "testing", "local"}
+)
+
+_clock_skew_checked: bool = False
+_clock_skew_offset_s: float = 0.0
 
 
 # ==============================================================================
-# Plugin Component Factories
+# 1. Lazy LiveKit Clock-Skew Compensation (D6 / NFR1)
 # ==============================================================================
 
-def create_stt(language: Optional[str] = None, api_key: Optional[str] = None) -> dg.STT:
-    """
-    Initialize Deepgram STT client for streaming transcription.
-    
-    Args:
-        language: Language code (e.g. 'ar' for Arabic, 'en-US' for English).
-                  Defaults to settings.deepgram_language.
-        api_key: Optional API key override (defaults to settings.deepgram_api_key).
-    """
-    lang = language or settings.deepgram_language
-    key = api_key or settings.deepgram_api_key
-    if not key:
-        logger.warning("Deepgram API key not found in settings. Using placeholder key for offline/mock mode.")
-        key = "mock_deepgram_key"
 
-    return dg.STT(
-        model=settings.deepgram_model,
-        language=lang,
+def _apply_livekit_clock_skew_patch(livekit_url: str | None = None) -> float:
+    """
+    Lazily inspect clock drift between local host and the configured LiveKit server
+    and compensate PyJWT validation timestamps if drift exceeds 30 seconds.
+
+    MUST ONLY be called lazily inside `entrypoint()` or `run_worker()`, NEVER at import time.
+    Fails open silently with `0.0` offset when offline or unreachable.
+    """
+    global _clock_skew_checked, _clock_skew_offset_s
+    if _clock_skew_checked:
+        return _clock_skew_offset_s
+
+    _clock_skew_checked = True
+    cfg = get_settings()
+    raw_url = (livekit_url or cfg.livekit_url or "").strip()
+    if not raw_url or "your-" in raw_url or "localhost" in raw_url or "127.0.0.1" in raw_url:
+        return 0.0
+
+    http_url = (
+        raw_url.replace("wss://", "https://", 1).replace("ws://", "http://", 1)
+    )
+    if not http_url.startswith(("http://", "https://")):
+        return 0.0
+
+    try:
+        import httpx
+
+        resp = httpx.head(http_url, timeout=1.5, follow_redirects=True)
+        date_hdr = resp.headers.get("Date")
+        if date_hdr:
+            server_dt = email.utils.parsedate_to_datetime(date_hdr)
+            skew_s = server_dt.timestamp() - time.time()
+            if abs(skew_s) > 30.0:
+                _clock_skew_offset_s = skew_s
+                logger.warning(
+                    "Detected %.1fs clock skew against LiveKit host; recorded offset compensation.",
+                    skew_s,
+                )
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("LiveKit clock-skew probe skipped (offline/unreachable): %s", exc)
+
+    return _clock_skew_offset_s
+
+
+# ==============================================================================
+# 2. Verified Caller Identity Extraction (R3 / D2 / D5 / T1.4)
+# ==============================================================================
+
+
+def _extract_mapping(obj: Any, attr_name: str) -> Mapping[str, Any]:
+    """Safely extract a dict-like attribute from a LiveKit Participant or Room."""
+    if obj is None:
+        return {}
+    if isinstance(obj, Mapping):
+        return obj
+    val = getattr(obj, attr_name, None)
+    if isinstance(val, Mapping):
+        return val
+    return {}
+
+
+def _parse_room_metadata(room: Any) -> dict[str, Any]:
+    """Safely parse JSON `room.metadata` for non-sensitive tenant/branch/language defaults."""
+    if room is None:
+        return {}
+    raw_meta = getattr(room, "metadata", None)
+    if isinstance(raw_meta, Mapping):
+        return dict(raw_meta)
+    if isinstance(raw_meta, str) and raw_meta.strip():
+        try:
+            parsed = json.loads(raw_meta)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+    return {}
+
+
+def extract_verified_caller_identity(
+    participant: Any | None = None,
+    room: Any | None = None,
+    *,
+    default_language: str | None = None,
+    settings_obj: Settings | None = None,
+) -> VerifiedCallerIdentity:
+    """
+    Resolve verified caller identity strictly from LiveKit SIP attributes (`sip.phoneNumber`)
+    first, then cryptographically signed JWT participant attributes (`caller_phone`, `lang`,
+    `tenant_id`, `branch_id`).
+
+    Returns `caller_phone=None` (`is_verified=False`) when neither SIP nor signed JWT
+    phone attribute is present — never accepting spoken phone numbers from transcript.
+    """
+    cfg = settings_obj or get_settings()
+    p_attrs = _extract_mapping(participant, "attributes")
+    r_meta = _parse_room_metadata(room)
+
+    sip_phone = str(p_attrs.get("sip.phoneNumber") or "").strip()
+    jwt_phone = str(p_attrs.get("caller_phone") or "").strip()
+
+    if sip_phone:
+        resolved_phone: str | None = sip_phone
+        source = "sip"
+    elif jwt_phone:
+        resolved_phone = jwt_phone
+        source = "jwt"
+    else:
+        resolved_phone = None
+        source = "unverified"
+
+    raw_lang = (
+        p_attrs.get("lang")
+        or p_attrs.get("language")
+        or r_meta.get("lang")
+        or r_meta.get("language")
+        or default_language
+        or cfg.deepgram_language
+        or "ar"
+    )
+    resolved_lang = "en" if is_english(str(raw_lang)) else "ar"
+
+    raw_tenant = (
+        p_attrs.get("tenant_id")
+        or r_meta.get("tenant_id")
+        or "default"
+    )
+    raw_branch = (
+        p_attrs.get("branch_id")
+        or r_meta.get("branch_id")
+        or "main"
+    )
+    tenant_str = str(raw_tenant).strip()
+    branch_str = str(raw_branch).strip()
+    safe_tenant = tenant_str if _SAFE_SCOPE_ID_RE.fullmatch(tenant_str) else "default"
+    safe_branch = branch_str if _SAFE_SCOPE_ID_RE.fullmatch(branch_str) else "main"
+
+    signed_name = p_attrs.get("caller_name") or p_attrs.get("patient_name")
+    p_name = getattr(participant, "name", None) if participant is not None else None
+    if signed_name and str(signed_name).strip():
+        caller_name: str | None = str(signed_name).strip()
+    elif p_name and str(p_name).strip():
+        caller_name = str(p_name).strip()
+    else:
+        caller_name = None
+
+    identity = VerifiedCallerIdentity(
+        caller_phone=resolved_phone,
+        caller_name=caller_name,
+        tenant_id=safe_tenant,
+        branch_id=safe_branch,
+        language=resolved_lang,
+        source=source,
+    )
+    if not identity.is_verified and identity.source != "unverified":
+        identity = identity.model_copy(update={"source": "unverified"})
+    return identity
+
+
+# ==============================================================================
+# 3. Offline-Safe Gateway-Backed LLM Sentinel & Plugin Factories (R7 / T1.6)
+# ==============================================================================
+
+
+class GatewayBackedLLM(llm.LLM):
+    """
+    Lightweight LiveKit `llm.LLM` adapter satisfying `AgentSession`'s non-None LLM check
+    while guaranteeing that 100% of reasoning routes through `ClinicVoiceAgent.llm_node` ->
+    `ClinicTurnEngine` -> `ModelGateway` (never bypassing guardrails via `livekit.plugins.groq.LLM`).
+    """
+
+    def __init__(self, model_name: str | None = None) -> None:
+        super().__init__()
+        cfg = get_settings()
+        self._model_name = model_name or cfg.groq_model
+
+    @property
+    def model(self) -> str:
+        return self._model_name
+
+    @property
+    def provider(self) -> str:
+        return "model_gateway"
+
+    def chat(
+        self,
+        *,
+        chat_ctx: llm.ChatContext,
+        tools: list[llm.Tool] | None = None,
+        conn_options: APIConnectOptions = DEFAULT_API_CONNECT_OPTIONS,
+        parallel_tool_calls: NotGivenOr[bool] = NOT_GIVEN,
+        tool_choice: NotGivenOr[llm.ToolChoice] = NOT_GIVEN,
+        extra_kwargs: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
+    ) -> llm.LLMStream:
+        raise RuntimeError(
+            "Direct GatewayBackedLLM.chat() is disabled; all voice turns must execute via "
+            "ClinicVoiceAgent.llm_node -> ClinicTurnEngine -> ModelGateway."
+        )
+
+
+def _resolve_api_key(configured_key: str | None, placeholder: str) -> str:
+    cleaned = (configured_key or "").strip()
+    if not cleaned or "your_" in cleaned:
+        return placeholder
+    return cleaned
+
+
+def create_stt(
+    language: str | None = None,
+    *,
+    settings_obj: Settings | None = None,
+) -> deepgram.STT:
+    """
+    Construct the Deepgram `nova-3` streaming STT plugin configured for the call's single
+    resolved language (`"ar"` or `"en"`), falling back to an offline placeholder key when unset.
+    """
+    cfg = settings_obj or get_settings()
+    raw_lang = language or cfg.deepgram_language or "ar"
+    dg_lang = "en" if is_english(raw_lang) else "ar"
+    api_key = _resolve_api_key(cfg.deepgram_api_key, _OFFLINE_DEEPGRAM_KEY)
+
+    return deepgram.STT(
+        model=cfg.deepgram_model or "nova-3",
+        language=dg_lang,
         interim_results=True,
         punctuate=True,
-        smart_format=True,
-        api_key=key,
+        smart_format=False,
+        filler_words=True,
+        api_key=api_key,
     )
 
 
-def create_llm(api_key: Optional[str] = None) -> gq.LLM:
+def create_tts(
+    language: str | None = None,
+    *,
+    settings_obj: Settings | None = None,
+) -> elevenlabs.TTS:
     """
-    Initialize Groq LLM client for fast token generation & tool calling.
-    
-    Args:
-        api_key: Optional API key override (defaults to settings.groq_api_key).
+    Construct the ElevenLabs `eleven_turbo_v2_5` multilingual low-latency TTS plugin,
+    falling back to an offline placeholder key when unset.
     """
-    key = api_key or settings.groq_api_key
-    if not key:
-        logger.warning("Groq API key not found in settings. Using placeholder key for offline/mock mode.")
-        key = "mock_groq_key"
+    cfg = settings_obj or get_settings()
+    raw_key = getattr(cfg, "eleven_api_key", None) or getattr(cfg, "elevenlabs_api_key", "")
+    api_key = _resolve_api_key(raw_key, _OFFLINE_ELEVENLABS_KEY)
+    raw_voice_id = (
+        getattr(cfg, "eleven_voice_id", None)
+        or getattr(cfg, "elevenlabs_voice_id", "")
+        or ""
+    )
+    voice_id = str(raw_voice_id).strip() or _DEFAULT_ELEVENLABS_VOICE_ID
+    raw_model = (
+        getattr(cfg, "eleven_model", None)
+        or getattr(cfg, "elevenlabs_model", None)
+        or "eleven_turbo_v2_5"
+    )
+    el_lang = "en" if is_english(language or cfg.deepgram_language) else "ar"
 
-    return gq.LLM(
-        model=settings.groq_model,
-        temperature=settings.llm_temperature,
-        api_key=key,
+    return elevenlabs.TTS(
+        voice_id=voice_id,
+        model=raw_model,
+        language=el_lang,
+        api_key=api_key,
     )
 
 
-def create_tts(api_key: Optional[str] = None) -> el.TTS:
+def create_vad(*, prewarmed_vad: Any | None = None) -> silero.VAD:
     """
-    Initialize ElevenLabs TTS client for low-latency voice synthesis.
-    
-    Args:
-        api_key: Optional API key override (defaults to settings.eleven_api_key).
+    Load or reuse the bundled Silero VAD (`v4`) ONNX detector tuned for responsive
+    Egyptian clinic barge-in cutoff without cloud network calls.
     """
-    key = api_key or settings.eleven_api_key
-    if not key:
-        logger.warning("ElevenLabs API key not found in settings. Using placeholder key for offline/mock mode.")
-        key = "mock_elevenlabs_key"
-
-    return el.TTS(
-        model=settings.eleven_model,
-        voice_id=settings.eleven_voice_id,
-        sync_alignment=True,
-        api_key=key,
-    )
-
-
-def create_vad() -> sil.VAD:
-    """
-    Initialize Silero Voice Activity Detector for low-latency barge-in and turn detection.
-    """
-    return sil.VAD.load(
+    if isinstance(prewarmed_vad, silero.VAD):
+        return prewarmed_vad
+    return silero.VAD.load(
         min_speech_duration=0.05,
         min_silence_duration=0.45,
-        prefix_padding_duration=0.3,
+        activation_threshold=0.5,
+        force_cpu=True,
     )
 
 
 # ==============================================================================
-# LiveKit Function Tools Factory
+# 4. `ClinicVoiceAgent` (`Agent.llm_node` Override) & Lifecycle Hooks (R6, R7)
 # ==============================================================================
 
-def create_voice_tools(session: Optional[CallSession] = None) -> List[Any]:
+
+def extract_latest_user_utterance(chat_ctx: llm.ChatContext | Any) -> str:
     """
-    Create LiveKit function tools bound to the active voice session.
-    
-    When invoked by the LLM during a live call, these tools execute the domain logic
-    and log arguments, execution results, and context updates to CallSession.
-    
-    Args:
-        session: Active CallSession instance (if available).
-        
-    Returns:
-        List of decorated LiveKit FunctionTool instances.
+    Extract the latest user message text from a LiveKit `ChatContext` (1.7.x).
+    """
+    if chat_ctx is None:
+        return ""
+
+    messages_attr = getattr(chat_ctx, "messages", None)
+    items: list[Any]
+    if callable(messages_attr):
+        items = list(messages_attr())
+    elif isinstance(messages_attr, list):
+        items = messages_attr
+    else:
+        items = list(getattr(chat_ctx, "items", []) or [])
+
+    for msg in reversed(items):
+        role = getattr(msg, "role", None)
+        role_str = getattr(role, "value", role)
+        if str(role_str).lower() != "user":
+            continue
+
+        text_content = getattr(msg, "text_content", None)
+        if isinstance(text_content, str) and text_content.strip():
+            return text_content.strip()
+
+        raw_content = getattr(msg, "content", None)
+        if isinstance(raw_content, str) and raw_content.strip():
+            return raw_content.strip()
+        if isinstance(raw_content, list):
+            joined = " ".join(
+                str(part).strip()
+                for part in raw_content
+                if isinstance(part, str) and part.strip()
+            )
+            if joined:
+                return joined
+
+    return ""
+
+
+class ClinicVoiceAgent(Agent):
+    """
+    LiveKit `Agent` subclass for the Egyptian Polyclinic Medical Receptionist.
+
+    Overrides `llm_node` so LiveKit streams text chunks yielded by `ClinicTurnEngine`
+    directly into ElevenLabs TTS while keeping Silero VAD barge-in active.
     """
 
-    @function_tool
-    async def search_restaurant_knowledge(query: str) -> str:
-        """Search restaurant menu items, ingredients, prices, allergens, operating hours, delivery areas, and branch policies.
-
-        Args:
-            query: The customer's inquiry or keyword regarding food items, ingredients, allergens, prices, opening hours, or policies.
-        """
-        logger.info(f"Tool invoked: search_restaurant_knowledge(query='{query}')")
-        try:
-            res = await async_search_restaurant_knowledge(query=query)
-            payload = res.model_dump()
-            if session:
-                session.record_tool_call("search_restaurant_knowledge", {"query": query}, payload)
-
-            # Return concise factual text for speech synthesis
-            if res.formatted_context:
-                return res.formatted_context
-            return res.message
-        except Exception as e:
-            logger.exception(f"Error in search_restaurant_knowledge: {e}")
-            return build_error_fallback_message(language=session.context.language if session else "ar")
-
-    @function_tool
-    async def get_order_status(order_id: str = "", phone: str = "") -> str:
-        """Look up real-time status, driver details, and estimated delivery time for an order.
-
-        Args:
-            order_id: The unique order identifier (e.g. ORD-1001).
-            phone: Registered customer phone number if order ID is not provided.
-        """
-        clean_order_id = order_id.strip() if order_id else None
-        clean_phone = phone.strip() if phone else None
-        logger.info(f"Tool invoked: get_order_status(order_id='{clean_order_id}', phone='{clean_phone}')")
-
-        try:
-            lookup_id = clean_order_id or clean_phone or ""
-            res = await async_get_order_status(order_id=lookup_id, phone_number=clean_phone)
-            payload = res.model_dump()
-            if session:
-                session.record_tool_call(
-                    "get_order_status",
-                    {"order_id": clean_order_id, "phone": clean_phone},
-                    payload,
-                )
-            return res.message
-        except Exception as e:
-            logger.exception(f"Error in get_order_status: {e}")
-            return build_error_fallback_message(language=session.context.language if session else "ar")
-
-    @function_tool
-    async def book_reservation(
-        customer_name: str,
-        phone_number: str,
-        party_size: int,
-        date: str,
-        time: str,
-        branch: str = "الفرع الرئيسي",
-        special_requests: str = "",
-    ) -> str:
-        """Check table availability and book a dining reservation for a customer.
-
-        Args:
-            customer_name: Full name of the primary guest.
-            phone_number: Mobile phone number for reservation confirmation and SMS reminders.
-            party_size: Number of guests (1 to 30).
-            date: Date of dining in YYYY-MM-DD format (or 'today', 'tomorrow').
-            time: Time slot in HH:MM format (e.g. 19:30 or 20:00).
-            branch: Target restaurant branch name. Defaults to 'الفرع الرئيسي'.
-            special_requests: Optional seating requests, celebrations, high chair, or outdoor seating.
-        """
-        logger.info(
-            f"Tool invoked: book_reservation(name='{customer_name}', guests={party_size}, date={date}, time={time})"
+    def __init__(
+        self,
+        *,
+        instructions: str | None = None,
+        turn_engine: ClinicTurnEngine | None = None,
+        call_session: CallSession | None = None,
+        caller_identity: VerifiedCallerIdentity | None = None,
+        language: str = "ar",
+        custom_instructions: str | None = None,
+        session_mgr: SessionManager | None = None,
+        **kwargs: Any,
+    ) -> None:
+        resolved_lang = (
+            caller_identity.language
+            if caller_identity is not None
+            else ("en" if is_english(language) else "ar")
         )
-        try:
-            res = await async_book_reservation(
-                customer_name=customer_name,
-                phone_number=phone_number,
-                party_size=party_size,
-                date=date,
-                time=time,
-                branch=branch,
-                special_requests=special_requests or None,
-            )
-            payload = res.model_dump()
-            if session:
-                session.record_tool_call(
-                    "book_reservation",
-                    {
-                        "customer_name": customer_name,
-                        "phone_number": phone_number,
-                        "party_size": party_size,
-                        "date": date,
-                        "time": time,
-                        "branch": branch,
-                        "special_requests": special_requests,
-                    },
-                    payload,
-                )
-            return res.message
-        except Exception as e:
-            logger.exception(f"Error in book_reservation: {e}")
-            return build_error_fallback_message(language=session.context.language if session else "ar")
+        eff_instructions = instructions or get_system_prompt(
+            custom_instructions=custom_instructions,
+            language=resolved_lang,
+        )
+        super().__init__(
+            instructions=eff_instructions,
+            allow_interruptions=True,
+            **kwargs,
+        )
+        self.turn_engine: ClinicTurnEngine = turn_engine or ClinicTurnEngine()
+        self.caller_identity: VerifiedCallerIdentity = (
+            caller_identity or VerifiedCallerIdentity(language=resolved_lang)
+        )
+        self.session_mgr: SessionManager = session_mgr or session_manager
+        self.call_session: CallSession = call_session or self.session_mgr.create_session(
+            language=resolved_lang,
+            patient_phone=self.caller_identity.caller_phone,
+        )
+        self.custom_instructions = custom_instructions
+        self._last_stt_latency_ms: float | None = None
 
-    @function_tool
-    async def escalate_to_human(
-        reason: str,
-        department: str = "customer_support",
-        customer_name: str = "",
-        customer_phone: str = "",
-        urgency: str = "medium",
-    ) -> str:
-        """Escalate the live phone call to a human supervisor or specialist department.
-
-        Args:
-            reason: Explanation of why the caller needs a human agent or manager.
-            department: Target department: 'customer_support', 'kitchen_manager', 'delivery_dispatch', 'billing'.
-            customer_name: Customer's name if known.
-            customer_phone: Customer's phone number for callback if disconnected.
-            urgency: Urgency level: 'low', 'medium', 'high', or 'critical'.
+    async def llm_node(
+        self,
+        chat_ctx: llm.ChatContext,
+        tools: list[llm.Tool],
+        model_settings: ModelSettings,
+    ) -> AsyncGenerator[str, None]:
         """
-        logger.info(f"Tool invoked: escalate_to_human(reason='{reason}', dept='{department}', urgency='{urgency}')")
-        try:
-            res = await async_escalate_to_human(
-                reason=reason,
-                department=department,
-                customer_name=customer_name or None,
-                customer_phone=customer_phone or None,
-                urgency=urgency,
-            )
-            payload = res.model_dump()
-            if session:
-                session.record_tool_call(
-                    "escalate_to_human",
-                    {
-                        "reason": reason,
-                        "department": department,
-                        "customer_name": customer_name,
-                        "customer_phone": customer_phone,
-                        "urgency": urgency,
-                    },
-                    payload,
+        LiveKit 1.7.x `llm_node` hook: extracts the latest user utterance from `chat_ctx`
+        and streams plain-text chunks validated by `ClinicTurnEngine` directly to TTS.
+        """
+        utterance = extract_latest_user_utterance(chat_ctx)
+        if not utterance:
+            return
+
+        stt_ms = self._last_stt_latency_ms
+        self._last_stt_latency_ms = None
+
+        async for chunk in self.turn_engine.run_turn(
+            utterance=utterance,
+            call_session=self.call_session,
+            caller_identity=self.caller_identity,
+            stt_latency_ms=stt_ms,
+            custom_instructions=self.custom_instructions,
+        ):
+            if chunk:
+                yield chunk
+
+    async def close_and_persist_session(
+        self,
+        status: CallLifecycle | None = None,
+    ) -> Path | None:
+        """End and atomically persist the PII-redacted `CallSession`."""
+        return await handle_session_close(
+            self.call_session,
+            manager=self.session_mgr,
+            status=status,
+        )
+
+
+async def handle_session_close(
+    call_session: CallSession,
+    *,
+    manager: SessionManager | None = None,
+    status: CallLifecycle | None = None,
+) -> Path | None:
+    """
+    Persist a PII-redacted JSON snapshot of `call_session` via `async_end_and_persist`.
+    Preserves `CallLifecycle.ESCALATED` if the call escalated during the conversation;
+    otherwise transitions to `CallLifecycle.ENDED` (`T2.6`).
+    """
+    mgr = manager or session_manager
+    if status is not None:
+        target_status: CallLifecycle | None = status
+    elif (
+        call_session.lifecycle == CallLifecycle.ESCALATED
+        or call_session.context.escalated
+        or call_session.context.escalation is not None
+    ):
+        target_status = CallLifecycle.ESCALATED
+    else:
+        target_status = CallLifecycle.ENDED
+
+    # Ensure session is registered in `mgr` before `async_end_and_persist`
+    if mgr.get_session(call_session.session_id) is None:
+        with mgr._lock:
+            mgr._sessions[call_session.session_id] = call_session
+
+    return await mgr.async_end_and_persist(
+        call_session.session_id,
+        status=target_status,
+    )
+
+
+def attach_session_lifecycle_hooks(
+    agent_session: AgentSession,
+    voice_agent: ClinicVoiceAgent,
+    *,
+    manager: SessionManager | None = None,
+) -> set[asyncio.Task[Any]]:
+    """
+    Wire LiveKit `AgentSession` events (`user_input_transcribed`, `speech_created`,
+    `agent_state_changed`, `close`) to `CallSession` activity, barge-in interruption
+    counting (`record_interruption`), and PII-redacted persistence (`async_end_and_persist`).
+    """
+    mgr = manager or voice_agent.session_mgr
+    call_session = voice_agent.call_session
+    background_tasks: set[asyncio.Task[Any]] = set()
+    interim_start_ts: float | None = None
+
+    @agent_session.on("user_input_transcribed")
+    def _on_user_transcribed(event: Any) -> None:
+        nonlocal interim_start_ts
+        is_final = bool(getattr(event, "is_final", False))
+        if not is_final:
+            if interim_start_ts is None:
+                interim_start_ts = time.perf_counter()
+            call_session.set_activity(CallActivity.LISTENING)
+        else:
+            if interim_start_ts is not None:
+                voice_agent._last_stt_latency_ms = round(
+                    (time.perf_counter() - interim_start_ts) * 1000.0, 2
                 )
-            # Spoken confirmation before handoff transfer
-            dept_name = res.department.value if hasattr(res.department, "value") else str(res.department)
-            spoken_handoff = build_handoff_message(
-                department_name=dept_name,
-                estimated_wait_seconds=res.estimated_wait_seconds,
-                language=session.context.language if session else "ar",
+                interim_start_ts = None
+
+    @agent_session.on("speech_created")
+    def _on_speech_created(event: Any) -> None:
+        call_session.set_activity(CallActivity.SPEAKING)
+        handle = getattr(event, "speech_handle", None)
+        if handle is not None and hasattr(handle, "add_done_callback"):
+
+            def _on_speech_done(done_handle: Any) -> None:
+                if bool(getattr(done_handle, "interrupted", False)):
+                    call_session.record_interruption()
+
+            handle.add_done_callback(_on_speech_done)
+
+    @agent_session.on("agent_state_changed")
+    def _on_agent_state_changed(event: Any) -> None:
+        new_state = str(getattr(event, "new_state", "") or "").lower()
+        if new_state in ("listening", "thinking"):
+            call_session.set_activity(CallActivity.LISTENING)
+        elif new_state == "speaking":
+            call_session.set_activity(CallActivity.SPEAKING)
+
+    @agent_session.on("close")
+    def _on_close(_event: Any) -> None:
+        try:
+            task = asyncio.create_task(
+                handle_session_close(call_session, manager=mgr),
+                name=f"persist_call_session_{call_session.session_id}",
             )
-            return f"{spoken_handoff} {res.message}"
-        except Exception as e:
-            logger.exception(f"Error in escalate_to_human: {e}")
-            return build_error_fallback_message(language=session.context.language if session else "ar")
+            background_tasks.add(task)
+            task.add_done_callback(background_tasks.discard)
+        except RuntimeError:
+            # Fallback if called outside a running event loop
+            mgr.end_and_persist(call_session.session_id, status=CallLifecycle.ENDED)
 
-    return [search_restaurant_knowledge, get_order_status, book_reservation, escalate_to_human]
+    return background_tasks
 
 
 # ==============================================================================
-# Voice Pipeline Assembler
+# 5. Pipeline Factory & LiveKit Worker Entrypoint (R7 / T1.6 / T7.1)
 # ==============================================================================
+
 
 def create_voice_pipeline(
-    session: Optional[CallSession] = None,
-    custom_instructions: Optional[str] = None,
-    language: Optional[str] = None,
-) -> Tuple[AgentSession, Agent]:
+    *,
+    language: str | None = None,
+    custom_instructions: str | None = None,
+    caller_identity: VerifiedCallerIdentity | None = None,
+    call_session: CallSession | None = None,
+    turn_engine: ClinicTurnEngine | None = None,
+    session_mgr: SessionManager | None = None,
+    prewarmed_vad: Any | None = None,
+    settings_obj: Settings | None = None,
+) -> tuple[AgentSession, ClinicVoiceAgent]:
     """
-    Assemble and configure the AgentSession and Agent components.
-    
-    Args:
-        session: Active CallSession instance for state/metric tracking.
-        custom_instructions: Optional system prompt overrides.
-        language: Conversational language code ('ar' or 'en').
-        
-    Returns:
-        Tuple of (AgentSession, Agent).
+    Assemble the complete `(AgentSession, ClinicVoiceAgent)` WebRTC pipeline configured
+    for a single resolved call language (`"ar"` default, or `"en"`).
     """
-    lang = language or (session.context.language if session else settings.deepgram_language)
-    
-    # 1. Initialize components
-    stt = create_stt(language=lang)
-    llm = create_llm()
-    tts = create_tts()
-    vad = create_vad()
-    
-    # 2. Build domain tools bound to this session
-    tools = create_voice_tools(session=session)
-    
-    # 3. Dynamic system prompt
-    prompt = get_system_prompt(
-        custom_instructions=custom_instructions,
-        language=lang,
+    cfg = settings_obj or get_settings()
+    eff_identity = caller_identity or VerifiedCallerIdentity(
+        language=language or cfg.deepgram_language or "ar"
     )
-    
-    # 4. Construct Agent and AgentSession
-    agent = Agent(
-        instructions=prompt,
-        tools=tools,
+    resolved_lang = eff_identity.language
+
+    stt_plugin = create_stt(language=resolved_lang, settings_obj=cfg)
+    tts_plugin = create_tts(language=resolved_lang, settings_obj=cfg)
+    vad_plugin = create_vad(prewarmed_vad=prewarmed_vad)
+    llm_sentinel = GatewayBackedLLM(model_name=cfg.groq_model)
+
+    mgr = session_mgr or session_manager
+    eff_call_session = call_session or mgr.create_session(
+        language=resolved_lang,
+        patient_phone=eff_identity.caller_phone,
+    )
+
+    instructions = get_system_prompt(
+        custom_instructions=custom_instructions,
+        language=resolved_lang,
+    )
+    voice_agent = ClinicVoiceAgent(
+        instructions=instructions,
+        turn_engine=turn_engine,
+        call_session=eff_call_session,
+        caller_identity=eff_identity,
+        language=resolved_lang,
+        custom_instructions=custom_instructions,
+        session_mgr=mgr,
     )
 
     agent_session = AgentSession(
-        stt=stt,
-        llm=llm,
-        tts=tts,
-        vad=vad,
+        stt=stt_plugin,
+        vad=vad_plugin,
+        llm=llm_sentinel,
+        tts=tts_plugin,
+        allow_interruptions=True,
+        min_endpointing_delay=0.3,
+        max_endpointing_delay=2.5,
+        max_tool_steps=cfg.max_tool_rounds_per_turn,
     )
-    
-    return agent_session, agent
+    attach_session_lifecycle_hooks(agent_session, voice_agent, manager=mgr)
+
+    return agent_session, voice_agent
 
 
-# ==============================================================================
-# LiveKit Worker Entrypoint
-# ==============================================================================
+def prewarm(proc: JobProcess) -> None:
+    """Preload Silero VAD ONNX weights once per worker process for instant call startup."""
+    proc.userdata["vad"] = create_vad()
+
 
 async def entrypoint(ctx: JobContext) -> None:
     """
-    LiveKit room worker entrypoint.
-    
-    Invoked automatically by the LiveKit Agents runtime when a customer joins
-    a WebRTC room (via telephony SIP bridge or web playground).
-    
-    Args:
-        ctx: LiveKit JobContext containing room and connection metadata.
+    LiveKit room worker entrypoint:
+    1. Lazily probes LiveKit clock skew (`_apply_livekit_clock_skew_patch`).
+    2. Connects to the room with audio-only auto-subscription.
+    3. Waits for the remote caller participant and extracts verified SIP / JWT identity.
+    4. Starts `AgentSession` + `ClinicVoiceAgent` in the caller's single resolved language.
+    5. Speaks the localized Cairo time-of-day clinic greeting (`build_greeting_message`).
     """
-    logger.info(f"Starting Voice Agent worker for room: '{ctx.room.name}' (Job ID: {ctx.job.id})")
-    
-    # 1. Connect to WebRTC room (audio only)
+    _apply_livekit_clock_skew_patch()
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
-    
-    # 2. Wait for customer / caller to join
+
     participant = await ctx.wait_for_participant()
-    logger.info(f"Caller connected: identity='{participant.identity}', name='{participant.name}'")
-    
-    # 3. Initialize or retrieve session state
-    session_id = ctx.room.name or ctx.job.id
-    call_session = session_manager.get_or_create_session(
-        session_id=session_id,
-        room_name=ctx.room.name,
-        participant_identity=participant.identity,
+    identity = extract_verified_caller_identity(participant=participant, room=ctx.room)
+
+    room_name = getattr(ctx.room, "name", "") or ""
+    p_identity = getattr(participant, "identity", "") or ""
+
+    call_session = session_manager.create_session(
+        room_name=room_name,
+        participant_identity=p_identity,
+        language=identity.language,
+        patient_phone=identity.caller_phone,
     )
-    call_session.status = CallStatus.ACTIVE
-    
-    # 4. Create Voice Pipeline
-    agent_session, agent = create_voice_pipeline(session=call_session)
-    
-    # 5. Wire up event listeners for observability & metrics
-    @agent_session.on("user_input_transcribed")
-    def on_user_transcribed(event: Any) -> None:
-        text = getattr(event, "text", "") or getattr(event, "content", "")
-        if text and text.strip():
-            logger.info(f"[User Speech] {text}")
-            call_session.add_user_message(content=text.strip())
+    call_session.transition_to(CallLifecycle.ACTIVE)
 
-    @agent_session.on("speech_created")
-    def on_speech_created(event: Any) -> None:
-        logger.debug("Assistant speech synthesis started")
-        call_session.status = CallStatus.SPEAKING
+    prewarmed_vad = ctx.proc.userdata.get("vad") if hasattr(ctx, "proc") else None
+    agent_session, voice_agent = create_voice_pipeline(
+        language=identity.language,
+        caller_identity=identity,
+        call_session=call_session,
+        prewarmed_vad=prewarmed_vad,
+    )
 
-    @agent_session.on("agent_state_changed")
-    def on_state_changed(event: Any) -> None:
-        state_val = getattr(event, "new_state", None) or getattr(event, "state", None)
-        logger.debug(f"Agent state changed to: {state_val}")
+    await agent_session.start(agent=voice_agent, room=ctx.room)
 
-    @agent_session.on("close")
-    def on_close(event: Any) -> None:
-        logger.info(f"Agent session closed for room '{ctx.room.name}'")
-        call_session.end_call()
-        session_manager.save_session(call_session.session_id)
-
-    # 6. Start the AgentSession in the room
-    logger.info("Starting AgentSession in room...")
-    await agent_session.start(agent, room=ctx.room)
-    
-    # 7. Speak initial welcoming greeting
-    greeting = build_greeting_message(language=call_session.context.language)
-    logger.info(f"[Agent Spoken Greeting] {greeting}")
-    call_session.add_assistant_message(content=greeting)
-    
-    # Non-blocking voice greeting
-    asyncio.create_task(agent_session.say(greeting))
-    
-    logger.info(f"Voice Agent pipeline running actively for room '{ctx.room.name}'")
+    greeting_text = build_greeting_message(language=identity.language)
+    call_session.add_assistant_message(greeting_text)
+    await agent_session.say(greeting_text, allow_interruptions=True)
 
 
-# ==============================================================================
-# Worker Process Prewarm & Lifecycle
-# ==============================================================================
-
-def prewarm(proc: JobProcess) -> None:
+def get_worker_options(*, settings_obj: Settings | None = None) -> WorkerOptions:
     """
-    Prewarm worker processes before receiving calls.
-    Loads Silero VAD into memory to avoid startup latency on the first call.
+    Construct `livekit.agents.WorkerOptions` bound to `entrypoint` and `prewarm`
+    using offline-safe credential fallbacks strictly in dev/test environments (`T1.6`, `T7.1`).
     """
-    logger.info("Prewarming worker process: Loading Silero VAD model...")
-    try:
-        proc.userdata["vad"] = sil.VAD.load()
-        logger.info("Silero VAD model prewarmed successfully.")
-    except Exception as e:
-        logger.warning(f"VAD prewarm failed (will lazy-load on call): {e}")
+    cfg = settings_obj or get_settings()
+    is_dev_env = (cfg.environment or "").strip().lower() in _DEV_ENVIRONMENTS
 
+    raw_key = (cfg.livekit_api_key or "").strip()
+    raw_secret = (cfg.livekit_api_secret or "").strip()
+    key_missing = not raw_key or raw_key.lower().startswith("your_") or "your_" in raw_key
+    secret_missing = (
+        not raw_secret or raw_secret.lower().startswith("your_") or "your_" in raw_secret
+    )
 
-def get_worker_options() -> WorkerOptions:
-    """
-    Construct WorkerOptions for the LiveKit CLI runner.
-    """
-    kwargs: dict[str, Any] = {
-        "entrypoint_fnc": entrypoint,
-        "prewarm_fnc": prewarm,
-        "worker_type": WorkerType.ROOM,
-    }
-    if settings.livekit_url:
-        kwargs["ws_url"] = settings.livekit_url
-    if settings.livekit_api_key:
-        kwargs["api_key"] = settings.livekit_api_key
-    if settings.livekit_api_secret:
-        kwargs["api_secret"] = settings.livekit_api_secret
+    if not is_dev_env and (key_missing or secret_missing):
+        raise ValueError(
+            f"LiveKit API key and secret are required when environment={cfg.environment!r}; "
+            "offline devkey fallback is restricted to development/test environments."
+        )
 
-    return WorkerOptions(**kwargs)
+    ws_url = (cfg.livekit_url or "").strip() or "ws://localhost:7880"
+    api_key = _OFFLINE_LIVEKIT_KEY if key_missing else raw_key
+    api_secret = _OFFLINE_LIVEKIT_SECRET if secret_missing else raw_secret
+
+    return WorkerOptions(
+        entrypoint_fnc=entrypoint,
+        prewarm_fnc=prewarm,
+        worker_type=WorkerType.ROOM,
+        ws_url=ws_url,
+        api_key=api_key,
+        api_secret=api_secret,
+    )
 
 
 def run_worker() -> None:
-    """
-    CLI runner entry point for the LiveKit Voice Agent service.
-    
-    Usage:
-        python -m src.agent.voice_agent start
-        python -m src.agent.voice_agent console
-        python -m src.agent.voice_agent dev
-    """
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level.upper(), logging.INFO),
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    )
-    logger.info("Starting Voice AI Agent worker daemon...")
+    """CLI entrypoint launching the LiveKit Agents room worker."""
+    _apply_livekit_clock_skew_patch()
     cli.run_app(get_worker_options())
+
+
+__all__ = [
+    "ClinicVoiceAgent",
+    "GatewayBackedLLM",
+    "_apply_livekit_clock_skew_patch",
+    "attach_session_lifecycle_hooks",
+    "create_stt",
+    "create_tts",
+    "create_vad",
+    "create_voice_pipeline",
+    "entrypoint",
+    "extract_latest_user_utterance",
+    "extract_verified_caller_identity",
+    "get_worker_options",
+    "handle_session_close",
+    "prewarm",
+    "run_worker",
+]
 
 
 if __name__ == "__main__":

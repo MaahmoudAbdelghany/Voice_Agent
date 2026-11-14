@@ -55,48 +55,16 @@ from src.tools.knowledge_search import (
     KnowledgeSearchTool,
     async_search_clinic_knowledge,
     async_search_knowledge,
-    async_search_restaurant_knowledge,
     clinic_knowledge_search_tool,
     knowledge_search_tool,
     search_clinic_knowledge,
     search_knowledge,
-    search_restaurant_knowledge,
-)
-
-# Legacy restaurant schemas (deprecated; removed once Features 3.2-3.6 land)
-from src.tools.legacy_schemas import (
-    HandoffDepartmentEnum,
-    HandoffUrgencyEnum,
-    HumanHandoffInput,
-    HumanHandoffOutput,
-    KnowledgeChunk,
-    KnowledgeSearchInput,
-    KnowledgeSearchOutput,
-    OrderItem,
-    OrderStatusEnum,
-    OrderStatusInput,
-    OrderStatusOutput,
-    ReservationInput,
-    ReservationOutput,
-    ReservationStatusEnum,
 )
 from src.tools.manage_appointment import (
     ManageAppointmentTool,
     async_manage_appointment,
     manage_appointment,
     manage_appointment_tool,
-)
-from src.tools.order_status import (
-    OrderStatusTool,
-    async_get_order_status,
-    get_order_status,
-    order_status_tool,
-)
-from src.tools.reservation import (
-    ReservationTool,
-    async_book_reservation,
-    book_reservation,
-    reservation_tool,
 )
 
 # Clinic domain schemas (Feature 3.1)
@@ -110,6 +78,9 @@ from src.tools.schemas import (
     ClinicKnowledgeSearchOutput,
     DoctorAvailabilityInput,
     DoctorAvailabilityOutput,
+    HandoffDepartmentEnum,
+    HandoffUrgencyEnum,
+    KnowledgeChunk,
     LLMAppointmentBookingInput,
     LLMManageAppointmentInput,
     ManageAppointmentAction,
@@ -166,28 +137,6 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         output_schema=ClinicKnowledgeSearchOutput,
         sync_callable=search_clinic_knowledge,
         async_callable=async_search_clinic_knowledge,
-    ),
-    "get_order_status": ToolDefinition(
-        name="get_order_status",
-        description=(
-            "Look up real-time customer order status, delivery driver contact, "
-            "and estimated delivery time by order ID (e.g. ORD-1001) or phone number."
-        ),
-        input_schema=OrderStatusInput,
-        output_schema=OrderStatusOutput,
-        sync_callable=get_order_status,
-        async_callable=async_get_order_status,
-    ),
-    "book_reservation": ToolDefinition(
-        name="book_reservation",
-        description=(
-            "Check table availability and book table reservations at restaurant "
-            "branches for a specific date, time slot, and party size (1-30 guests)."
-        ),
-        input_schema=ReservationInput,
-        output_schema=ReservationOutput,
-        sync_callable=book_reservation,
-        async_callable=async_book_reservation,
     ),
     "transfer_to_receptionist": ToolDefinition(
         name="transfer_to_receptionist",
@@ -339,18 +288,31 @@ def execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolResult:
             message=voice_msg,
             data=payload if isinstance(payload, dict) else {"result": payload},
         )
-    except Exception as e:
-        logger.exception("Error executing tool '%s' with args %s", tool_name, arguments)
+    except Exception as e:  # noqa: BLE001
+        from src.ai_core.guardrails import get_pii_redactor
+
+        redactor = get_pii_redactor()
+        safe_args = redactor.redact_dict(arguments) if isinstance(arguments, dict) else {}
+        safe_err = redactor.redact(str(e))
+        logger.error(
+            "Error executing tool '%s' with args %s (%s): %s",
+            tool_name,
+            safe_args,
+            type(e).__name__,
+            safe_err,
+            exc_info=False,
+        )
         return ToolResult(
             success=False,
             message="عذراً، حدث خطأ أثناء تنفيذ هذا الإجراء. هل يمكنك إعادة المحاولة؟",
-            error=str(e),
+            error=safe_err,
         )
 
 
 async def async_execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolResult:
     """
     Asynchronously execute a registered tool by name (non-blocking for LiveKit turns).
+    Routes appointment booking and management through `AppointmentWorkflowStateMachine` (ADR-009).
 
     Args:
         tool_name: Name of tool in registry.
@@ -368,7 +330,49 @@ async def async_execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolR
         return ToolResult(success=False, message="عذراً، هذه الأداة غير متاحة حالياً.", error=err_msg)
 
     try:
-        prepared_args = _prepare_tool_arguments(tool_name, arguments)
+        prepared_args = _prepare_tool_arguments(
+            tool_name, arguments if isinstance(arguments, dict) else {}
+        )
+
+        # ADR-009: Route appointment workflows through AppointmentWorkflowStateMachine
+        if tool_name == "book_appointment":
+            from src.ai_core.workflow import AppointmentWorkflowStateMachine, WorkflowAction
+
+            raw_doc_id = prepared_args.get("doctor_id")
+            coerced_doc_id: int | None = None
+            if raw_doc_id is not None and not isinstance(raw_doc_id, bool):
+                coerced_doc_id = int(raw_doc_id)
+
+            wf = AppointmentWorkflowStateMachine(
+                session_factory=appointment_booking_tool.session_factory
+            )
+            wf_res = await wf.execute(
+                WorkflowAction.BOOK,
+                patient_name=prepared_args.get("patient_name"),
+                patient_phone=prepared_args.get("patient_phone"),
+                doctor_id=coerced_doc_id,
+                doctor_name=prepared_args.get("doctor_name"),
+                date=prepared_args.get("date"),
+                visit_type=prepared_args.get("visit_type"),
+                notes=prepared_args.get("notes"),
+            )
+            return wf_res.tool_result
+
+        if tool_name == "manage_appointment":
+            from src.ai_core.workflow import AppointmentWorkflowStateMachine
+
+            wf = AppointmentWorkflowStateMachine(
+                session_factory=manage_appointment_tool.session_factory
+            )
+            wf_res = await wf.execute(
+                prepared_args.get("action") or "",
+                booking_code=prepared_args.get("booking_code"),
+                phone=prepared_args.get("phone"),
+                new_date=prepared_args.get("new_date"),
+                reason=prepared_args.get("reason"),
+            )
+            return wf_res.tool_result
+
         validated_args = tool_def.input_schema.model_validate(prepared_args)
         args_dict = validated_args.model_dump(exclude_unset=True)
 
@@ -388,12 +392,24 @@ async def async_execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolR
             message=voice_msg,
             data=payload if isinstance(payload, dict) else {"result": payload},
         )
-    except Exception as e:
-        logger.exception("Error in async tool execution '%s'", tool_name)
+    except Exception as e:  # noqa: BLE001
+        from src.ai_core.guardrails import get_pii_redactor
+
+        redactor = get_pii_redactor()
+        safe_args = redactor.redact_dict(arguments) if isinstance(arguments, dict) else {}
+        safe_err = redactor.redact(str(e))
+        logger.error(
+            "Error in async tool execution '%s' with args %s (%s): %s",
+            tool_name,
+            safe_args,
+            type(e).__name__,
+            safe_err,
+            exc_info=False,
+        )
         return ToolResult(
             success=False,
             message="عذراً، حدث خطأ أثناء تنفيذ هذا الإجراء. هل يمكنك إعادة المحاولة؟",
-            error=str(e),
+            error=safe_err,
         )
 
 
@@ -413,21 +429,9 @@ __all__ = [  # noqa: RUF022
     "ManageAppointmentOutput",
     "ClinicKnowledgeSearchInput",
     "ClinicKnowledgeSearchOutput",
+    "KnowledgeChunk",
     "ReceptionistHandoffInput",
     "ReceptionistHandoffOutput",
-    # Legacy Schemas (deprecated)
-    "KnowledgeSearchInput",
-    "KnowledgeSearchOutput",
-    "KnowledgeChunk",
-    "OrderStatusInput",
-    "OrderStatusOutput",
-    "OrderItem",
-    "OrderStatusEnum",
-    "ReservationInput",
-    "ReservationOutput",
-    "ReservationStatusEnum",
-    "HumanHandoffInput",
-    "HumanHandoffOutput",
     "HandoffUrgencyEnum",
     "HandoffDepartmentEnum",
     # Tools Classes & Singletons
@@ -441,10 +445,6 @@ __all__ = [  # noqa: RUF022
     "clinic_knowledge_search_tool",
     "KnowledgeSearchTool",
     "knowledge_search_tool",
-    "OrderStatusTool",
-    "order_status_tool",
-    "ReservationTool",
-    "reservation_tool",
     "HumanHandoffTool",
     "human_handoff_tool",
     "ReceptionistHandoffTool",
@@ -460,12 +460,6 @@ __all__ = [  # noqa: RUF022
     "async_search_clinic_knowledge",
     "search_knowledge",
     "async_search_knowledge",
-    "search_restaurant_knowledge",
-    "async_search_restaurant_knowledge",
-    "get_order_status",
-    "async_get_order_status",
-    "book_reservation",
-    "async_book_reservation",
     "transfer_to_receptionist",
     "async_transfer_to_receptionist",
     "escalate_to_human",

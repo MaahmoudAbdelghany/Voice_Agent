@@ -5,4 +5,4 @@ Nothing here is a commitment until `sdd-replan` (mode B) schedules it on `spec/r
 
 | Date | Item | Type | Status | Raised during |
 |:---|:---|:---|:---|:---|
-
+| 2026-11-09 | [Deepgram Language Auto-Detection for Egyptian Arabic & English](./2026-11-09-deepgram-language-autodetect.md) | Research | Open | Phase 5 (`phase/5-livekit-voice-core`) |

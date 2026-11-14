@@ -6,6 +6,7 @@ models (default: BAAI/bge-small-en-v1.5) with local caching and zero API fees.
 """
 
 import logging
+import os
 
 from src.config import settings
 
@@ -13,6 +14,21 @@ logger = logging.getLogger(__name__)
 
 # Default dimension for BAAI/bge-small-en-v1.5
 DEFAULT_EMBEDDING_DIM = 384
+
+
+def _normalize_no_proxy_ipv6() -> None:
+    """Unwrap bracketed IPv6 literals (e.g. '[::1]' -> '::1') in NO_PROXY for httpx compatibility."""
+    for key in ("NO_PROXY", "no_proxy"):
+        raw = os.environ.get(key)
+        if not raw or "[" not in raw:
+            continue
+        parts = [
+            p.strip()[1:-1]
+            if p.strip().startswith("[") and p.strip().endswith("]") and "://" not in p
+            else p.strip()
+            for p in raw.split(",")
+        ]
+        os.environ[key] = ",".join(parts)
 
 
 class EmbeddingService:
@@ -30,6 +46,7 @@ class EmbeddingService:
         """Lazy load the TextEmbedding model to prevent startup latency."""
         if self._model is None:
             try:
+                _normalize_no_proxy_ipv6()
                 from fastembed import TextEmbedding
 
                 logger.info(f"Loading FastEmbed model: {self.model_name}")

@@ -49,8 +49,6 @@ DEPARTMENT_NAMES_ARABIC: dict[str, str] = {
     "emergency": "الطوارئ",
     # Legacy mappings
     "customer_support": "الاستقبال",
-    "kitchen_manager": "الاستقبال",
-    "delivery_dispatch": "الاستقبال",
 }
 
 URGENCY_RANKS: dict[str, int] = {
@@ -255,20 +253,31 @@ class ReceptionistHandoffTool:
     """
     Production Receptionist Escalation Tool for Egyptian Polyclinics (Feature 3.6).
     Creates persistent database tickets, applies emergency safety net, handles working hours,
-    and supports call de-duplication with 400ms resilient fallback.
+    and supports call de-duplication bounded by `write_tool_hard_cap_ms`.
     """
 
     def __init__(
         self,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
-        timeout_s: float = 0.4,
+        timeout_s: float | None = None,
     ) -> None:
         self.session_factory = session_factory
-        self.timeout_s = timeout_s
+        self._timeout_s = timeout_s
+
+    @property
+    def timeout_s(self) -> float:
+        """Effective persistence timeout in seconds (defaults to write_tool_hard_cap_ms / 1000)."""
+        if self._timeout_s is not None:
+            return float(self._timeout_s)
+        return max(0.1, float(get_settings().write_tool_hard_cap_ms) / 1000.0)
+
+    @timeout_s.setter
+    def timeout_s(self, value: float | None) -> None:
+        self._timeout_s = value
 
     def _normalize_department(self, dept: Any) -> str:
         d = str(dept.value if hasattr(dept, "value") else dept or "").strip().lower()
-        if d in ("reception", "customer_support", "kitchen_manager", "delivery_dispatch"):
+        if d in ("reception", "customer_support"):
             return HandoffDepartmentEnum.RECEPTION.value
         if d in ("nursing",):
             return HandoffDepartmentEnum.NURSING.value

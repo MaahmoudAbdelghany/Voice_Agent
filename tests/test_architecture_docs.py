@@ -12,8 +12,9 @@ Verifies that:
 4. Every configuration key listed under an ADR's `Code References` is an actual
    field on `src.config.Settings` (`Settings.model_fields`).
 5. `spec/architecture.md` exists, contains the RTL wrapper, includes the
-   Technical Debt section and links to all 9 ADRs, defines `classDef planned`,
-   and contains exactly 6 Mermaid diagrams matching the required C4 diagram types.
+   Built-vs-Planned legend and links to all 9 ADRs, defines `classDef planned`,
+   contains zero purged restaurant references, and contains exactly 6 Mermaid
+   diagrams matching the required C4 diagram types.
 """
 
 from __future__ import annotations
@@ -225,8 +226,8 @@ def test_adr_007_links_to_threat_model() -> None:
     )
 
 
-def test_architecture_doc_mermaid_diagrams_and_technical_debt() -> None:
-    """Verify `spec/architecture.md` has 6 valid Mermaid diagrams, planned styling, and debt log."""
+def test_architecture_doc_mermaid_diagrams_and_clinic_purity() -> None:
+    """T2.3: Verify `spec/architecture.md` has 6 valid Mermaid diagrams, planned styling, ADR links, and zero legacy restaurant references."""
     assert ARCH_DOC.is_file(), f"Missing architecture document: {ARCH_DOC}"
     text = ARCH_DOC.read_text(encoding="utf-8")
 
@@ -237,16 +238,16 @@ def test_architecture_doc_mermaid_diagrams_and_technical_debt() -> None:
     assert "[Planned" in text, (
         "[spec/architecture.md] Missing '[Planned]' label on unbuilt future phase components."
     )
-    assert "Technical Debt" in text, (
-        "[spec/architecture.md] Missing 'Technical Debt' section for legacy restaurant files."
-    )
-    for legacy_file in (
+    for removed_legacy_ref in (
         "src/tools/order_status.py",
         "src/tools/reservation.py",
         "src/tools/legacy_schemas.py",
+        "get_order_status",
+        "book_reservation",
+        "search_restaurant_knowledge",
     ):
-        assert legacy_file in text, (
-            f"[spec/architecture.md] Technical Debt section must list '{legacy_file}'."
+        assert removed_legacy_ref not in text, (
+            f"[spec/architecture.md] Must not reference purged legacy artifact '{removed_legacy_ref}'."
         )
 
     for adr_filename in EXPECTED_ADR_FILES:

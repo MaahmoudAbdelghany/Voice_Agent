@@ -444,85 +444,9 @@ class KnowledgeIngestionPipeline:
             "مخ واعصاب",
         ]
 
-        # Legacy restaurant keywords
-        menu_keywords = [
-            "menu",
-            "shawarma",
-            "grill",
-            "mezza",
-            "salad",
-            "dessert",
-            "beverage",
-            "منيو",
-            "قائمة الطعام",
-            "شاورما",
-            "مشاوي",
-            "مقبلات",
-            "سلطات",
-            "حلويات",
-            "مشروبات",
-            "ساندوتش",
-            "سندوتش",
-            "وجبات",
-            "وجبة",
-            "فتة",
-            "عصائر",
-        ]
-        allergen_keywords = [
-            "allergen",
-            "dietary",
-            "vegan",
-            "vegetarian",
-            "gluten",
-            "halal",
-            "nut",
-            "حساسية",
-            "مسببات",
-            "دايت",
-            "نباتي",
-            "جلوتين",
-            "حلال",
-            "مكسرات",
-            "ألبان",
-            "بيض",
-            "ثومية",
-            "تومية",
-        ]
-        delivery_keywords = [
-            "delivery",
-            "shipping",
-            "توصيل",
-            "دليفري",
-            "أوردر",
-            "اوردر",
-            "شحن",
-        ]
-        reservation_keywords = [
-            "table",
-            "party",
-            "walk-in",
-            "ترابيزة",
-            "ترابيزات",
-            "طاولة",
-            "طاولات",
-            "عيد ميلاد",
-            "أفراح",
-        ]
-        catering_keywords = ["cater", "بوفيه", "حفلات", "عزومات", "ايفنت"]
-
         # 1. Prioritize title-based categorization for accurate section boundaries
         if any(k in lower_title for k in safety_keywords):
             return "safety_guardrails"
-        elif any(k in lower_title for k in delivery_keywords):
-            return "delivery"
-        elif any(k in lower_title for k in reservation_keywords):
-            return "reservations"
-        elif any(k in lower_title for k in allergen_keywords):
-            return "allergens"
-        elif any(k in lower_title for k in catering_keywords):
-            return "catering"
-        elif any(k in lower_title for k in menu_keywords):
-            return "menu"
         elif (
             any(k in lower_title for k in faq_keywords)
             or bool(re.match(r"^س\s*\d+", lower_title))
@@ -547,14 +471,6 @@ class KnowledgeIngestionPipeline:
         # 2. Fallback to body text keyword matching
         if any(k in lower_text for k in safety_keywords):
             return "safety_guardrails"
-        elif any(k in lower_text for k in delivery_keywords):
-            return "delivery"
-        elif any(k in lower_text for k in allergen_keywords):
-            return "allergens"
-        elif any(k in lower_text for k in reservation_keywords):
-            return "reservations"
-        elif any(k in lower_text for k in menu_keywords):
-            return "menu"
         elif any(k in lower_text for k in faq_keywords):
             return "faqs"
         elif any(k in lower_text for k in insurance_keywords):

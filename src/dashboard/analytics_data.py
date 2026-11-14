@@ -1,15 +1,12 @@
 """
-Analytics Data Aggregation, KPI Telemetry & Historical Call Seeder.
+Analytics Data Aggregation & Clinic Voice KPI Telemetry.
 
 Provides statistical aggregation for voice latency (STT/LLM/TTS), SLA compliance,
-time-series volume bucketing (hourly/daily), sentiment and tool invocation analytics,
-and automated multi-day call session seeding for rich dashboard visualizations.
+time-series volume bucketing (hourly/daily), caller sentiment, and clinic tool invocation analytics.
 """
 
 import logging
-import uuid
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -18,7 +15,6 @@ from src.agent.session_manager import (
     CallSession,
     CallStatus,
     MessageRole,
-    SessionManager,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,198 +27,7 @@ SLA_BUDGET_TTS_MS: float = 250.0
 
 
 # ==============================================================================
-# 1. 7-Day Time-Distributed Analytics Call Seeder
-# ==============================================================================
-
-def seed_analytics_call_sessions(
-    storage_dir: str | Path | None = None,
-    min_threshold: int = 10,
-) -> list[CallSession]:
-    """
-    Generate realistic, time-distributed mock call sessions spanning the last 7 days.
-    Triggered when stored call records are fewer than min_threshold to ensure
-    analytics charts render rich, production-grade visual trends immediately.
-    
-    Args:
-        storage_dir: Storage directory for persisted JSON call records.
-        min_threshold: Minimum sessions required before seeding is skipped.
-        
-    Returns:
-        List of newly seeded CallSession objects.
-    """
-    mgr = SessionManager(storage_dir=storage_dir or "data/calls")
-    existing = mgr.load_all_persisted_sessions()
-    
-    if len(existing) >= min_threshold:
-        return existing
-
-    seeded: list[CallSession] = []
-    now = datetime.now(timezone.utc)
-
-    # Scenarios template pool
-    scenarios = [
-        {
-            "lang": "ar",
-            "name": "أحمد الشمري",
-            "phone": "+966501112233",
-            "order_id": "ORD-7801",
-            "sentiment": "positive",
-            "tool": "check_order_status",
-            "tool_args": {"order_id": "ORD-7801"},
-            "tool_res": {"order_id": "ORD-7801", "status": "out_for_delivery", "courier": "خالد"},
-            "user_text": "مرحباً، أود معرفة أين وصل طلبي رقم 7801؟",
-            "agent_text": "أهلاً بك يا أحمد. طلبك في الطريق مع الكابتن خالد وسيصلك خلال 10 دقائق.",
-            "escalated": False,
-        },
-        {
-            "lang": "en",
-            "name": "David Miller",
-            "phone": "+14155553819",
-            "order_id": None,
-            "sentiment": "positive",
-            "tool": "book_reservation",
-            "tool_args": {"date": "2026-10-12", "time": "19:30", "party_size": 2},
-            "tool_res": {"reservation_id": "RES-5102", "table": "Patio #4", "status": "confirmed"},
-            "user_text": "Hi, I'd like to book a table for 2 tomorrow evening around 7:30 PM.",
-            "agent_text": "Certainly David! I have reserved patio table #4 for you tomorrow at 7:30 PM. Reference RES-5102.",
-            "escalated": False,
-        },
-        {
-            "lang": "ar",
-            "name": "فاطمة القحطاني",
-            "phone": "+966542223344",
-            "order_id": None,
-            "sentiment": "neutral",
-            "tool": "search_knowledge_base",
-            "tool_args": {"query": "قائمة طعام خالية من الجلوتين"},
-            "tool_res": {"query": "قائمة خالية من الجلوتين", "results_count": 3},
-            "user_text": "هل لديكم خيارات بيتزا خالية من الجلوتين في فرع التحلية؟",
-            "agent_text": "نعم يا فاطمة، تتوفر لدينا بيتزا مارغريتا بعجينة خالية من الجلوتين بالإضافة لسلطات الكينوا.",
-            "escalated": False,
-        },
-        {
-            "lang": "en",
-            "name": "Emma Watson",
-            "phone": "+12125559812",
-            "order_id": "ORD-9204",
-            "sentiment": "negative",
-            "tool": "escalate_to_human",
-            "tool_args": {"reason": "Missing items in delivery"},
-            "tool_res": {"escalated": True, "department": "Customer Relations"},
-            "user_text": "My food arrived cold and half the order is missing! I demand to speak to a supervisor.",
-            "agent_text": "I truly apologize for this bad experience Emma. Transferring you immediately to a duty supervisor.",
-            "escalated": True,
-        },
-        {
-            "lang": "ar",
-            "name": "سعد الدوسري",
-            "phone": "+966567778899",
-            "order_id": "ORD-3312",
-            "sentiment": "positive",
-            "tool": "check_order_status",
-            "tool_args": {"order_id": "ORD-3312"},
-            "tool_res": {"order_id": "ORD-3312", "status": "delivered"},
-            "user_text": "السلام عليكم، هل تم تسليم الطلب بالاستقبال؟",
-            "agent_text": "وعليكم السلام يا سعد، نعم تم تأكيد التسليم في الاستقبال قبل دقيقتين. بالهناء والعافية!",
-            "escalated": False,
-        },
-        {
-            "lang": "en",
-            "name": "Robert Chen",
-            "phone": "+14155554499",
-            "order_id": None,
-            "sentiment": "neutral",
-            "tool": "search_knowledge_base",
-            "tool_args": {"query": "outdoor seating and pets"},
-            "tool_res": {"query": "pet friendly patio", "results_count": 2},
-            "user_text": "Hello, do you allow small dogs on your outdoor terrace?",
-            "agent_text": "Yes Robert! Our outdoor terrace welcomes pets, and we even offer fresh water bowls upon request.",
-            "escalated": False,
-        },
-    ]
-
-    # Generate calls distributed over the past 7 days across lunch (12-15) and dinner (19-22) hours
-    call_idx = 1
-    for day_offset in range(6, -1, -1):
-        target_date = now - timedelta(days=day_offset)
-        
-        # 2 to 3 calls per day
-        daily_call_count = 3 if day_offset in (0, 1, 5, 6) else 2
-        for i in range(daily_call_count):
-            sc = scenarios[(call_idx - 1) % len(scenarios)]
-            
-            # Select rush hour hour: Lunch (12:00-14:30) or Dinner (19:00-22:00)
-            hour = 13 if i == 0 else (20 if i == 1 else 14)
-            minute = (i * 19 + day_offset * 7) % 55
-            call_time = target_date.replace(hour=hour, minute=minute, second=15)
-            
-            # Simulate realistic SLA-aligned latency (mostly <800ms, occasionally breach for realistic analytics)
-            is_sla_breach = (call_idx % 9 == 0)
-            if is_sla_breach:
-                stt_lat = 210.0 + (call_idx % 20)
-                llm_lat = 380.0 + (call_idx % 40)
-                tts_lat = 290.0 + (call_idx % 30)
-                tot_lat = stt_lat + llm_lat + tts_lat
-            else:
-                stt_lat = 140.0 + (call_idx % 45)
-                llm_lat = 220.0 + (call_idx % 55)
-                tts_lat = 180.0 + (call_idx % 40)
-                tot_lat = stt_lat + llm_lat + tts_lat
-
-            session_id = f"call-seed-{day_offset}d-{i+1:02d}-{uuid.uuid4().hex[:6]}"
-            session = mgr.create_session(
-                session_id=session_id,
-                room_name=f"restaurant-room-{sc['lang']}-{call_idx:03d}",
-                participant_identity=f"caller-{call_idx:03d}",
-                language=sc["lang"],
-                customer_phone=sc["phone"],
-            )
-            session.start_time = call_time
-            session.context.customer_name = sc["name"]
-            session.context.sentiment = sc["sentiment"]
-            session.context.order_id = sc["order_id"]
-            session.context.escalated = sc["escalated"]
-            if sc["escalated"]:
-                session.context.escalation_reason = "Customer requested human supervisor"
-                session.context.escalation_department = "Support Desk"
-
-            # Add turns
-            session.add_turn(
-                role=MessageRole.USER,
-                content=sc["user_text"],
-                stt_latency_ms=stt_lat,
-            )
-            session.add_turn(
-                role=MessageRole.ASSISTANT,
-                content=sc["agent_text"],
-                latency_ms=tot_lat,
-                llm_latency_ms=llm_lat,
-                tts_latency_ms=tts_lat,
-            )
-            if sc["tool"]:
-                session.add_turn(
-                    role=MessageRole.TOOL,
-                    content=str(sc["tool_res"]),
-                    tool_name=sc["tool"],
-                    tool_arguments=sc["tool_args"],
-                    tool_result=sc["tool_res"],
-                )
-
-            duration = 45.0 + (call_idx * 7) % 65
-            session.end_time = session.start_time + timedelta(seconds=duration)
-            session.status = CallStatus.ESCALATED if sc["escalated"] else CallStatus.ENDED
-            session.metrics.duration_seconds = duration
-
-            mgr.save_session(session.session_id)
-            seeded.append(session)
-            call_idx += 1
-
-    logger.info(f"Successfully seeded {len(seeded)} time-distributed analytics calls across 7 days")
-    return seeded
-
-
-# ==============================================================================
-# 2. Filtering Utilities
+# 1. Filtering Utilities
 # ==============================================================================
 
 def filter_by_time_range(
@@ -441,7 +246,7 @@ def aggregate_daily_volume(sessions: list[CallSession]) -> list[dict[str, Any]]:
 
 def aggregate_hourly_volume(sessions: list[CallSession]) -> list[dict[str, Any]]:
     """
-    Aggregate calls across 24 hourly buckets (00:00 to 23:00) with peak rush hour flags.
+    Aggregate calls across 24 hourly buckets (00:00 to 23:00) with peak clinic shift flags.
     """
     hourly_counts = {h: 0 for h in range(24)}
     for s in sessions:
@@ -449,7 +254,7 @@ def aggregate_hourly_volume(sessions: list[CallSession]) -> list[dict[str, Any]]
 
     result = []
     for h in range(24):
-        # Peak restaurant rush hours: Lunch (12:00-15:00) & Dinner (19:00-22:00)
+        # Peak clinic shift hours: Midday (12:00-15:00) & Evening (19:00-22:00)
         is_peak = (12 <= h <= 15) or (19 <= h <= 22)
         result.append({
             "hour": h,
@@ -462,7 +267,7 @@ def aggregate_hourly_volume(sessions: list[CallSession]) -> list[dict[str, Any]]
 
 def aggregate_sentiment_distribution(sessions: list[CallSession]) -> dict[str, int]:
     """
-    Count customer sentiments across filtered calls (positive, neutral, negative).
+    Count caller sentiments across filtered calls (positive, neutral, negative).
     """
     dist = {"positive": 0, "neutral": 0, "negative": 0}
     for s in sessions:
@@ -476,7 +281,7 @@ def aggregate_sentiment_distribution(sessions: list[CallSession]) -> dict[str, i
 
 def aggregate_tool_invocations(sessions: list[CallSession]) -> list[dict[str, Any]]:
     """
-    Aggregate and rank tool calls made across all sessions.
+    Aggregate and rank clinic tool calls made across all sessions.
     """
     counts: dict[str, int] = {}
     total_tool_calls = 0
@@ -508,3 +313,7 @@ def aggregate_language_distribution(sessions: list[CallSession]) -> dict[str, in
         lang = (s.context.language or "en").lower()
         dist[lang] = dist.get(lang, 0) + 1
     return dist
+
+
+# Canonical alias used by dashboard and tests
+compute_dashboard_analytics = calculate_analytics_kpis

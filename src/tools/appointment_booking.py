@@ -517,9 +517,16 @@ class AppointmentBookingTool:
             )
             return ToolResult(success=True, message=message, data=payload)
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             # No patient identifiers in logs (NFR-4)
-            logger.exception("Unexpected error in appointment booking")
+            from src.ai_core.guardrails import get_pii_redactor
+
+            redacted_err = get_pii_redactor().redact(str(exc))
+            logger.error(
+                "Unexpected error in appointment booking (%s): %s",
+                type(exc).__name__,
+                redacted_err,
+            )
             return _failure(
                 "عذراً، حصلت مشكلة أثناء الحجز. ممكن نحاول تاني؟",
                 f"unexpected_error: {type(exc).__name__}",

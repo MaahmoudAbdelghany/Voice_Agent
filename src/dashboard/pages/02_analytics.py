@@ -27,7 +27,6 @@ from src.dashboard.analytics_data import (
     aggregate_tool_invocations,
     calculate_analytics_kpis,
     filter_analytics_sessions,
-    seed_analytics_call_sessions,
 )
 from src.dashboard.calls_data import load_all_call_sessions
 from src.dashboard.i18n import t
@@ -84,7 +83,7 @@ if is_arabic:
 # ==============================================================================
 with st.sidebar:
     st.markdown(f"### ⚙️ {t('sidebar_settings_title', lang)}")
-    
+
     # Language Switcher
     lang_options = {"en": "English 🇺🇸", "ar": "العربية 🇸🇦"}
     current_index = 0 if lang == "en" else 1
@@ -150,14 +149,10 @@ with st.sidebar:
 
 
 # ==============================================================================
-# 4. Data Loading & Seeding
+# 4. Data Loading & Filtering
 # ==============================================================================
-raw_sessions = load_all_call_sessions(auto_seed=True)
-
-# Ensure historical curves are rich if records < 10
-if len(raw_sessions) < 10:
-    seed_analytics_call_sessions()
-    raw_sessions = load_all_call_sessions(auto_seed=False)
+storage_override = st.session_state.get("calls_storage_dir")
+raw_sessions = load_all_call_sessions(storage_dir=storage_override)
 
 # Filter sessions according to sidebar criteria
 sessions = filter_analytics_sessions(

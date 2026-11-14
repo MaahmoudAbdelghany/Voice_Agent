@@ -18,20 +18,43 @@ from src.rag.embeddings import embedding_service
 logger = logging.getLogger(__name__)
 
 
+_local_memory_client: QdrantClient | None = None
+
+
 class QdrantKnowledgeRetriever:
     """
     Manages vector indexing and retrieval from Qdrant vector database.
     Seamlessly operates with Qdrant Cloud or local in-memory client.
     """
 
-    def __init__(self, collection_name: str | None = None):
+    def __init__(self, collection_name: str | None = None, *, lazy: bool = False):
         self.collection_name = collection_name or settings.qdrant_collection
-        self.client = self._init_client()
         self.embeddings = embedding_service
-        self._ensure_collection()
+        self._client: QdrantClient | None = None
+        self._collection_ensured: bool = False
+        if not lazy and not settings.is_qdrant_cloud():
+            self._client = self._init_client()
+            self._collection_ensured = True
+            self._ensure_collection()
+
+    @property
+    def client(self) -> QdrantClient:
+        """Lazily resolve Qdrant client and ensure collection exists."""
+        if self._client is None:
+            self._client = self._init_client()
+        if not self._collection_ensured:
+            self._collection_ensured = True
+            self._ensure_collection()
+        return self._client
+
+    @client.setter
+    def client(self, value: QdrantClient) -> None:
+        self._client = value
+        self._collection_ensured = True
 
     def _init_client(self) -> QdrantClient:
         """Initializes Qdrant client based on configuration."""
+        global _local_memory_client
         if settings.is_qdrant_cloud():
             logger.info(f"Connecting to Qdrant Cloud at {settings.qdrant_url}")
             return QdrantClient(
@@ -39,17 +62,22 @@ class QdrantKnowledgeRetriever:
                 api_key=settings.qdrant_api_key,
             )
         else:
-            logger.info("Using local in-memory Qdrant instance for vector search")
-            return QdrantClient(":memory:")
+            if _local_memory_client is None:
+                logger.info("Using local in-memory Qdrant instance for vector search")
+                _local_memory_client = QdrantClient(":memory:")
+            return _local_memory_client
 
     def _ensure_collection(self) -> None:
         """Ensure collection exists in Qdrant with appropriate vector configuration."""
+        if self._client is None:
+            self._client = self._init_client()
+        self._collection_ensured = True
         try:
-            collections = self.client.get_collections().collections
+            collections = self._client.get_collections().collections
             exists = any(col.name == self.collection_name for col in collections)
             if not exists:
                 logger.info(f"Creating collection '{self.collection_name}' in Qdrant...")
-                self.client.create_collection(
+                self._client.create_collection(
                     collection_name=self.collection_name,
                     vectors_config=qmodels.VectorParams(
                         size=self.embeddings.dimension,
@@ -57,14 +85,14 @@ class QdrantKnowledgeRetriever:
                     ),
                 )
                 try:
-                    self.client.create_payload_index(
+                    self._client.create_payload_index(
                         collection_name=self.collection_name,
                         field_name="category",
                         field_schema=qmodels.PayloadSchemaType.KEYWORD,
                     )
-                except Exception as idx_err:
+                except Exception as idx_err:  # noqa: BLE001
                     logger.debug(f"Payload index creation info for '{self.collection_name}': {idx_err}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error checking/creating collection '{self.collection_name}': {e}")
 
     def recreate_collection(self) -> None:
@@ -74,7 +102,7 @@ class QdrantKnowledgeRetriever:
             if any(col.name == self.collection_name for col in collections):
                 logger.info(f"Deleting existing collection '{self.collection_name}'...")
                 self.client.delete_collection(collection_name=self.collection_name)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Error deleting collection '{self.collection_name}': {e}")
         self._ensure_collection()
 
@@ -139,7 +167,7 @@ class QdrantKnowledgeRetriever:
         category: str | None = None,
     ) -> list[dict[str, Any]]:
         """
-        Execute semantic vector similarity search against the restaurant knowledge base.
+        Execute semantic vector similarity search against the clinic knowledge base.
         
         Args:
             query: User utterance or question.
@@ -183,7 +211,7 @@ class QdrantKnowledgeRetriever:
                     limit=limit,
                     score_threshold=score_threshold,
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error performing Qdrant search: {e}")
             return []
 
@@ -229,5 +257,22 @@ class QdrantKnowledgeRetriever:
         return "\n\n".join(context_blocks)
 
 
-# Singleton instance
-retriever = QdrantKnowledgeRetriever()
+_retriever_singleton: QdrantKnowledgeRetriever | None = None
+
+
+def get_retriever() -> QdrantKnowledgeRetriever:
+    """Return the lazy module-level QdrantKnowledgeRetriever singleton."""
+    global _retriever_singleton
+    if "retriever" in globals():
+        return globals()["retriever"]
+    if _retriever_singleton is None:
+        _retriever_singleton = QdrantKnowledgeRetriever(lazy=True)
+        globals()["retriever"] = _retriever_singleton
+    return _retriever_singleton
+
+
+def __getattr__(name: str) -> Any:
+    if name == "retriever":
+        return get_retriever()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+

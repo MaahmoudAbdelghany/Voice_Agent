@@ -1,14 +1,16 @@
 """RAG and Vector Search Package for Voice Agent."""
 
+from typing import Any
+
 from src.rag.embeddings import EmbeddingService, embedding_service
 from src.rag.hybrid_retriever import (
     BM25Index,
     HybridKnowledgeRetriever,
-    hybrid_retriever,
+    get_hybrid_retriever,
     reciprocal_rank_fusion,
     tokenize_for_bm25,
 )
-from src.rag.retriever import QdrantKnowledgeRetriever, retriever
+from src.rag.retriever import QdrantKnowledgeRetriever, get_retriever
 from src.rag.sanitizer import (
     DocumentSanitizer,
     SanitizationFinding,
@@ -31,3 +33,16 @@ __all__ = [
     "retriever",
     "tokenize_for_bm25",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    if name == "retriever":
+        return get_retriever()
+    if name == "hybrid_retriever":
+        return get_hybrid_retriever()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals().keys()) | set(__all__))
+

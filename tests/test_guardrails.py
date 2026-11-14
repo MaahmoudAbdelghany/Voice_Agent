@@ -611,3 +611,22 @@ async def test_guardrails_latency_sla():
     assert task is not None
     assert sched_ms < 1.0, f"schedule_check took {sched_ms:.2f}ms on hot path (SLA < 1ms)"
     await task
+
+
+def test_pii_redactor_arabic_indic_and_grouped_phones_and_nids():
+    """Verify Arabic-Indic (٠-٩), Extended Arabic (۰-۹), and spaced/hyphenated phones & NIDs are redacted."""
+    redactor = EgyptianPIIRedactor()
+
+    samples = [
+        ("رقمي ٠١٠١٢٣٤٥٦٧٨", "٠١٠١٢٣٤٥٦٧٨", "[REDACTED_PHONE]"),
+        ("رقمي ۰۱۱٩٨٧٦٥٤٣٢", "۰۱۱٩٨٧٦٥٤٣٢", "[REDACTED_PHONE]"),
+        ("موبايلي 010 - 1234 - 5678 للتواصل", "010 - 1234 - 5678", "[REDACTED_PHONE]"),
+        ("موبايلي +20 12 3456 7890", "+20 12 3456 7890", "[REDACTED_PHONE]"),
+        ("الرقم القومي ٢٩٥٠١١٥٠١٠١٢٣٤", "٢٩٥٠١١٥٠١٠١٢٣٤", "[REDACTED_NATIONAL_ID]"),
+        ("الرقم القومي 2950115 - 0101 - 234", "2950115 - 0101 - 234", "[REDACTED_NATIONAL_ID]"),
+    ]
+    for raw_text, secret, expected_token in samples:
+        redacted = redactor.redact(raw_text)
+        assert secret not in redacted, f"Failed to redact '{secret}' in '{raw_text}' -> '{redacted}'"
+        assert expected_token in redacted
+
