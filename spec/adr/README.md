@@ -22,5 +22,8 @@
 | **007** | [طبقة الثقة المتوافقة مع OWASP وحواجز الحماية الفورية وتنقية PII والمصنّف غير المتزامن](./007-owasp-trust-layer.md) | `Accepted` | Feature 4.4 |
 | **008** | [سلّم التخزين المؤقت ثلاثي المستويات مع عزل الفئات وعتبة التشابه الدلالي `0.97`](./008-three-tier-cache-ladder.md) | `Accepted` | Feature 4.2 |
 | **009** | [آلة الحالة المحدودة الحتمية (FSM) لسير عمل الحجز بدل حلقات الوكيل المفتوحة](./009-state-machine-over-agent-loop.md) | `Accepted` | Feature 4.5 |
+| **010** | [فصل هوية المتصل عن رقم التواصل عبر الواتساب وتوحيد صيغة `E.164` لدعم مصر والخليج](./010-e164-and-whatsapp-contact-separation.md) | `Accepted` | Feature 6.1 & 6.2 |
+| **011** | [طبقة إشعارات واتساب معيارية (`Meta Cloud API`) وجدولة `Transactional Outbox` لاعتذار الطبيب والتذكيرات](./011-whatsapp-adapter-and-db-outbox.md) | `Accepted` | Feature 6.3 & 7.1–7.3 |
+| **012** | [استراتيجية النشر الموفر بحاويات قياسية (`12-Factor`) على `AWS EC2` مع مسار ترقية صفري إلى `ECS Fargate`](./012-lean-aws-ec2-to-ecs-deployment.md) | `Accepted` | Feature 8.2 & 8.3 |
 
 </div>

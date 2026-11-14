@@ -1,4 +1,4 @@
-# Product Roadmap — Voice AI Agent for Egyptian Polyclinics
+# Product Roadmap — Voice AI Agent & WhatsApp Operations for Polyclinics (Egypt, KSA & UAE)
 
 ## Overview
 This roadmap is a **Living Document** under Spec-Driven Development (SDD). Each milestone progresses through:
@@ -58,31 +58,34 @@ This roadmap is a **Living Document** under Spec-Driven Development (SDD). Each 
 - [x] **Feature 5.5**: CLI Simulated Call Runner & Clinic Scenarios (`scripts/test_call.py`, `src/agent/scenarios.py`).
 - [x] **Feature 5.6**: Automated Voice Orchestration & Guardrail Test Suite (`tests/test_agent.py`).
 
-### Phase 6: LLMOps Production Operations, Identity & Reliability 📈
-*Goal: Keep the live system observable, continuously evaluated, access-controlled, and within SLA once real patients depend on it — Prometheus/Grafana telemetry, online sampled evaluation, SSO/RBAC with multi-branch isolation, load testing, and a formal SLI/SLO/SLA contract.*
+### Phase 6: Regional Readiness, Confirmed WhatsApp Contact & Doctor Schedule Exceptions 🌍
+*Goal: Prepare the booking and availability engine for Egypt (default), Saudi Arabia, and UAE via canonical `E.164` phones, separate session caller identity from confirmed WhatsApp contact numbers, and support emergency doctor shift exceptions.*
 
-- [ ] **Feature 6.1**: Prometheus Metrics Exporter (`src/ops/metrics.py` — Counters for calls/tokens/cost/errors, Gauge for active calls, Histograms for per-turn latency; bounded labels only, never `phone`/`call_id`).
-- [ ] **Feature 6.2**: Grafana Dashboards & Alertmanager Rules (`infra/observability/` — calls/min, P95 per turn, infra vs semantic error rate, daily token cost, cache hit ratio, alerts on SLO and 80% budget).
-- [ ] **Feature 6.3**: Online Sampled Evaluation (`src/ops/online_eval.py` — async RAGAS on 10% of production traces + sampled Llama Guard, results pushed back to Langfuse).
-- [ ] **Feature 6.4**: SSO (OAuth2/OIDC JWT) & RBAC (`src/auth/` — pluggable IdP: Keycloak local / Microsoft Entra ID prod; roles `admin`, `receptionist`, `doctor`, `viewer`).
-- [ ] **Feature 6.5**: Multi-Branch Tenant Isolation & Role-Scoped Tools (`tenant_id`/`branch_id` in Qdrant payloads and DB tables via migration, pre-retrieval filtering from verified token, fixed `caller` role with tool allowlist).
-- [ ] **Feature 6.6**: Load & Stress Testing (`tests/load/` — Locust for API/text path + LiveKit `lk load-test` for voice path at 50 concurrent calls).
-- [ ] **Feature 6.7**: SLI/SLO/SLA Contract & Autoscaling Policy (`spec/sla.md` — SLO P95 <= 800ms/turn & 99.9% uptime; SLA P95 <= 1.2s & 99.5% monthly up to 50 concurrent calls; scale on active calls per task, not CPU).
+- [ ] **Feature 6.1**: Regional Clinic Profile & `E.164` Multi-Country Phone Engine (`src/config.py`, `src/db/schemas.py`, `src/ai_core/guardrails.py` — supporting Egypt `+20` default, KSA `+966`, UAE `+971`, configurable currency/timezone/dialect, and regional PII redaction).
+- [ ] **Feature 6.2**: Confirmed WhatsApp Contact Phone Separation in Voice Booking Flow (`src/db/models.py`, `src/tools/schemas.py`, `src/tools/gates.py`, `src/ai_core/workflow.py`, `src/agent/prompts.py` — `whatsapp_phone` + `whatsapp_confirmed` with explicit digit-group read-back confirmation).
+- [ ] **Feature 6.3**: Doctor Schedule Exceptions & Next-Available-Slot Lookup (`src/db/models.py`, `src/db/repository.py`, `src/tools/doctor_availability.py`, `src/tools/gates.py` — `DoctorScheduleException` model blocking bookings on cancelled shifts and surfacing the next shift with open capacity during voice inquiries).
 
-### Phase 7: Clinic Admin & Analytics Dashboard 📊
-*Goal: Adapt Streamlit dashboard for clinic operations: live calls, patient bookings table, queue monitoring, and receptionist handoffs.*
+### Phase 7: Modular WhatsApp Notifications, Outbox Scheduler & Doctor Apology Workflow 💬
+*Goal: Deliver instant post-booking receipts, automated pre-shift reminders, and bulk doctor-apology notifications with next-available-slot guidance via Meta WhatsApp Cloud API at minimum cost and zero voice-path latency.*
 
-> Note: Existing spec folders `spec/features/feature-501..503-*` belong to this phase and keep their original names.
+- [ ] **Feature 7.1**: Pluggable WhatsApp Provider Layer & Localized Utility Templates (`src/notifications/providers.py`, `src/notifications/templates.py` — `WhatsAppProvider` Protocol, official direct `MetaCloudWhatsAppProvider` via async `httpx`, and local `MockOutboxProvider` for dev/demos).
+- [ ] **Feature 7.2**: Transactional Notification Outbox & Async Reminder Worker (`src/db/models.py`, `src/notifications/outbox.py`, `src/notifications/scheduler.py` — DB-backed `NotificationOutbox` with idempotency keys and exponential backoff, instant booking confirmation + configurable `24h` / `3h` pre-shift reminders, zero `Redis`/`Celery` overhead).
+- [ ] **Feature 7.3**: Clinic Operations FastAPI & Atomic Doctor Apology Orchestrator (`src/api/app.py`, `src/api/routes/shifts.py`, `src/notifications/apology_service.py` — close shift via `DoctorScheduleException`, transition affected bookings to `cancelled_by_doctor`, cancel pending reminders, compute next open shift, and enqueue WhatsApp apologies).
 
-- [ ] **Feature 7.1**: Main Clinic Portal, Arabic RTL Theme & Health Monitor (`src/dashboard/app.py`).
-- [ ] **Feature 7.2**: Patient Call Logs, Audio Playback & Transcript Viewer (`src/dashboard/pages/01_calls.py`).
-- [ ] **Feature 7.3**: Appointments & Queue Management Page (`src/dashboard/pages/02_appointments.py`).
-- [ ] **Feature 7.4**: Latency Breakdown & Call Volume Analytics (`src/dashboard/pages/03_analytics.py`).
-- [ ] **Feature 7.5**: Receptionist Escalations & Live Alerts Drawer (`src/dashboard/pages/04_escalations.py`).
+### Phase 8: Receptionist Clinic Portal & Cost-Optimized AWS MVP Deployment 🚀
+*Goal: Equip clinic receptionists with an RTL operational portal including 1-click doctor apology handling and WhatsApp outbox visibility, and ship a lean, 12-Factor containerized AWS EC2 production deployment.*
 
-### Phase 8: Production Containerization & Cloud Deployment 📦
-*Goal: Package the polyclinic voice agent, database, and LLMOps stack for scalable cloud deployment.*
+> Note: Existing historical spec folders `spec/features/feature-501..503-*` remain preserved on disk as reference context for dashboard pages.
 
-- [ ] **Feature 8.1**: Multi-stage production `Dockerfile` & `docker-compose.yml` (App + PostgreSQL + Qdrant + Redis + Langfuse + Prometheus + Grafana).
-- [ ] **Feature 8.2**: AWS ECS Fargate task definition, autoscaling on active-calls custom metric & deployment automation scripts (`infra/`).
-- [ ] **Feature 8.3**: End-to-end simulated clinic call flow verification (`tests/test_e2e.py`).
+- [ ] **Feature 8.1**: RTL Receptionist Portal, Live Queue, WhatsApp Outbox & 1-Click Doctor Apology (`src/dashboard/app.py`, `src/dashboard/pages/` — call logs, daily appointments queue, receptionist escalations, WhatsApp status monitor, and 1-click shift apology wired to `FastAPI`).
+- [ ] **Feature 8.2**: Multi-Stage `12-Factor` Dockerization & Compose Stack (`Dockerfile`, `docker-compose.yml` — clean container boundaries for `voice-worker`, `ops-api-scheduler`, `dashboard`, `postgres`, and `qdrant`, portable between single-host EC2 and ECS Fargate).
+- [ ] **Feature 8.3**: Lean AWS EC2 Production Pipeline, SSM Secrets, S3 Backups & E2E Smoke Suite (`.github/workflows/deploy.yml`, `infra/aws-mvp/`, `tests/test_e2e_mvp.py` — `AWS ECR` image push, `SSM Parameter Store` secrets, automated `PostgreSQL` backups to `S3`, and full booking -> reminder -> doctor apology end-to-end verification).
+
+### Phase 9: Post-MVP Enterprise Scale, Multi-Branch Isolation & Observability 📈
+*Goal: Scale the platform for multi-branch hospital groups once MVP clinic ROI is proven — full Prometheus/Grafana telemetry, online sampled evaluation, OIDC SSO/RBAC, cryptographic tenant isolation, 50-call load testing, and AWS ECS Fargate + RDS migration.*
+
+- [ ] **Feature 9.1**: Prometheus Metrics Exporter & Grafana/Alertmanager Dashboards (`src/ops/metrics.py`, `infra/observability/` — bounded labels only, P95 latency & budget alerts).
+- [ ] **Feature 9.2**: Online Sampled Evaluation (`src/ops/online_eval.py` — async RAGAS on 10% of production traces + sampled Llama Guard pushed to Langfuse).
+- [ ] **Feature 9.3**: OIDC SSO & RBAC (`src/auth/` — pluggable Keycloak local / Microsoft Entra ID prod; roles `admin`, `receptionist`, `doctor`, `viewer`).
+- [ ] **Feature 9.4**: Multi-Branch Tenant Isolation & Role-Scoped Tools (`tenant_id`/`branch_id` pre-retrieval filtering across Qdrant and PostgreSQL).
+- [ ] **Feature 9.5**: 50-Call Load Testing, Formal SLI/SLO/SLA Contract & AWS ECS Fargate + RDS Migration (`tests/load/`, `spec/sla.md`, `infra/ecs/`).
