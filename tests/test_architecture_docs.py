@@ -40,6 +40,9 @@ EXPECTED_ADR_FILES: tuple[str, ...] = (
     "007-owasp-trust-layer.md",
     "008-three-tier-cache-ladder.md",
     "009-state-machine-over-agent-loop.md",
+    "010-e164-and-whatsapp-contact-separation.md",
+    "011-whatsapp-adapter-and-db-outbox.md",
+    "012-lean-aws-ec2-to-ecs-deployment.md",
 )
 
 REQUIRED_METADATA_MARKERS: tuple[str, ...] = (
