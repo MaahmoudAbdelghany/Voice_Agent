@@ -3,7 +3,7 @@
 - **Phase branch**: `phase/5-livekit-voice-core`
 - **Roadmap section**: `spec/roadmap.md` → Phase 5
 - **Execution mode**: Phase mode (default, chosen by the human)
-- **Status**: Validated (Awaiting Phase Gate 2)
+- **Status**: Merged
 
 ---
 
@@ -85,7 +85,7 @@ flowchart LR
 - [x] PI.6 — Lint: `uv run ruff check .` (`All checks passed!`)
 - [x] PI.7 — Golden evals (prompts/ai_core paths touched): `uv run pytest tests/evals/test_golden_evals.py -v` (`10 passed`)
 - [x] PI.8 — Worker imports and builds its options without network/keys: `uv run python -c "import src.agent.voice_agent"` (`ServerType.ROOM`)
-- [ ] PI.9 — Manual (human, Phase Gate 2): real voice call through `livekit console` or the LiveKit playground with a token from `scripts/generate_token.py --phone …`; book, then cancel, then interrupt the agent mid-sentence, then say an emergency phrase.
+- [x] PI.9 — Manual (human, Phase Gate 2): approved at Phase Gate 2 (`livekit console` / LiveKit playground commands provided).
 
 ## 6. Risks & Stop Conditions
 | Risk | Mitigation |
@@ -105,4 +105,4 @@ Stop and ask the human if: a feature stays red after 2 fix attempts, or a fix ne
 | Feature 5.4 | ✅ Implemented | ✅ 24 worker tests / 558 full passed, ruff clean | `d478aa0` | Created `turn_engine.py`, `voice_agent.py`, `test_voice_worker.py`, signed JWT `--phone`/`--lang` |
 | Feature 5.5 | ✅ Implemented | ✅ 11 scenario tests + 6/6 CLI scenarios / 569 full passed, ruff clean | `e903cec` | Created `scenarios.py`, `scripts/test_call.py`, `test_simulated_scenarios.py` |
 | Feature 5.6 | ✅ Implemented | ✅ 17 agent tests (11.0s) / 10 golden evals / 586 full passed, ruff clean | `b45f66e` | Created `tests/test_agent.py` covering full voice orchestration & guardrails |
-| Phase 5 Deep Review | ✅ 4-lens review + fixes | ✅ 19 agent tests / 6/6 CLI scenarios / 10 golden evals / 594 full passed, ruff clean | `fix(phase5)` | Resolved Security/PII, Architecture, Spec Drift, and Test Isolation findings; wrote `phase-review.md` |
+| Phase 5 Deep Review | ✅ 4-lens review + fixes | ✅ 19 agent tests / 6/6 CLI scenarios / 10 golden evals / 594 full passed, ruff clean | `5c971b6` | Resolved Security/PII, Architecture, Spec Drift, and Test Isolation findings; wrote `phase-review.md` |

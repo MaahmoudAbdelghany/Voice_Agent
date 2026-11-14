@@ -82,12 +82,12 @@
 ---
 
 ## 5. Verdict
-- **Status**: `APPROVED-PENDING-HUMAN`
-- **Local commits ready on `phase/5-livekit-voice-core`**:
+- **Status**: `APPROVED` (Approved at Phase Gate 2)
+- **Local commits on `phase/5-livekit-voice-core`**:
   1. `2ad640d` — `docs(spec): add Phase 5 specs`
   2. `92aac2c` — `feat(agent): implement Feature 5.3 legacy restaurant purge and codebase sanitization`
   3. `d478aa0` — `feat(agent): implement Feature 5.4 LiveKit voice pipeline worker and clinic turn engine`
   4. `e903cec` — `feat(agent): implement Feature 5.5 CLI simulated call runner and clinic scenarios`
   5. `b45f66e` — `feat(tests): implement Feature 5.6 automated voice orchestration and guardrail test suite`
-  6. `fix(phase5): resolve deep-review security, architecture, test isolation, and docs findings`
-- **Next step**: **Phase Gate 2** — waiting for human approval (and manual live voice call verification `PI.9`) before running `sdd-changelog`, pushing `phase/5-livekit-voice-core`, and merging to `main`.
+  6. `5c971b6` — `fix(phase5): resolve deep-review security, architecture, test isolation, and docs findings`
+- **Next step**: Update `CHANGELOG.md`, push `phase/5-livekit-voice-core`, and merge into `main`.

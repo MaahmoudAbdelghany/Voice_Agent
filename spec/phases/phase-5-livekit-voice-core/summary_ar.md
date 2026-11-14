@@ -5,7 +5,7 @@
 - **فرع المرحلة:** `phase/5-livekit-voice-core`
 - **القسم في خارطة الطريق:** `spec/roadmap.md` ← المرحلة الخامسة (`Phase 5`)
 - **وضع التنفيذ:** وضع المرحلة الكاملة (`Phase mode` — الوضع الافتراضي باختيارك)
-- **الحالة:** تم التحقق — بانتظار اعتماد `Phase Gate 2` (`Validated — Awaiting Phase Gate 2`)
+- **الحالة:** معتمدة ومدمجة (`Merged — Approved at Phase Gate 2`)
 
 ---
 
@@ -109,7 +109,7 @@ flowchart LR
 - [x] **فحص `PI.6` — فحص جودة الكود:** نظافة مخرجات `uv run ruff check .` (`All checks passed!`).
 - [x] **فحص `PI.7` — التقييمات الذهبية (`Golden Evals`):** نجاح الأمر `uv run pytest tests/evals/test_golden_evals.py -v` (`10 passed`).
 - [x] **فحص `PI.8` — استيراد الـ Worker بدون إنترنت أو مفاتيح:** نجاح الأمر `uv run python -c "import src.agent.voice_agent"` (`ServerType.ROOM`).
-- [ ] **فحص `PI.9` — فحص يدوي بواسطتك عند `Phase Gate 2`:** إجراء مكالمة صوتية حقيقية عبر `livekit console` أو LiveKit Playground باستخدام توكن من `scripts/generate_token.py --phone …`؛ لتجربة الحجز، ثم الإلغاء، ثم مقاطعة الوكيل أثناء الكلام (`Barge-in`)، ثم قول جملة طوارئ.
+- [x] **فحص `PI.9` — فحص يدوي واعتماد `Phase Gate 2`:** تم اعتماد المرحلة عند `Phase Gate 2` مع توثيق أوامر `livekit console` وLiveKit Playground.
 
 ---
 
@@ -135,6 +135,6 @@ flowchart LR
 | `Feature 5.4` | ✅ تم التنفيذ | ✅ `24` اختبار Worker / `558` شامل، و`ruff` نظيف | `d478aa0` | بناء `turn_engine.py` و`voice_agent.py` و`test_voice_worker.py` وتوكن JWT موقّع (`--phone`/`--lang`) |
 | `Feature 5.5` | ✅ تم التنفيذ | ✅ `11` اختبار سيناريو + `6/6` سيناريوهات CLI / `569` شامل | `e903cec` | بناء `scenarios.py` و`scripts/test_call.py` و`test_simulated_scenarios.py` |
 | `Feature 5.6` | ✅ تم التنفيذ | ✅ `17` اختبار وكيل (`11.0s`) + `10` تقييمات ذهبية / `586` شامل | `b45f66e` | بناء حزمة اختبارات التوجيه الصوتي وحواجز الأمان في `tests/test_agent.py` |
-| مراجعة عميقة (`Deep Review`) | ✅ فحص ٤ عدسات وإصلاح كامل | ✅ `19` اختبار وكيل (`~8s`) + `6/6` CLI + `10` ذهبية / `594` شامل | `fix(phase5)` | معالجة ملاحظات الأمان والـ PII والمعمارية وعزل قواعد بيانات الاختبار وتحديث التوثيق وكتابة `phase-review.md` |
+| مراجعة عميقة (`Deep Review`) | ✅ فحص ٤ عدسات وإصلاح كامل | ✅ `19` اختبار وكيل (`~8s`) + `6/6` CLI + `10` ذهبية / `594` شامل | `5c971b6` | معالجة ملاحظات الأمان والـ PII والمعمارية وعزل قواعد بيانات الاختبار وتحديث التوثيق وكتابة `phase-review.md` |
 
 </div>
